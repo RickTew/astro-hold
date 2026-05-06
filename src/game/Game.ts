@@ -36,8 +36,8 @@ export class Game {
     this.scene.background = new THREE.Color(0x1b1610)  // matches terrain base
 
     const halfH = 600 / (window.innerWidth / window.innerHeight)
-    this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 0.1, 1000)
-    this.camera.position.set(0, 0, 100)
+    this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 1, 1500)
+    this.camera.position.set(0, 300, 300)
     this.camera.lookAt(0, 0, 0)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -164,8 +164,12 @@ export class Game {
     const dy = e.clientY - this.lastPan.y
     const ww = this.camera.right - this.camera.left
     const wh = this.camera.top - this.camera.bottom
-    this.camera.position.x -= (dx / window.innerWidth) * ww
-    this.camera.position.y += (dy / window.innerHeight) * wh
+    // Camera right = world X; camera up = (0, 0.707, -0.707) at 45° tilt
+    const panX = (dx / window.innerWidth) * ww
+    const panY = (dy / window.innerHeight) * wh
+    this.camera.position.x -= panX
+    this.camera.position.y += panY * 0.707
+    this.camera.position.z -= panY * 0.707
     this.lastPan = { x: e.clientX, y: e.clientY }
   }
 

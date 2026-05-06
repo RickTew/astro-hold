@@ -6,13 +6,12 @@ import { Projectile } from '../entities/Projectile'
 import { Explosion } from '../entities/Explosion'
 import { PowerCore } from '../entities/PowerCore'
 
-const TURN_INTERVAL = 0.65   // seconds between turns
 const MINE_DETECT_RADIUS = 65
 
 export class BattlePhase {
   private projectiles: Projectile[] = []
   private explosions: Explosion[] = []
-  private turnTimer = TURN_INTERVAL
+  private turnTimer = Config.TURN_INTERVAL
   private unitIdx = 0
   private structIdx = 0
   private isUnitTurn = true
@@ -53,7 +52,7 @@ export class BattlePhase {
 
     this.turnTimer -= delta
     if (this.turnTimer > 0) return
-    this.turnTimer = TURN_INTERVAL
+    this.turnTimer = Config.TURN_INTERVAL
 
     this.executeTurn()
   }
@@ -130,8 +129,7 @@ export class BattlePhase {
     } else {
       const nx = unit.worldX + (dx / dist) * unit.speed
       const ny = unit.worldY + (dy / dist) * unit.speed
-      unit.mesh.position.x = nx
-      unit.mesh.position.y = ny
+      unit.moveTo(nx, ny)
       // Re-check mines after moving
       this.checkMines(unit)
     }

@@ -4,7 +4,8 @@ export const Config = {
   ATTACKER_MIN_X: 200,
   GRID_CELL: 50,
   START_CREDITS: 200,
-  POWER_CORE: { X: -550, Y: 0, HP: 100, RADIUS: 25 },
+  TURN_INTERVAL: 0.65,   // seconds per battle turn — also drives unit move speed
+  POWER_CORE: { X: -550, Y: 0, HP: 100, RADIUS: 18 },
 
   STRUCTURES: {
     turret: { cost: 30, hp: 80,  damage: 15, range: 200, fireInterval: 2, label: 'Turret 30cr' },

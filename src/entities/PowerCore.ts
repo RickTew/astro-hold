@@ -31,12 +31,13 @@ export class PowerCore {
     this.coreMesh = new THREE.Mesh(geo, mat)
     this.mesh.add(this.coreMesh)
 
-    // HP bar background
+    // HP bar background — tilted to face the 45° top-down camera
     const bgBar = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
       new THREE.MeshBasicMaterial({ color: 0x222222 })
     )
     bgBar.position.set(0, 44, 0.1)
+    bgBar.rotation.x = -Math.PI / 4
     this.mesh.add(bgBar)
 
     // HP bar fill
@@ -45,6 +46,7 @@ export class PowerCore {
       new THREE.MeshBasicMaterial({ color: 0x00ff88 })
     )
     this.hpBar.position.set(0, 44, 0.2)
+    this.hpBar.rotation.x = -Math.PI / 4
     this.mesh.add(this.hpBar)
 
     scene.add(this.mesh)

@@ -44,7 +44,7 @@ export class BuildPhase {
   }
 
   private buildGrid() {
-    const mat = new THREE.LineBasicMaterial({ color: 0x1a3a55, transparent: true, opacity: 0.6 } as THREE.LineBasicMaterialParameters)
+    const mat = new THREE.LineBasicMaterial({ color: 0x1a3a55, transparent: true, opacity: 0.25 } as THREE.LineBasicMaterialParameters)
     for (let c = 0; c <= COLS; c++) {
       const x = Config.WORLD.LEFT + c * Config.GRID_CELL
       const pts = [
