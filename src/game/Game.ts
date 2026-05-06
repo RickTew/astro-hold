@@ -31,7 +31,7 @@ export class Game {
 
   constructor(private canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x0d0b08)
+    this.scene.background = new THREE.Color(0x1b1610)  // matches terrain base
 
     const halfH = 600 / (window.innerWidth / window.innerHeight)
     this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 0.1, 1000)

@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { Config } from '../game/GameConfig'
 
 // Adjust scale when sphere.glb is loaded — Meshy models vary in size
-const SPHERE_SCALE = 0.06
+const SPHERE_SCALE = 1.5  // Meshy sphere — tune up/down until it fills the power core ring
 
 export class PowerCore {
   readonly mesh: THREE.Group
