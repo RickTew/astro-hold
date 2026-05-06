@@ -7,71 +7,100 @@ export class Background {
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group()
     this.buildGround()
-    this.buildTerrainDetail()
     this.buildZoneOverlays()
     scene.add(this.group)
   }
 
   private buildGround() {
-    const geo = new THREE.PlaneGeometry(1400, 600)
-    const mat = new THREE.MeshBasicMaterial({ color: 0x1a1410 })
+    const size = 512
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+
+    // Base rocky ground color
+    ctx.fillStyle = '#1b1610'
+    ctx.fillRect(0, 0, size, size)
+
+    // Random organic rock specks — dark tones
+    for (let i = 0; i < 4000; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      const r = Math.random() * 5 + 0.5
+      const v = Math.floor(Math.random() * 20 + 6)
+      ctx.fillStyle = `rgb(${v + 16},${v + 11},${v + 4})`
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Lighter mineral highlights
+    for (let i = 0; i < 600; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      const r = Math.random() * 2.5 + 0.3
+      const v = Math.floor(Math.random() * 15 + 28)
+      ctx.fillStyle = `rgb(${v + 12},${v + 8},${v + 3})`
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Subtle crack lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < 30; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 60)
+      ctx.stroke()
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    texture.repeat.set(7, 4)
+
+    const geo = new THREE.PlaneGeometry(1600, 1000)
+    const mat = new THREE.MeshBasicMaterial({ map: texture })
     const plane = new THREE.Mesh(geo, mat)
     plane.position.z = -6
     this.group.add(plane)
   }
 
-  private buildTerrainDetail() {
-    const patches: Array<{ x: number; y: number; w: number; h: number; color: number }> = [
-      { x: -520, y:  100, w:  90, h: 60, color: 0x221a14 },
-      { x: -300, y:  -80, w: 130, h: 45, color: 0x0e0c09 },
-      { x:  -80, y:   70, w: 200, h: 80, color: 0x1e1812 },
-      { x:  260, y: -120, w: 110, h: 55, color: 0x231b13 },
-      { x:  450, y:   80, w:  90, h: 70, color: 0x0e0c09 },
-      { x: -100, y: -150, w: 150, h: 50, color: 0x201810 },
-      { x:  320, y:  140, w:  80, h: 45, color: 0x1a1208 },
-      { x: -400, y: -100, w:  65, h: 90, color: 0x0c0a07 },
-      { x:  150, y:   60, w:  70, h: 60, color: 0x181410 },
-      { x: -200, y:  120, w: 110, h: 50, color: 0x120f0b },
-      { x:   50, y: -170, w:  90, h: 40, color: 0x161210 },
-      { x: -480, y:  -60, w:  50, h: 75, color: 0x1c1610 },
-    ]
-    for (const p of patches) {
-      const geo = new THREE.PlaneGeometry(p.w, p.h)
-      const mat = new THREE.MeshBasicMaterial({ color: p.color })
-      const mesh = new THREE.Mesh(geo, mat)
-      mesh.position.set(p.x, p.y, -5.5)
-      this.group.add(mesh)
-    }
-  }
-
   private buildZoneOverlays() {
-    const H = Config.WORLD.TOP - Config.WORLD.BOTTOM
+    const H = 1000  // tall enough to cover any screen
 
+    // Defender zone — blue tint
     const defMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(400, H),
-      new THREE.MeshBasicMaterial({ color: 0x001133, transparent: true, opacity: 0.4 })
+      new THREE.MeshBasicMaterial({ color: 0x001133, transparent: true, opacity: 0.35 })
     )
     defMesh.position.set(-400, 0, -4)
     this.group.add(defMesh)
 
+    // Attacker zone — red tint
     const attMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(400, H),
-      new THREE.MeshBasicMaterial({ color: 0x1a0008, transparent: true, opacity: 0.4 })
+      new THREE.MeshBasicMaterial({ color: 0x1a0008, transparent: true, opacity: 0.35 })
     )
     attMesh.position.set(400, 0, -4)
     this.group.add(attMesh)
 
+    // Zone divider lines
     const lineMat = new THREE.LineBasicMaterial({ color: 0x2a4a66 })
     const mkLine = (pts: THREE.Vector3[]) =>
       new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat)
 
     this.group.add(mkLine([
-      new THREE.Vector3(-200, Config.WORLD.BOTTOM, -3),
-      new THREE.Vector3(-200, Config.WORLD.TOP, -3),
+      new THREE.Vector3(-200, -500, -3),
+      new THREE.Vector3(-200,  500, -3),
     ]))
     this.group.add(mkLine([
-      new THREE.Vector3(200, Config.WORLD.BOTTOM, -3),
-      new THREE.Vector3(200, Config.WORLD.TOP, -3),
+      new THREE.Vector3(200, -500, -3),
+      new THREE.Vector3(200,  500, -3),
     ]))
   }
 

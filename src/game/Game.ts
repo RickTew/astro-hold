@@ -33,7 +33,8 @@ export class Game {
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x0d0b08)
 
-    this.camera = new THREE.OrthographicCamera(-600, 600, 200, -200, 0.1, 1000)
+    const halfH = 600 / (window.innerWidth / window.innerHeight)
+    this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 0.1, 1000)
     this.camera.position.set(0, 0, 100)
     this.camera.lookAt(0, 0, 0)
 
@@ -117,6 +118,10 @@ export class Game {
     const { innerWidth: w, innerHeight: h } = window
     if (w === 0 || h === 0) return
     this.renderer.setSize(w, h)
+    const halfH = 600 / (w / h)
+    this.camera.top    =  halfH
+    this.camera.bottom = -halfH
+    this.camera.updateProjectionMatrix()
   }
 
   private onWheel = (e: WheelEvent) => {
