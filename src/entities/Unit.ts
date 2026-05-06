@@ -206,11 +206,12 @@ export class Unit {
   }
 
   private buildHpBar(): THREE.Mesh {
+    // y=52 puts bar above the head (model head is at ~y=41 with MODEL_SCALE=25)
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(30, 4),
       new THREE.MeshBasicMaterial({ color: 0x222222 })
     )
-    bg.position.set(0, 28, 0.1)
+    bg.position.set(0, 52, 0.1)
     bg.rotation.x = HP_BAR_TILT
     this.mesh.add(bg)
 
@@ -218,7 +219,7 @@ export class Unit {
       new THREE.PlaneGeometry(30, 4),
       new THREE.MeshBasicMaterial({ color: 0x00cc44 })
     )
-    fill.position.set(0, 28, 0.2)
+    fill.position.set(0, 52, 0.2)
     fill.rotation.x = HP_BAR_TILT
     this.mesh.add(fill)
     return fill

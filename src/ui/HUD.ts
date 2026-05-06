@@ -22,11 +22,12 @@ export class HUD {
     this.container.innerHTML = `
       <div id="loading-screen">LOADING ASSETS...</div>
       <div id="phase-display" class="hidden">BUILD PHASE</div>
+      <div id="team-label-def" class="hidden">ROBOTS</div>
       <div id="credits-display" class="hidden">Credits: <span id="credits-val">200</span></div>
+      <div id="team-label-att" class="hidden">CYBORGS</div>
       <div id="att-credits-display" class="hidden">Credits: <span id="att-credits-val">200</span></div>
       <div id="bottom-bar" class="hidden">
         <div id="shop" class="shop-panel">
-          <span class="panel-label">DEFENDER</span>
           <button class="shop-btn" data-type="turret">Turret 30cr</button>
           <button class="shop-btn" data-type="cannon">Cannon 60cr</button>
           <button class="shop-btn" data-type="wall">Wall 20cr</button>
@@ -34,7 +35,6 @@ export class HUD {
         </div>
         <button id="battle-btn">&#9876; BATTLE</button>
         <div id="attacker-shop" class="shop-panel att-panel">
-          <span class="panel-label">ATTACKER</span>
           <button class="att-btn" data-type="scout">Scout 20cr</button>
           <button class="att-btn" data-type="tank">Tank 50cr</button>
           <button class="att-btn" data-type="bomber">Bomber 60cr</button>
@@ -74,6 +74,9 @@ export class HUD {
     this.loadingEl.classList.add('hidden')
     this.phaseEl.classList.remove('hidden')
     this.container.querySelector('#credits-display')!.classList.remove('hidden')
+    this.container.querySelector('#att-credits-display')!.classList.remove('hidden')
+    this.container.querySelector('#team-label-def')!.classList.remove('hidden')
+    this.container.querySelector('#team-label-att')!.classList.remove('hidden')
   }
 
   setCredits(amount: number) {
@@ -89,13 +92,11 @@ export class HUD {
       case 'build':
         this.phaseEl.textContent = 'BUILD PHASE'
         this.bottomBarEl.classList.remove('hidden')
-        this.container.querySelector('#att-credits-display')!.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'battle':
         this.phaseEl.textContent = 'BATTLE PHASE'
         this.bottomBarEl.classList.add('hidden')
-        this.container.querySelector('#att-credits-display')!.classList.add('hidden')
         break
       case 'win':
         this.phaseEl.textContent = 'BATTLE PHASE'

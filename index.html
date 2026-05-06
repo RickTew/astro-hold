@@ -29,42 +29,63 @@
       text-shadow: 0 0 12px #0088ff;
     }
 
+    #team-label-def {
+      position: absolute;
+      top: 8px; left: 20px;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #66aaff;
+      text-shadow: 0 0 8px #0066cc;
+    }
+
+    #team-label-att {
+      position: absolute;
+      top: 8px; right: 20px;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #ff6666;
+      text-shadow: 0 0 8px #cc0000;
+      text-align: right;
+    }
+
     #credits-display {
       position: absolute;
-      top: 18px; left: 20px;
-      font-size: 16px;
+      top: 26px; left: 20px;
+      font-size: 14px;
       color: #aaddff;
     }
 
     #att-credits-display {
       position: absolute;
-      top: 18px; right: 20px;
-      font-size: 16px;
+      top: 26px; right: 20px;
+      font-size: 14px;
       color: #ffaaaa;
       text-align: right;
     }
 
-    /* Bottom bar — holds both shops and battle button, never overlaps */
+    /* Bottom bar — single row, scrolls horizontally on narrow windows */
     #bottom-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       display: flex;
-      align-items: stretch;
+      align-items: center;
       justify-content: space-between;
       gap: 10px;
       padding: 10px 16px;
       background: rgba(0, 0, 0, 0.45);
+      overflow-x: auto;
     }
 
     .shop-panel {
       display: flex;
       gap: 8px;
       align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       padding: 6px 12px;
       border: 1px solid #1a4466;
       background: rgba(0, 8, 20, 0.8);
       min-width: 0;
+      overflow-x: auto;
     }
 
     .att-panel {
