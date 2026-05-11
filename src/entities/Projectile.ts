@@ -8,6 +8,7 @@ export class Projectile {
   isDone = false
   targetX: number
   targetY: number
+  onHit: (() => void) | null = null
 
   constructor(
     private scene: THREE.Scene,

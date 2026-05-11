@@ -59,19 +59,19 @@ export class Unit {
     ))
   }
 
-  constructor(scene: THREE.Scene, type: UnitType, spawnX: number) {
+  constructor(scene: THREE.Scene, type: UnitType, spawnX: number, spawnY?: number) {
     this.type = type
     this.hp = this.maxHp = Config.UNITS[type].hp
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
 
     const spread = Config.WORLD.TOP - Config.WORLD.BOTTOM - 40
-    const spawnY = (Math.random() - 0.5) * spread
+    const y = spawnY ?? (Math.random() - 0.5) * spread
 
     this.logicalX = spawnX
-    this.logicalY = spawnY
+    this.logicalY = y
 
     this.mesh = new THREE.Group()
-    this.mesh.position.set(spawnX, spawnY, 0)
+    this.mesh.position.set(spawnX, y, 0)
 
     this.swapAnim('idle')
     this.hpBarFill = this.buildHpBar()
@@ -93,15 +93,15 @@ export class Unit {
   takeDamage(amount: number) {
     if (this.isDead) return
     this.hp = Math.max(0, this.hp - amount)
+    const ratio = this.hp / this.maxHp
+    this.hpBarFill.scale.x = ratio
+    this.hpBarFill.position.x = -(1 - ratio) * 15
+    const mat = this.hpBarFill.material as THREE.MeshBasicMaterial
+    mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     if (this.hp <= 0) {
       this.kill()
     } else {
       this.flashHit()
-      const ratio = this.hp / this.maxHp
-      this.hpBarFill.scale.x = ratio
-      this.hpBarFill.position.x = -(1 - ratio) * 15
-      const mat = this.hpBarFill.material as THREE.MeshBasicMaterial
-      mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     }
   }
 
@@ -147,12 +147,11 @@ export class Unit {
       }
     }
 
-    // Death cleanup timer
+    // Body stays on ground — stop updating mixer after animation settles
     if (this.isDead && !this.isDisposed) {
       this.dyingTimer -= delta
       if (this.dyingTimer <= 0) {
-        this.mesh.removeFromParent()
-        this.isDisposed = true
+        this.isDisposed = true  // stop ticking mixer; body stays in scene
       }
     }
   }

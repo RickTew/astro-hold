@@ -11,6 +11,7 @@ export class HUD {
 
   onSelectStructure: ((type: StructureType) => void) | null = null
   onSpawnUnit: ((type: UnitType) => void) | null = null
+  onBuySphere: (() => void) | null = null
   onBattle: (() => void) | null = null
 
   constructor() {
@@ -28,17 +29,11 @@ export class HUD {
       <div id="att-credits-display" class="hidden">Credits: <span id="att-credits-val">200</span></div>
       <div id="bottom-bar" class="hidden">
         <div id="shop" class="shop-panel">
-          <button class="shop-btn" data-type="turret">Turret 30cr</button>
-          <button class="shop-btn" data-type="cannon">Cannon 60cr</button>
-          <button class="shop-btn" data-type="wall">Wall 20cr</button>
-          <button class="shop-btn" data-type="mine">Mine 20cr</button>
+          <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
         </div>
-        <button id="battle-btn">&#9876; BATTLE</button>
+        <button id="battle-btn">BATTLE</button>
         <div id="attacker-shop" class="shop-panel att-panel">
-          <button class="att-btn" data-type="scout">Scout 20cr</button>
-          <button class="att-btn" data-type="tank">Tank 50cr</button>
-          <button class="att-btn" data-type="bomber">Bomber 60cr</button>
-          <button class="att-btn" data-type="drone">Drone 30cr</button>
+          <button class="att-btn" data-type="scout">Cyborg 20cr</button>
         </div>
       </div>
       <div id="game-message" class="hidden"></div>
@@ -51,7 +46,11 @@ export class HUD {
     this.bottomBarEl   = this.container.querySelector('#bottom-bar')!
     this.messageEl     = this.container.querySelector('#game-message')!
 
-    this.container.querySelectorAll('.shop-btn').forEach(btn => {
+    this.container.querySelector('#sphere-btn')?.addEventListener('click', () => {
+      this.onBuySphere?.()
+    })
+
+    this.container.querySelectorAll('.shop-btn:not(#sphere-btn)').forEach(btn => {
       btn.addEventListener('click', e => {
         const type = (e.currentTarget as HTMLElement).dataset.type as StructureType
         this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))
@@ -67,7 +66,10 @@ export class HUD {
       })
     })
 
-    this.container.querySelector('#battle-btn')!.addEventListener('click', () => this.onBattle?.())
+    this.container.querySelector('#battle-btn')!.addEventListener('click', () => {
+      this.playBattleSound()
+      this.onBattle?.()
+    })
   }
 
   showGame() {
@@ -85,6 +87,18 @@ export class HUD {
 
   setAttCredits(amount: number) {
     this.attCreditsEl.textContent = String(amount)
+  }
+
+  markSpherePurchased() {
+    const btn = this.container.querySelector('#sphere-btn') as HTMLButtonElement | null
+    if (btn) { btn.textContent = 'Sphere ✓'; btn.disabled = true }
+  }
+
+  setSelectedUnitType(type: UnitType | null) {
+    this.container.querySelectorAll('.att-btn').forEach(b => b.classList.remove('selected'))
+    if (type) {
+      this.container.querySelector(`.att-btn[data-type="${type}"]`)?.classList.add('selected')
+    }
   }
 
   setPhase(phase: 'build' | 'battle' | 'win' | 'lose') {
@@ -111,6 +125,24 @@ export class HUD {
         this.messageEl.classList.remove('hidden')
         break
     }
+  }
+
+  private playBattleSound() {
+    try {
+      const ctx = new AudioContext()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(220, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.35)
+      gain.gain.setValueAtTime(0.25, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.45)
+      osc.onended = () => ctx.close()
+    } catch { /* audio unavailable */ }
   }
 
   dispose() {

@@ -15,10 +15,10 @@ export const Config = {
   },
 
   UNITS: {
-    scout:  { cost: 20, hp: 30,  speed: 65,  damage: 10, range: 130, aoeRadius: 0,  label: 'Scout',  color: 0x4488ff },
-    tank:   { cost: 50, hp: 200, speed: 22,  damage: 25, range: 100, aoeRadius: 0,  label: 'Tank',   color: 0xff4444 },
-    bomber: { cost: 60, hp: 80,  speed: 35,  damage: 35, range: 80,  aoeRadius: 80, label: 'Bomber', color: 0xff8800 },
-    drone:  { cost: 30, hp: 20,  speed: 80,  damage: 8,  range: 180, aoeRadius: 0,  label: 'Drone',  color: 0x44ffff },
+    scout:  { cost: 20, hp: 120, speed: 130, damage: 10, range: 280, aoeRadius: 0,  label: 'Scout',  color: 0x4488ff },
+    tank:   { cost: 50, hp: 200, speed: 44,  damage: 25, range: 200, aoeRadius: 0,  label: 'Tank',   color: 0xff4444 },
+    bomber: { cost: 60, hp: 80,  speed: 70,  damage: 35, range: 160, aoeRadius: 80, label: 'Bomber', color: 0xff8800 },
+    drone:  { cost: 30, hp: 20,  speed: 160, damage: 8,  range: 350, aoeRadius: 0,  label: 'Drone',  color: 0x44ffff },
   },
 } as const
 

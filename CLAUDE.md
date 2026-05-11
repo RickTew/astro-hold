@@ -1,6 +1,6 @@
 # AstroHold — Project Rules for Claude
 
-## Stack (locked)
+## Stack 
 - Package manager: pnpm
 - Bundler: Vite 8 (Rolldown inside)
 - Renderer: Three.js r184
@@ -13,11 +13,11 @@
 - Zip archives go in `/_zips/`
 
 ## Key constants to know
-- World: x -600 to 600, y -350 to 350
+- World: x -600 to 600, y -200 to 200
 - Defender zone: x < -200 | Attacker zone: x > 200 | Battlefield: middle
 - Power Core at (-550, 0)
-- Grid cell: 50×50 in defender zone (8 cols × 14 rows)
-- Start credits: 200
+- Grid cell: 50×50 in defender zone (8 cols × 8 rows)
+- Start credits: 200 (defender + attacker each start with 200)
 
 ## Models
 - Cyborg (attacker units): `/public/models/cyborg/` — idle, running, dead, hit, walking, kick
@@ -27,11 +27,21 @@
 
 ## Architecture
 - `GameConfig.ts` — all constants, change numbers here first before touching logic
-- `Game.ts` — scene, camera, renderer, state machine (loading → build → battle → win/lose)
-- `BuildPhase.ts` — grid placement, mouse events (cleanup() removes listeners)
-- `BattlePhase.ts` — turn-based: unit acts → structure acts, alternating, TURN_INTERVAL controls speed
-- `HUD.ts` — DOM overlay only, no Three.js
+- `Game.ts` — scene, camera, renderer, state machine (loading → build → battle → win/lose); owns sphere placement flow (sphereSelecting / spherePlaced / sphereGhostMesh)
+- `BuildPhase.ts` — grid structure placement; exposes `spendCredits(n)` and `getCredits()` so Game.ts can deduct for sphere purchase
+- `BattlePhase.ts` — turn-based: ALL units act simultaneously, then ALL structures + sphere act simultaneously; TURN_INTERVAL controls speed; damage deferred via Projectile.onHit callbacks
+- `SphereDefender.ts` — defender hero; worldX/worldY are mutable (updated at placement time); range 200, HP 300, cost 100cr
+- `HUD.ts` — DOM overlay only, no Three.js; exposes onBuySphere / onSpawnUnit / onBattle / onSelectStructure callbacks; markSpherePurchased() disables button
 - HMR dispose is wired in `main.ts` + `Game.ts` — do not remove it
+
+## Rendering
+- Use `MeshBasicMaterial` for ground/overlays — MeshStandardMaterial multiplies color by ambient+directional (≈3.7×), making dark earth tones render as washed-out gray
+- Grid: neutral gray (0xaaaaaa/0x777777), opacity 0.3, z=1.5 (must be above zone tint overlays at z=-4)
+- Scene background color should match terrain darkest tone (currently 0x201b14)
+
+## Deployment
+- Always deploy with `vercel --prod` — `vercel` alone creates a preview URL that users won't see
+- Production URL: https://astrohold3.vercel.app
 
 ## Rules
 - Don't hardcode rules or patterns that don't match our actual build — verify before committing

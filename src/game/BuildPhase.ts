@@ -138,6 +138,15 @@ export class BuildPhase {
     }
   }
 
+  getCredits(): number { return this.credits }
+
+  spendCredits(amount: number): boolean {
+    if (this.credits < amount) return false
+    this.credits -= amount
+    this.hud.setCredits(this.credits)
+    return true
+  }
+
   getStructures(): Structure[] { return this.structures }
 
   cleanup() {

@@ -5,6 +5,7 @@ import { Structure } from '../entities/Structure'
 import { Projectile } from '../entities/Projectile'
 import { Explosion } from '../entities/Explosion'
 import { PowerCore } from '../entities/PowerCore'
+import { SphereDefender } from '../entities/SphereDefender'
 
 const MINE_DETECT_RADIUS = 65
 
@@ -12,8 +13,6 @@ export class BattlePhase {
   private projectiles: Projectile[] = []
   private explosions: Explosion[] = []
   private turnTimer = Config.TURN_INTERVAL
-  private unitIdx = 0
-  private structIdx = 0
   private isUnitTurn = true
   private over = false
 
@@ -24,19 +23,22 @@ export class BattlePhase {
     private scene: THREE.Scene,
     private core: PowerCore,
     private units: Unit[],
-    private structures: Structure[]
+    private structures: Structure[],
+    private sphere: SphereDefender | null = null
   ) {}
 
   update(delta: number) {
-    if (this.over) return
-
+    // Always update units so death animations and timers finish after game ends
     for (const u of this.units) u.update(delta)
+
+    if (this.over) return
 
     // Advance projectiles; apply damage on arrival
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const hit = this.projectiles[i].update(delta)
       if (hit) {
         const proj = this.projectiles[i]
+        proj.onHit?.()
         this.explosions.push(new Explosion(this.scene, proj.targetX, proj.targetY, proj.isAoe ? proj.aoeRadius : 20, 0.4))
         this.projectiles.splice(i, 1)
       }
@@ -63,14 +65,11 @@ export class BattlePhase {
     if (this.core.isDead)  { this.over = true; this.onLose?.(); return }
 
     if (this.isUnitTurn) {
-      if (this.unitIdx >= alive.length) this.unitIdx = 0
-      this.doUnitTurn(alive[this.unitIdx++])
+      for (const u of alive) this.doUnitTurn(u)
     } else {
       const activeStructs = this.structures.filter(s => !s.isDead && s.type !== 'wall' && s.type !== 'mine')
-      if (activeStructs.length) {
-        if (this.structIdx >= activeStructs.length) this.structIdx = 0
-        this.doStructureTurn(activeStructs[this.structIdx++], alive)
-      }
+      for (const s of activeStructs) this.doStructureTurn(s, alive)
+      if (this.sphere && !this.sphere.isDead) this.doSphereTurn(alive)
     }
 
     this.isUnitTurn = !this.isUnitTurn
@@ -101,41 +100,59 @@ export class BattlePhase {
       }
     }
 
-    // Engage nearest structure within attack range (fight mode)
+    // Check if sphere defender is in range
+    if (this.sphere && !this.sphere.isDead) {
+      const sdx = this.sphere.worldX - unit.worldX
+      const sdy = this.sphere.worldY - unit.worldY
+      if (Math.sqrt(sdx * sdx + sdy * sdy) <= unit.range) {
+        const proj = new Projectile(
+          this.scene, unit.worldX, unit.worldY + 20, null,
+          this.sphere.worldX, this.sphere.worldY + 12,
+          unit.damage, false, 0, 0x00ccff
+        )
+        const sphere = this.sphere
+        proj.onHit = () => sphere.takeDamage(unit.damage)
+        this.projectiles.push(proj)
+        return
+      }
+    }
+
+    // Engage nearest structure within attack range
     let nearestStruct: typeof this.structures[0] | null = null
     let nearestStructDist: number = unit.range
     for (const s of this.structures) {
-      if (s.isDead || s.type === 'wall') continue   // can't shoot through walls
+      if (s.isDead || s.type === 'wall') continue
       const dx = s.worldX - unit.worldX
       const dy = s.worldY - unit.worldY
       const d = Math.sqrt(dx * dx + dy * dy)
-      if (d < nearestStructDist) { nearestStructDist = d; nearestStruct = s }
+      if (d <= nearestStructDist) { nearestStructDist = d; nearestStruct = s }
     }
     if (nearestStruct) {
-      // Fire cyan projectile toward structure (damage applied immediately)
-      this.projectiles.push(new Projectile(
-        this.scene,
-        unit.worldX, unit.worldY,
-        null,
-        nearestStruct.worldX, nearestStruct.worldY,
-        unit.damage,
-        unit.isBomber,
-        unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0,
-        0x00ccff   // cyan = unit shots
-      ))
-      nearestStruct.takeDamage(unit.damage)
-      if (unit.isBomber && !nearestStruct.isDead) {
+      const target = nearestStruct
+      const proj = new Projectile(
+        this.scene, unit.worldX, unit.worldY + 20, null,
+        target.worldX, target.worldY,
+        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0x00ccff
+      )
+      if (unit.isBomber) {
+        const structs = this.structures
         const aoe = Config.UNITS.bomber.aoeRadius
-        this.explosions.push(new Explosion(this.scene, nearestStruct.worldX, nearestStruct.worldY, aoe, 0.6))
-        for (const s of this.structures) {
-          if (!s.isDead) {
-            const sdx = s.worldX - nearestStruct.worldX
-            const sdy = s.worldY - nearestStruct.worldY
-            if (Math.sqrt(sdx * sdx + sdy * sdy) < aoe) s.takeDamage(unit.damage * 0.5)
+        proj.onHit = () => {
+          target.takeDamage(unit.damage)
+          for (const s of structs) {
+            if (!s.isDead) {
+              const sdx = s.worldX - target.worldX
+              const sdy = s.worldY - target.worldY
+              if (Math.sqrt(sdx * sdx + sdy * sdy) < aoe) s.takeDamage(unit.damage * 0.5)
+            }
           }
+          unit.kill()
         }
+      } else {
+        proj.onHit = () => target.takeDamage(unit.damage)
       }
-      return   // attacked this turn — don't also move
+      this.projectiles.push(proj)
+      return
     }
 
     // No structure in range — move toward power core
@@ -146,22 +163,31 @@ export class BattlePhase {
     const dist = Math.sqrt(dx * dx + dy * dy)
 
     if (dist <= Config.POWER_CORE.RADIUS + 20) {
-      // Attack the core
+      const unitX = unit.worldX
+      const unitY = unit.worldY + 20
+      const proj = new Projectile(
+        this.scene, unitX, unitY, null, tx, ty,
+        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0x00ccff
+      )
+      const coreRef = this.core
       if (unit.isBomber) {
+        const structs = this.structures
         const aoe = Config.UNITS.bomber.aoeRadius
-        this.core.takeDamage(unit.damage)
-        this.explosions.push(new Explosion(this.scene, unit.worldX, unit.worldY, aoe, 0.8))
-        for (const s of this.structures) {
-          if (!s.isDead) {
-            const sdx = s.worldX - unit.worldX
-            const sdy = s.worldY - unit.worldY
-            if (Math.sqrt(sdx * sdx + sdy * sdy) < aoe) s.takeDamage(unit.damage * 0.4)
+        proj.onHit = () => {
+          coreRef.takeDamage(unit.damage)
+          for (const s of structs) {
+            if (!s.isDead) {
+              const sdx = s.worldX - unitX
+              const sdy = s.worldY - unitY
+              if (Math.sqrt(sdx * sdx + sdy * sdy) < aoe) s.takeDamage(unit.damage * 0.4)
+            }
           }
+          unit.kill()
         }
-        unit.kill()
       } else {
-        this.core.takeDamage(unit.damage)
+        proj.onHit = () => coreRef.takeDamage(unit.damage)
       }
+      this.projectiles.push(proj)
     } else {
       const nx = unit.worldX + (dx / dist) * unit.speed
       const ny = unit.worldY + (dy / dist) * unit.speed
@@ -191,6 +217,28 @@ export class BattlePhase {
     }
   }
 
+  private doSphereTurn(aliveUnits: Unit[]) {
+    if (!this.sphere || this.sphere.isDead) return
+    let nearest: Unit | null = null
+    let nearestDist: number = this.sphere.range
+    for (const u of aliveUnits) {
+      const dx = u.worldX - this.sphere.worldX
+      const dy = u.worldY - this.sphere.worldY
+      const d = Math.sqrt(dx * dx + dy * dy)
+      if (d <= nearestDist) { nearestDist = d; nearest = u }
+    }
+    if (!nearest) return
+    const target = nearest
+    const sphere = this.sphere
+    const proj = new Projectile(
+      this.scene, this.sphere.worldX, this.sphere.worldY + 12,
+      target, target.worldX, target.worldY + 20,
+      this.sphere.damage, false, 0, 0xffee00
+    )
+    proj.onHit = () => target.takeDamage(sphere.damage)
+    this.projectiles.push(proj)
+  }
+
   private doStructureTurn(structure: Structure, aliveUnits: Unit[]) {
     if (structure.isDead) return
 
@@ -201,33 +249,36 @@ export class BattlePhase {
       const dx = u.worldX - structure.worldX
       const dy = u.worldY - structure.worldY
       const d = Math.sqrt(dx * dx + dy * dy)
-      if (d < nearestDist) { nearestDist = d; nearest = u }
+      if (d <= nearestDist) { nearestDist = d; nearest = u }
     }
 
     if (!nearest) return
 
     const isAoe = structure.type === 'cannon'
     const proj = new Projectile(
-      this.scene,
-      structure.worldX, structure.worldY,
-      nearest,
-      nearest.worldX, nearest.worldY,
-      structure.damage,
-      isAoe,
-      isAoe ? 45 : 0
+      this.scene, structure.worldX, structure.worldY + 10,
+      nearest, nearest.worldX, nearest.worldY + 20,
+      structure.damage, isAoe, isAoe ? 45 : 0
     )
     this.projectiles.push(proj)
 
-    // Damage applied on projectile arrival (in update loop)
-    // Apply now for gameplay correctness; visual is the flying projectile
     if (isAoe) {
-      for (const u of aliveUnits) {
-        const dx = u.worldX - nearest.worldX
-        const dy = u.worldY - nearest.worldY
-        if (Math.sqrt(dx * dx + dy * dy) < 45) u.takeDamage(structure.damage)
+      const dmg = structure.damage
+      const allUnits = this.units
+      proj.onHit = () => {
+        const cx = proj.targetX
+        const cy = proj.targetY
+        for (const u of allUnits) {
+          if (!u.isDead) {
+            const dx = u.worldX - cx
+            const dy = u.worldY - cy
+            if (Math.sqrt(dx * dx + dy * dy) < 45) u.takeDamage(dmg)
+          }
+        }
       }
     } else {
-      nearest.takeDamage(structure.damage)
+      const target = nearest
+      proj.onHit = () => target.takeDamage(structure.damage)
     }
   }
 }
