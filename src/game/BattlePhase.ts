@@ -20,6 +20,8 @@ export class BattlePhase {
   onLose: (() => void) | null = null
 
   faceCamera(camera: THREE.Camera) {
+    // Spheres are owned + ticked by Game.ts (so their HP bars + spin keep running
+    // during build phase too); BattlePhase only reads from them for combat logic.
     for (const u of this.units) u.faceCamera(camera)
     for (const s of this.structures) if (!s.isDead) s.faceCamera(camera)
   }
@@ -29,11 +31,12 @@ export class BattlePhase {
     private core: PowerCore,
     private units: Unit[],
     private structures: Structure[],
-    private sphere: SphereDefender | null = null
+    private spheres: SphereDefender[] = []
   ) {}
 
   update(delta: number) {
-    // Always update units so death animations and timers finish after game ends
+    // Always update units so death animations and timers finish after game ends.
+    // Spheres are ticked by Game.ts (not here) so they keep spinning in build phase too.
     for (const u of this.units) u.update(delta)
 
     if (this.over) return
@@ -74,7 +77,7 @@ export class BattlePhase {
     } else {
       const activeStructs = this.structures.filter(s => !s.isDead && s.type !== 'wall' && s.type !== 'mine')
       for (const s of activeStructs) this.doStructureTurn(s, alive)
-      if (this.sphere && !this.sphere.isDead) this.doSphereTurn(alive)
+      for (const sp of this.spheres) if (!sp.isDead) this.doSphereTurn(sp, alive)
     }
 
     this.isUnitTurn = !this.isUnitTurn
@@ -105,21 +108,26 @@ export class BattlePhase {
       }
     }
 
-    // Check if sphere defender is in range
-    if (this.sphere && !this.sphere.isDead) {
-      const sdx = this.sphere.worldX - unit.worldX
-      const sdy = this.sphere.worldY - unit.worldY
-      if (Math.sqrt(sdx * sdx + sdy * sdy) <= unit.range) {
-        const proj = new Projectile(
-          this.scene, unit.worldX, unit.worldY + 20, null,
-          this.sphere.worldX, this.sphere.worldY + 12,
-          unit.damage, false, 0, 0x00ccff
-        )
-        const sphere = this.sphere
-        proj.onHit = () => sphere.takeDamage(unit.damage)
-        this.projectiles.push(proj)
-        return
-      }
+    // Engage the nearest sphere within attack range (if any)
+    let nearestSphere: SphereDefender | null = null
+    let nearestSphereDist: number = unit.range
+    for (const sp of this.spheres) {
+      if (sp.isDead) continue
+      const sdx = sp.worldX - unit.worldX
+      const sdy = sp.worldY - unit.worldY
+      const d = Math.sqrt(sdx * sdx + sdy * sdy)
+      if (d <= nearestSphereDist) { nearestSphereDist = d; nearestSphere = sp }
+    }
+    if (nearestSphere) {
+      const sphere = nearestSphere
+      const proj = new Projectile(
+        this.scene, unit.worldX, unit.worldY + 20, null,
+        sphere.worldX, sphere.worldY + 12,
+        unit.damage, false, 0, 0x00ccff
+      )
+      proj.onHit = () => sphere.takeDamage(unit.damage)
+      this.projectiles.push(proj)
+      return
     }
 
     // Engage nearest structure within attack range
@@ -222,23 +230,21 @@ export class BattlePhase {
     }
   }
 
-  private doSphereTurn(aliveUnits: Unit[]) {
-    if (!this.sphere || this.sphere.isDead) return
+  private doSphereTurn(sphere: SphereDefender, aliveUnits: Unit[]) {
     let nearest: Unit | null = null
-    let nearestDist: number = this.sphere.range
+    let nearestDist: number = sphere.range
     for (const u of aliveUnits) {
-      const dx = u.worldX - this.sphere.worldX
-      const dy = u.worldY - this.sphere.worldY
+      const dx = u.worldX - sphere.worldX
+      const dy = u.worldY - sphere.worldY
       const d = Math.sqrt(dx * dx + dy * dy)
       if (d <= nearestDist) { nearestDist = d; nearest = u }
     }
     if (!nearest) return
     const target = nearest
-    const sphere = this.sphere
     const proj = new Projectile(
-      this.scene, this.sphere.worldX, this.sphere.worldY + 12,
+      this.scene, sphere.worldX, sphere.worldY + 12,
       target, target.worldX, target.worldY + 20,
-      this.sphere.damage, false, 0, 0xffee00
+      sphere.damage, false, 0, 0xffee00
     )
     proj.onHit = () => target.takeDamage(sphere.damage)
     this.projectiles.push(proj)

@@ -14,8 +14,8 @@ type Phase = 'loading' | 'build' | 'battle' | 'win' | 'lose'
 
 // Unified placement session — covers both cyborg and sphere placement.
 // Ghost mesh is the authoritative position; never re-raycast at click time.
-// onPlace returns true to end the session (single-shot, e.g. sphere),
-// false to stay in placement mode (multi-place, e.g. cyborg).
+// onPlace returns true to end the session (single-shot), false to stay
+// in placement mode (multi-place).
 type PlacementKind = 'sphere' | UnitType
 type PlacementSession = {
   kind: PlacementKind
@@ -26,6 +26,8 @@ type PlacementSession = {
   onPlace: (x: number, y: number) => boolean
   onEnd?: () => void
 }
+
+const SPHERE_COST = 100
 
 export class Game {
   private scene: THREE.Scene
@@ -46,11 +48,9 @@ export class Game {
   private attZoneMesh: THREE.Mesh | null = null
   private defZoneMesh: THREE.Mesh | null = null
 
-  private sphereChar: THREE.Group | null = null
-  private sphereInner: THREE.Group | null = null
-  private sphereFallback: THREE.Mesh | null = null
-  private sphereDefender: SphereDefender | null = null
-  private spherePlaced = false
+  // Multi-sphere: one template, many cloned instances per placement.
+  private sphereTemplate: THREE.Object3D | null = null
+  private spheres: SphereDefender[] = []
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
@@ -99,72 +99,46 @@ export class Game {
     gridMats.forEach(m => { const lm = m as THREE.LineBasicMaterial; lm.transparent = true; lm.opacity = 0.3 })
     this.scene.add(grid)
 
-    await Unit.preload()
-    this.initSphereCharacter()
+    // Block UI until all visuals are ready, so placements never show the swap.
+    await Promise.all([
+      Unit.preload(),
+      this.loadSphereTemplate(),
+    ])
 
     this.hud.showGame()
     this.enterBuildPhase()
   }
 
-  private initSphereCharacter() {
-    // Outer group: fixed position, HP bars attach here (never rotates)
-    const group = new THREE.Group()
-    group.position.set(-350, 0, 0)
-
-    // Inner group: rotates, contains the model
-    const inner = new THREE.Group()
-
-    // Fallback: cyan sphere using MeshBasicMaterial (per project rules — Standard
-    // material's color × ambient+directional washes out under our scene lighting).
-    // Shown only while the 57MB sphere.glb downloads, or if the GLB fails to load.
-    const fallbackGeo = new THREE.SphereGeometry(18, 24, 24)
-    const fallbackMat = new THREE.MeshBasicMaterial({ color: 0x44ccff })
-    const fallback = new THREE.Mesh(fallbackGeo, fallbackMat)
-    inner.add(fallback)
-    // Two thin equatorial rings to give the fallback some character
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x88eeff, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
-    const ring1 = new THREE.Mesh(new THREE.TorusGeometry(22, 0.8, 6, 32), ringMat)
-    ring1.rotation.x = Math.PI / 2
-    inner.add(ring1)
-    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(22, 0.8, 6, 32), ringMat)
-    ring2.rotation.y = Math.PI / 2
-    inner.add(ring2)
-
-    group.add(inner)
-
-    group.visible = false  // hidden until purchased during build phase
-    this.scene.add(group)
-    this.sphereChar = group
-    this.sphereInner = inner
-    this.sphereFallback = fallback
-    this.sphereDefender = new SphereDefender(this.scene, group)
-
-    const loader = new GLTFLoader()
-    loader.load(
-      '/models/sphere.glb',
-      gltf => {
-        if (!this.sphereInner || !this.sphereFallback) return
-        const model = gltf.scene
-        const box = new THREE.Box3().setFromObject(model)
-        const size = new THREE.Vector3()
-        box.getSize(size)
-        const maxDim = Math.max(size.x, size.y, size.z)
-        if (maxDim > 0) model.scale.setScalar(36 / maxDim)
-        // Remove fallback (sphere + rings) so only the real model shows
-        while (this.sphereInner.children.length > 0) {
-          const child = this.sphereInner.children[0]
-          this.sphereInner.remove(child)
-          if (child instanceof THREE.Mesh) {
-            child.geometry.dispose()
-            ;(child.material as THREE.Material).dispose()
-          }
+  // Loads sphere.glb once and stores a normalized model as the clone source.
+  // Falls back to a plain SphereGeometry only if the GLB load fails.
+  private loadSphereTemplate(): Promise<void> {
+    return new Promise<void>(resolve => {
+      const loader = new GLTFLoader()
+      loader.load(
+        '/models/sphere.glb',
+        gltf => {
+          const model = gltf.scene
+          const box = new THREE.Box3().setFromObject(model)
+          const size = new THREE.Vector3()
+          box.getSize(size)
+          const maxDim = Math.max(size.x, size.y, size.z)
+          if (maxDim > 0) model.scale.setScalar(36 / maxDim)
+          this.sphereTemplate = model
+          resolve()
+        },
+        undefined,
+        () => {
+          // Fallback only on failure — basic-material sphere so it renders
+          // correctly under the scene's bright ambient lighting.
+          const fallback = new THREE.Mesh(
+            new THREE.SphereGeometry(18, 24, 24),
+            new THREE.MeshBasicMaterial({ color: 0x44ccff })
+          )
+          this.sphereTemplate = fallback
+          resolve()
         }
-        this.sphereFallback = null
-        this.sphereInner.add(model)
-      },
-      undefined,
-      () => { /* sphere.glb missing — fallback stays */ }
-    )
+      )
+    })
   }
 
   private enterBuildPhase() {
@@ -175,9 +149,7 @@ export class Game {
     this.hud.setAttCredits(this.attCredits)
     this.buildPhase = new BuildPhase(this.scene, this.camera, this.hud, Config.START_CREDITS)
 
-    // Permanent zone tints — let players see where each side can place
-    // before they click a Buy button. Subtle (opacity 0.07) so they're not in
-    // the way; sphere/cyborg placement layers a brighter tint on top.
+    // Permanent subtle tints so players see each zone before clicking a Buy.
     this.defZoneMesh = this.makeZoneTint(
       Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff, 0.07, 0.3
     )
@@ -186,16 +158,14 @@ export class Game {
     )
 
     this.hud.onBuySphere = () => {
-      if (this.spherePlaced) return
       if (this.placement?.kind === 'sphere') { this.endPlacement(); return }
-      if (!this.buildPhase || this.buildPhase.getCredits() < 100) return
+      if (!this.buildPhase || this.buildPhase.getCredits() < SPHERE_COST) return
       this.startSpherePlacement()
     }
 
     this.hud.onBattle = () => this.enterBattlePhase()
 
     this.hud.onSpawnUnit = (type) => {
-      // Click same button → cancel
       if (this.placement?.kind === type) { this.endPlacement(); return }
       this.startCyborgPlacement(type)
     }
@@ -219,7 +189,7 @@ export class Game {
     this.phase = 'battle'
     this.hud.setPhase('battle')
 
-    this.battlePhase = new BattlePhase(this.scene, this.powerCore, units, structures, this.sphereDefender)
+    this.battlePhase = new BattlePhase(this.scene, this.powerCore, units, structures, this.spheres)
     this.battlePhase.onWin  = () => { this.phase = 'win';  this.hud.setPhase('win') }
     this.battlePhase.onLose = () => { this.phase = 'lose'; this.hud.setPhase('lose') }
   }
@@ -230,7 +200,6 @@ export class Game {
     const ghost = this.makeGhostRing(0x44aaff, 16, 24)
     ghost.position.set(-400, 0, 1)
     this.scene.add(ghost)
-    // Brighter tint highlighting the defender zone during placement
     const tint = this.makeZoneTint(
       Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff, 0.32, 0.5
     )
@@ -240,18 +209,10 @@ export class Game {
       zoneXMin: Config.WORLD.LEFT,
       zoneXMax: Config.DEFENDER_MAX_X,
       onPlace: (x, y) => {
-        if (!this.buildPhase?.spendCredits(100)) return false
-        if (this.sphereChar) {
-          this.sphereChar.position.set(x, y, 0)
-          this.sphereChar.visible = true
-        }
-        if (this.sphereDefender) {
-          this.sphereDefender.worldX = x
-          this.sphereDefender.worldY = y
-        }
-        this.spherePlaced = true
-        this.hud.markSpherePurchased()
-        return true  // end session
+        if (!this.buildPhase || !this.sphereTemplate) return false
+        if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
+        this.spheres.push(new SphereDefender(this.scene, x, y, this.sphereTemplate))
+        return false  // multi-place — keep selecting until user cancels or credits run out
       },
     }
   }
@@ -273,7 +234,7 @@ export class Game {
         this.attCredits -= cost
         this.hud.setAttCredits(this.attCredits)
         this.attackerUnits.push(new Unit(this.scene, type, x, y))
-        return false  // stay in placement
+        return false
       },
       onEnd: () => this.hud.setSelectedUnitType(null),
     }
@@ -282,7 +243,7 @@ export class Game {
   private endPlacement() {
     if (!this.placement) return
     const p = this.placement
-    this.placement = null  // clear first so onEnd handlers can't loop back
+    this.placement = null
     this.scene.remove(p.ghost)
     p.ghost.geometry.dispose()
     ;(p.ghost.material as THREE.Material).dispose()
@@ -344,15 +305,13 @@ export class Game {
     const delta = Math.min((now - this.lastTime) / 1000, 0.1)
     this.lastTime = now
 
-    this.attackerUnits.forEach(u => u.update(delta))
-    this.attackerUnits.forEach(u => u.faceCamera(this.camera))
+    this.attackerUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
     this.powerCore?.update(delta)
     this.powerCore?.faceCamera(this.camera)
-    this.sphereDefender?.faceCamera(this.camera)
+    this.spheres.forEach(s => { s.update(delta); s.faceCamera(this.camera) })
     this.buildPhase?.faceCamera(this.camera)
     this.battlePhase?.update(delta)
     this.battlePhase?.faceCamera(this.camera)
-    if (this.sphereInner) this.sphereInner.rotation.y += delta * 0.5
 
     // Smooth zoom with damping
     if (Math.abs(this.zoomVelocity) > 0.0002) {
@@ -383,7 +342,6 @@ export class Game {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    // Accumulate zoom velocity for smooth deceleration
     this.zoomVelocity += Math.max(-0.015, Math.min(0.015, e.deltaY * 0.00015))
   }
 
@@ -450,9 +408,9 @@ export class Game {
     this.endPlacement()
     this.removeZoneTint('att')
     this.removeZoneTint('def')
-    if (this.sphereChar) { this.scene.remove(this.sphereChar); this.sphereChar = null }
-    this.sphereInner = null
-    this.sphereFallback = null
+    for (const s of this.spheres) this.scene.remove(s.mesh)
+    this.spheres = []
+    this.sphereTemplate = null
     this.renderer.dispose()
     this.scene.clear()
     this.hud?.dispose()

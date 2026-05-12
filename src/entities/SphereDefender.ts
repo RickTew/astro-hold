@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 
 export class SphereDefender {
-  worldX = -350
-  worldY = 0
+  readonly mesh: THREE.Group       // outer, positioned in scene, never rotates
+  private inner: THREE.Group       // rotates around Y
+  worldX: number
+  worldY: number
   hp: number
   readonly maxHp = 300
   isDead = false
@@ -12,11 +14,28 @@ export class SphereDefender {
   private hpBarGroup: THREE.Group
   private hpBarFill: THREE.Mesh
 
-  constructor(private scene: THREE.Scene, readonly mesh: THREE.Group) {
+  // Caller owns the model template; SphereDefender deep-clones it per instance.
+  constructor(scene: THREE.Scene, x: number, y: number, modelTemplate: THREE.Object3D) {
+    this.worldX = x
+    this.worldY = y
     this.hp = this.maxHp
+
+    this.mesh = new THREE.Group()
+    this.mesh.position.set(x, y, 0)
+
+    this.inner = new THREE.Group()
+    this.inner.add(modelTemplate.clone(true))
+    this.mesh.add(this.inner)
+
     const { group, fill } = this.buildHpBar()
     this.hpBarGroup = group
     this.hpBarFill = fill
+
+    scene.add(this.mesh)
+  }
+
+  update(delta: number) {
+    this.inner.rotation.y += delta * 0.5
   }
 
   faceCamera(camera: THREE.Camera) {

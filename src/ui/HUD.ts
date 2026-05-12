@@ -89,11 +89,6 @@ export class HUD {
     this.attCreditsEl.textContent = String(amount)
   }
 
-  markSpherePurchased() {
-    const btn = this.container.querySelector('#sphere-btn') as HTMLButtonElement | null
-    if (btn) { btn.textContent = 'Sphere ✓'; btn.disabled = true }
-  }
-
   setSelectedUnitType(type: UnitType | null) {
     this.container.querySelectorAll('.att-btn').forEach(b => b.classList.remove('selected'))
     if (type) {
