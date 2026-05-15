@@ -95,16 +95,6 @@ export class Game {
     this.powerCore = new PowerCore(this.scene)
     this.hud = new HUD()
 
-    // Light map grid — rectangular, sized to actual world bounds (not the
-    // square 1200×1200 GridHelper, which spilled past the playable area).
-    const grid = this.buildGroundGrid(
-      Config.WORLD.LEFT, Config.WORLD.RIGHT,
-      Config.WORLD.BOTTOM, Config.WORLD.TOP,
-      Config.GRID_CELL, 0xaaaaaa, 0.3
-    )
-    grid.position.z = 1.5
-    this.scene.add(grid)
-
     // Block UI until all visuals are ready, so placements never show the swap.
     await Promise.all([
       Unit.preload(),
@@ -308,28 +298,7 @@ export class Game {
     p.onEnd?.()
   }
 
-  // Rectangular ground grid drawn as LineSegments. Spans exactly the world
-  // bounds passed in, with line spacing = cell. Replaces the square
-  // GridHelper that extended past the playable area.
-  private buildGroundGrid(
-    xMin: number, xMax: number,
-    yMin: number, yMax: number,
-    cell: number, color: number, opacity: number
-  ): THREE.LineSegments {
-    const verts: number[] = []
-    for (let x = xMin; x <= xMax + 0.001; x += cell) {
-      verts.push(x, yMin, 0, x, yMax, 0)
-    }
-    for (let y = yMin; y <= yMax + 0.001; y += cell) {
-      verts.push(xMin, y, 0, xMax, y, 0)
-    }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity })
-    return new THREE.LineSegments(geo, mat)
-  }
-
-  private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
+private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     const geo = new THREE.RingGeometry(inner, outer, 24)
     const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
     return new THREE.Mesh(geo, mat)
