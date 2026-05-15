@@ -39,25 +39,27 @@ export class PowerCore {
     )
     this.mesh.add(edges)
 
-    // Antenna spike on top, also angular (a small box, not a cylinder)
-    const antGeo = new THREE.BoxGeometry(size * 0.18, size * 0.18, size * 0.6)
+    // Antenna spike sticking up out of the top. With the camera at 45° looking
+    // down, world +Y projects to "up" on screen (+Z projects DOWN — that bit
+    // me last build). Long axis along +Y so it reads as a vertical mast.
+    const antGeo = new THREE.BoxGeometry(size * 0.18, size * 0.6, size * 0.18)
     const antMat = new THREE.MeshStandardMaterial({
       color: 0x00ffee,
       emissive: new THREE.Color(0x00aabb),
       emissiveIntensity: 1.5,
     })
     this.antenna = new THREE.Mesh(antGeo, antMat)
-    this.antenna.position.set(0, 0, size * 0.6)
+    this.antenna.position.set(0, size * 0.65, 0)
     this.mesh.add(this.antenna)
 
-    // Point light gives the bunker some ambient illumination on neighbors
+    // Point light at antenna tip gives the bunker some ambient illumination
     const light = new THREE.PointLight(0x00aaff, 3, 160)
-    light.position.set(0, 0, size * 0.5)
+    light.position.set(0, size * 0.5, 0)
     this.mesh.add(light)
 
     // HP bar — billboarded to face camera each frame (faceCamera method)
     this.hpBarGroup = new THREE.Group()
-    this.hpBarGroup.position.set(0, size * 0.9, 0)
+    this.hpBarGroup.position.set(0, size * 1.15, 0)
     const bgBar = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
       new THREE.MeshBasicMaterial({ color: 0x222222 })

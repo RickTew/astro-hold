@@ -76,8 +76,11 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 2.5))
-    const dir = new THREE.DirectionalLight(0xffffff, 1.2)
+    // Ambient was 2.5 + directional 1.2 = ~3.7× — too bright for GLB
+    // MeshStandardMaterials, blowing out the top half of any model facing +Z
+    // into a flat washed-out tone. Toned down so textures survive.
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8)
     dir.position.set(0, 0, 100)
     this.scene.add(dir)
 
@@ -128,8 +131,13 @@ export class Game {
           const box = new THREE.Box3().setFromObject(gltf.scene)
           const size = new THREE.Vector3()
           box.getSize(size)
-          const maxDim = Math.max(size.x, size.y, size.z)
-          this.sphereScale = maxDim > 0 ? 36 / maxDim : 1
+          // Scale by the smallest bbox axis, not the largest. The asset is ~14%
+          // wider on X than Y/Z (small features or slight body stretch). Using
+          // min keeps the body at full target diameter; longer-axis features
+          // just extend a touch past the 36-unit reference instead of forcing
+          // the whole body to render compressed.
+          const minDim = Math.min(size.x, size.y, size.z)
+          this.sphereScale = minDim > 0 ? 36 / minDim : 1
           resolve()
         }, reject)
       }))
