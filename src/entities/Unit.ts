@@ -234,7 +234,7 @@ export class Unit {
 
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(30, 4),
-      new THREE.MeshBasicMaterial({ color: 0x222222 })
+      new THREE.MeshBasicMaterial({ color: 0xcc2222 })
     )
     bg.position.z = 0.1
     group.add(bg)

@@ -62,7 +62,7 @@ export class PowerCore {
     this.hpBarGroup.position.set(0, size * 1.15, 0)
     const bgBar = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
-      new THREE.MeshBasicMaterial({ color: 0x222222 })
+      new THREE.MeshBasicMaterial({ color: 0xcc2222 })
     )
     bgBar.position.z = 0.1
     this.hpBarGroup.add(bgBar)

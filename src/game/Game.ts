@@ -69,7 +69,9 @@ export class Game {
 
     const halfH = 600 / (window.innerWidth / window.innerHeight)
     this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 1, 1500)
-    this.camera.position.set(0, 300, 300)
+    // Top-down so the ground plane projects 1:1 — grid cells render as
+    // perfect squares on screen (no 45° tilt squish).
+    this.camera.position.set(0, 0, 300)
     this.camera.lookAt(0, 0, 0)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -94,12 +96,14 @@ export class Game {
     this.powerCore = new PowerCore(this.scene)
     this.hud = new HUD()
 
-    // Light map grid (50-unit cells)
-    const grid = new THREE.GridHelper(1200, 24, 0xaaaaaa, 0x777777)
-    grid.rotation.x = Math.PI / 2
+    // Light map grid — rectangular, sized to actual world bounds (not the
+    // square 1200×1200 GridHelper, which spilled past the playable area).
+    const grid = this.buildGroundGrid(
+      Config.WORLD.LEFT, Config.WORLD.RIGHT,
+      Config.WORLD.BOTTOM, Config.WORLD.TOP,
+      Config.GRID_CELL, 0xaaaaaa, 0.3
+    )
     grid.position.z = 1.5
-    const gridMats = Array.isArray(grid.material) ? grid.material : [grid.material]
-    gridMats.forEach(m => { const lm = m as THREE.LineBasicMaterial; lm.transparent = true; lm.opacity = 0.3 })
     this.scene.add(grid)
 
     // Block UI until all visuals are ready, so placements never show the swap.
@@ -305,6 +309,27 @@ export class Game {
     p.onEnd?.()
   }
 
+  // Rectangular ground grid drawn as LineSegments. Spans exactly the world
+  // bounds passed in, with line spacing = cell. Replaces the square
+  // GridHelper that extended past the playable area.
+  private buildGroundGrid(
+    xMin: number, xMax: number,
+    yMin: number, yMax: number,
+    cell: number, color: number, opacity: number
+  ): THREE.LineSegments {
+    const verts: number[] = []
+    for (let x = xMin; x <= xMax + 0.001; x += cell) {
+      verts.push(x, yMin, 0, x, yMax, 0)
+    }
+    for (let y = yMin; y <= yMax + 0.001; y += cell) {
+      verts.push(xMin, y, 0, xMax, y, 0)
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity })
+    return new THREE.LineSegments(geo, mat)
+  }
+
   private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     const geo = new THREE.RingGeometry(inner, outer, 24)
     const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
@@ -418,11 +443,8 @@ export class Game {
       const dy = e.clientY - this.lastPan.y
       const ww = this.camera.right - this.camera.left
       const wh = this.camera.top - this.camera.bottom
-      const panX = (dx / window.innerWidth) * ww
-      const panY = (dy / window.innerHeight) * wh
-      this.camera.position.x -= panX
-      this.camera.position.y += panY * 0.707
-      this.camera.position.z -= panY * 0.707
+      this.camera.position.x -= (dx / window.innerWidth) * ww
+      this.camera.position.y += (dy / window.innerHeight) * wh
       this.lastPan = { x: e.clientX, y: e.clientY }
     }
     if (this.placement) {
