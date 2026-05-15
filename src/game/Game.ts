@@ -4,7 +4,7 @@ import { Config, UnitType } from './GameConfig'
 import { Background } from '../scene/Background'
 import { PowerCore } from '../entities/PowerCore'
 import { SphereDefender } from '../entities/SphereDefender'
-import { Unit } from '../entities/Unit'
+import { Unit, ALL_ANIM_CLIPS } from '../entities/Unit'
 import { HUD } from '../ui/HUD'
 import { AIPlayer } from '../ai/AIPlayer'
 import { BuildPhase } from './BuildPhase'
@@ -57,6 +57,11 @@ export class Game {
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
+
+  // Anim rotation test mode — each cyborg placed cycles through this list so
+  // the user can eyeball every clip in the merged animations.glb. Reset when
+  // a new battle starts (in enterBuildPhase).
+  private animTestIndex = 0
 
   // Camera pan/zoom state
   private isPanning = false
@@ -276,7 +281,11 @@ export class Game {
         if (this.attCredits < cost) return false
         this.attCredits -= cost
         this.hud.setAttCredits(this.attCredits)
-        this.attackerUnits.push(new Unit(this.scene, type, x, y))
+        // Rotation test mode: pass the next clip name as the idle override so
+        // each newly placed cyborg shows a different animation pose.
+        const clip = ALL_ANIM_CLIPS[this.animTestIndex % ALL_ANIM_CLIPS.length]
+        this.animTestIndex++
+        this.attackerUnits.push(new Unit(this.scene, type, x, y, clip))
         return false
       },
       onEnd: () => this.hud.setSelectedUnitType(null),

@@ -9,9 +9,40 @@ const MODEL_SCALE = 25
 const MODEL_TILT_X = 0   // model faces camera; 0 = upright, PI/2 = flat on ground
 
 type AnimName = 'idle' | 'running' | 'dead'
-type LoadedGLTF = { scene: THREE.Group; animations: THREE.AnimationClip[] }
 
-const cache: Partial<Record<AnimName, LoadedGLTF>> = {}
+// Map gameplay state → clip name inside the merged animations.glb
+const STATE_CLIP: Record<AnimName, string> = {
+  idle: 'Idle',
+  running: 'Running',
+  dead: 'Dead',
+}
+
+// All clip names exposed for the rotation test mode (also covers anything the
+// state machine doesn't yet use — handy for finding the right "shoot" pose).
+export const ALL_ANIM_CLIPS = [
+  'Idle',
+  'Running',
+  'Walking',
+  'Dead',
+  'Hit_Reaction_1',
+  'Female_Crouch_Pick_Gun_Point_Forward',
+  'Rifle_Aim_Turn_Right',
+  'Run_and_Shoot',
+  'Forward_Roll_and_Fire',
+  'Gun_Hold_Left_Turn',
+  'Crouch_Pull_and_Throw',
+  'Crouch_Walk_with_Torch',
+  'Spartan_Kick',
+] as const
+
+// Module-level cache populated once by preload() and shared by every Unit.
+const assets: {
+  characterTemplate: THREE.Group | null
+  clips: Map<string, THREE.AnimationClip>
+} = {
+  characterTemplate: null,
+  clips: new Map(),
+}
 const loader = new GLTFLoader()
 
 export class Unit {
@@ -37,33 +68,50 @@ export class Unit {
   // Persistent facing — written by move() and faceTarget(), re-applied
   // after each swapAnim so animation changes don't snap rotation back.
   private facingY = -Math.PI / 2
+  // Optional override for the IDLE pose — set per-instance to test specific
+  // animations (rotation test mode in Game.ts cycles through ALL_ANIM_CLIPS).
+  // Running/dead still use their normal clips.
+  private testIdleClip: string | null = null
 
   static async preload(): Promise<void> {
-    const anims: AnimName[] = ['idle', 'running', 'dead']
-    await Promise.all(anims.map(name =>
-      new Promise<void>(resolve => {
-        loader.load(
-          `/models/cyborg/${name}.glb`,
-          gltf => {
+    const character = new Promise<void>(resolve => {
+      loader.load(
+        '/models/cyborg/character.glb',
+        gltf => { assets.characterTemplate = gltf.scene; resolve() },
+        undefined,
+        () => { console.warn('character.glb missing — using fallback'); resolve() }
+      )
+    })
+    const animations = new Promise<void>(resolve => {
+      loader.load(
+        '/models/cyborg/animations.glb',
+        gltf => {
+          for (const clip of gltf.animations) {
             // Meshy bakes scale into animation tracks — strip them so our
-            // clone.scale.setScalar(MODEL_SCALE) is the sole scale authority
-            gltf.animations.forEach(clip => {
-              clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.scale'))
-            })
-            cache[name] = gltf as unknown as LoadedGLTF
-            resolve()
-          },
-          undefined,
-          () => { console.warn(`cyborg/${name}.glb not found — using fallback`); resolve() }
-        )
-      })
-    ))
+            // clone.scale.setScalar(MODEL_SCALE) is the sole scale authority.
+            clip.tracks = clip.tracks.filter(t => !t.name.endsWith('.scale'))
+            assets.clips.set(clip.name, clip)
+          }
+          resolve()
+        },
+        undefined,
+        () => { console.warn('animations.glb missing — using fallback'); resolve() }
+      )
+    })
+    await Promise.all([character, animations])
   }
 
-  constructor(scene: THREE.Scene, type: UnitType, spawnX: number, spawnY?: number) {
+  constructor(
+    scene: THREE.Scene,
+    type: UnitType,
+    spawnX: number,
+    spawnY?: number,
+    testIdleClip?: string
+  ) {
     this.type = type
     this.hp = this.maxHp = Config.UNITS[type].hp
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
+    this.testIdleClip = testIdleClip ?? null
 
     const spread = Config.WORLD.TOP - Config.WORLD.BOTTOM - 40
     const y = spawnY ?? (Math.random() - 0.5) * spread
@@ -75,6 +123,7 @@ export class Unit {
     this.mesh.position.set(spawnX, y, 0)
 
     this.swapAnim('idle')
+    if (testIdleClip) this.buildAnimLabel(testIdleClip)
     const { group, fill } = this.buildHpBar()
     this.hpBarGroup = group
     this.hpBarFill = fill
@@ -83,6 +132,10 @@ export class Unit {
 
   faceCamera(camera: THREE.Camera) {
     this.hpBarGroup.quaternion.copy(camera.quaternion)
+    // Also billboard the anim test label (if present)
+    for (const c of this.mesh.children) {
+      if (c.userData.isAnimLabel) c.quaternion.copy(camera.quaternion)
+    }
   }
 
   // Rotate the model to face a world-space point. Mirrors the formula used
@@ -198,13 +251,11 @@ export class Unit {
     }
     this.mixer = null
 
-    const gltf = cache[name]
-    if (!gltf) { this.buildFallback(); return }
+    if (!assets.characterTemplate) { this.buildFallback(); return }
 
-    const clone = skeletonClone(gltf.scene) as THREE.Group
+    const clone = skeletonClone(assets.characterTemplate) as THREE.Group
     clone.scale.setScalar(MODEL_SCALE)
     clone.rotation.x = MODEL_TILT_X
-    // Apply the unit's persistent facing instead of resetting on every swap.
     clone.rotation.y = this.facingY
 
     const emissive = new THREE.Color(Config.UNITS[this.type].color)
@@ -220,15 +271,43 @@ export class Unit {
     this.bodyGroup = clone
     this.mesh.add(clone)
 
-    if (gltf.animations.length > 0) {
+    // Pick the clip: test mode overrides only the idle pose.
+    const clipName = name === 'idle' && this.testIdleClip
+      ? this.testIdleClip
+      : STATE_CLIP[name]
+    const clip = assets.clips.get(clipName)
+    if (clip) {
       this.mixer = new THREE.AnimationMixer(clone)
-      const action = this.mixer.clipAction(gltf.animations[0])
+      const action = this.mixer.clipAction(clip)
       if (name === 'dead') {
         action.clampWhenFinished = true
         action.loop = THREE.LoopOnce
       }
       action.play()
     }
+  }
+
+  // Small canvas-textured plane above the unit showing which animation clip
+  // is being played. Used only in rotation test mode.
+  private buildAnimLabel(text: string) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512; canvas.height = 64
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 36px monospace'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(72, 9),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+    )
+    plane.position.set(0, 64, 0)
+    plane.userData.isAnimLabel = true
+    this.mesh.add(plane)
   }
 
   private buildFallback() {
