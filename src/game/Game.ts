@@ -44,8 +44,8 @@ export class Game {
   private attackerUnits: Unit[] = []
 
   private attCredits = Config.START_CREDITS
-  private attZoneMesh: THREE.Mesh | null = null
-  private defZoneMesh: THREE.Mesh | null = null
+  private attZoneMesh: THREE.LineSegments | null = null
+  private defZoneMesh: THREE.LineSegments | null = null
 
   // Multi-sphere: now sprite-based (8 directional pixel-art PNGs, ~24 KB total
   // instead of the 60 MB GLB). Pre-loaded in preloadSphereSprites().
@@ -114,12 +114,12 @@ private enterBuildPhase() {
     this.hud.setAttCredits(this.attCredits)
     this.buildPhase = new BuildPhase(this.scene, this.camera, this.hud, Config.START_CREDITS)
 
-    // Permanent subtle tints so players see each zone before clicking a Buy.
-    this.defZoneMesh = this.makeZoneTint(
-      Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff, 0.07, 0.3
+    // Thin fence borders mark each zone without covering sprites.
+    this.defZoneMesh = this.makeZoneBorder(
+      Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff
     )
-    this.attZoneMesh = this.makeZoneTint(
-      Config.ATTACKER_MIN_X, Config.WORLD.RIGHT, 0xff4488, 0.07, 0.3
+    this.attZoneMesh = this.makeZoneBorder(
+      Config.ATTACKER_MIN_X, Config.WORLD.RIGHT, 0xff4488
     )
 
     this.hud.onBuySphere = () => {
@@ -165,12 +165,9 @@ private enterBuildPhase() {
     const ghost = this.makeGhostRing(0x44aaff, 16, 24)
     ghost.position.set(-400, 0, 1)
     this.scene.add(ghost)
-    const tint = this.makeZoneTint(
-      Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff, 0.32, 0.5
-    )
     this.placement = {
       kind: 'sphere',
-      ghost, tint,
+      ghost, tint: null,
       zoneXMin: Config.WORLD.LEFT,
       zoneXMax: Config.DEFENDER_MAX_X,
       onPlace: (x, y) => {
@@ -232,16 +229,24 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     return new THREE.Mesh(geo, mat)
   }
 
-  private makeZoneTint(xMin: number, xMax: number, color: number, opacity: number, z: number): THREE.Mesh {
-    const w = xMax - xMin
-    const h = Config.WORLD.TOP - Config.WORLD.BOTTOM
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false })
-    )
-    mesh.position.set((xMin + xMax) / 2, 0, z)
-    this.scene.add(mesh)
-    return mesh
+  // Thin outline rectangle marking the playable zone. Replaces the old
+  // semi-transparent tint plane, which covered sprites and washed them out.
+  private makeZoneBorder(xMin: number, xMax: number, color: number): THREE.LineSegments {
+    const yMin = Config.WORLD.BOTTOM
+    const yMax = Config.WORLD.TOP
+    const z = 0.4
+    const verts = [
+      xMin, yMin, z, xMax, yMin, z,
+      xMax, yMin, z, xMax, yMax, z,
+      xMax, yMax, z, xMin, yMax, z,
+      xMin, yMax, z, xMin, yMin, z,
+    ]
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.7 })
+    const lines = new THREE.LineSegments(geo, mat)
+    this.scene.add(lines)
+    return lines
   }
 
   private removeZoneTint(side: 'att' | 'def') {
