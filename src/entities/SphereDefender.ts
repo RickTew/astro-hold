@@ -7,7 +7,7 @@ const SPHERE_DIRECTIONS = [
   'north', 'north-west', 'west', 'south-west',
 ] as const
 const SPHERE_FRAME_INTERVAL = 0.4    // seconds per direction = ~3.2 s per full spin
-const SPHERE_SCREEN_SIZE = 44        // sprite world-units (slightly larger than the old GLB at 36)
+const SPHERE_SCREEN_SIZE = 90        // sprite world-units — large enough to read the 108x108 pixel art clearly
 
 const sphereTextures: THREE.Texture[] = []
 let sphereTexturesLoaded = false
@@ -110,7 +110,7 @@ export class SphereDefender {
 
   private buildHpBar(): { group: THREE.Group; fill: THREE.Mesh } {
     const group = new THREE.Group()
-    group.position.set(0, 32, 0)
+    group.position.set(0, 55, 0)   // above the larger sphere sprite
 
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(30, 4),
