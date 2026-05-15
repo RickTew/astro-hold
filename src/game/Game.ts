@@ -22,6 +22,10 @@ type PlacementSession = {
   tint: THREE.Mesh | null
   zoneXMin: number
   zoneXMax: number
+  // How far the entity center must stay from world Y edges so the visual
+  // fits inside the zone (sphere is taller than cyborg, asymmetric).
+  marginTop: number
+  marginBottom: number
   onPlace: (x: number, y: number) => boolean
   onEnd?: () => void
 }
@@ -170,6 +174,7 @@ private enterBuildPhase() {
       ghost, tint: null,
       zoneXMin: Config.WORLD.LEFT,
       zoneXMax: Config.DEFENDER_MAX_X,
+      marginTop: 50, marginBottom: 50,   // sphere sprite is symmetric, half-height ~45
       onPlace: (x, y) => {
         if (!this.buildPhase) return false
         if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
@@ -190,6 +195,7 @@ private enterBuildPhase() {
       ghost, tint: null,
       zoneXMin: Config.ATTACKER_MIN_X,
       zoneXMax: Config.WORLD.RIGHT,
+      marginTop: 45, marginBottom: 20,   // cyborg stands up from its feet — head extends ~40 above center
       onPlace: (x, y) => {
         const cost = Config.UNITS[type].cost
         if (this.attCredits < cost) return false
@@ -329,6 +335,10 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     if (e.button === 0 && this.phase === 'build') {
       if ((e.target as HTMLElement).closest('#hud')) return  // ignore HUD clicks
 
+      // Refund-and-remove if clicking on an already-placed sphere or cyborg.
+      const world = this.screenToWorld(e.clientX, e.clientY)
+      if (world && this.tryRefund(world.x, world.y)) return
+
       if (this.placement) {
         if (!this.placement.ghost.visible) return
         const { x, y } = this.placement.ghost.position
@@ -336,6 +346,34 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
         if (shouldEnd) this.endPlacement()
       }
     }
+  }
+
+  // Click on a placed sphere or cyborg → remove + refund. Returns true if
+  // something was refunded (caller should skip normal placement logic).
+  private tryRefund(x: number, y: number): boolean {
+    const REFUND_RADIUS_SQ = 35 * 35
+    for (let i = 0; i < this.spheres.length; i++) {
+      const s = this.spheres[i]
+      const dx = s.worldX - x, dy = s.worldY - y
+      if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        this.spheres.splice(i, 1)
+        this.scene.remove(s.mesh)
+        this.buildPhase?.addCredits(SPHERE_COST)
+        return true
+      }
+    }
+    for (let i = 0; i < this.attackerUnits.length; i++) {
+      const u = this.attackerUnits[i]
+      const dx = u.worldX - x, dy = u.worldY - y
+      if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        this.attackerUnits.splice(i, 1)
+        this.scene.remove(u.mesh)
+        this.attCredits += Config.UNITS[u.type].cost
+        this.hud.setAttCredits(this.attCredits)
+        return true
+      }
+    }
+    return false
   }
 
   private onMouseMove = (e: MouseEvent) => {
@@ -360,7 +398,10 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
         && pos.x >= this.placement.zoneXMin
         && pos.x <= this.placement.zoneXMax
       if (pos && inZone) {
-        const clampedY = Math.max(Config.WORLD.BOTTOM + 20, Math.min(Config.WORLD.TOP - 20, pos.y))
+        const clampedY = Math.max(
+          Config.WORLD.BOTTOM + this.placement.marginBottom,
+          Math.min(Config.WORLD.TOP - this.placement.marginTop, pos.y)
+        )
         this.placement.ghost.position.set(pos.x, clampedY, 1)
         this.placement.ghost.visible = true
       } else {

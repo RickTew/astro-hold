@@ -127,6 +127,11 @@ private buildHitPlane(): THREE.Mesh {
     return true
   }
 
+  addCredits(amount: number) {
+    this.credits += amount
+    this.hud.setCredits(this.credits)
+  }
+
   getStructures(): Structure[] { return this.structures }
 
   cleanup() {
