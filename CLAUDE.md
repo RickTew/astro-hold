@@ -19,11 +19,30 @@
 - Grid cell: 50×50 in defender zone (8 cols × 8 rows)
 - Start credits: 200 (defender + attacker each start with 200)
 
-## Models
-- Cyborg (attacker units): `/public/models/cyborg/` — idle, running, dead, hit, walking, kick
-- Sphere: `/public/models/sphere.glb` — 57MB, too large for dev; use Three.js geometry until compressed
-- `MODEL_SCALE` and `MODEL_TILT_X` in `src/entities/Unit.ts` are the first things to tweak when model size/orientation is wrong
-- New models: create → add to `/public/models/` → playtest → exhaust improvements → then add next model
+## Visual stack: hybrid pixel-sprite + 3D
+The game uses **Three.js** as the rendering engine throughout. Inside that, individual entities can be EITHER pixel-art sprites OR 3D GLB models — both are first-class.
+
+**Default preference: pixel sprite from PixelLab** for simple/one-pose entities. Faster to build, instant load, no clone/material/Meshy-export gotchas.
+
+**3D GLB models still welcome** for humanoid characters with rigs and animations, or any time the 3D version is more fun to author or play with. The cyborg is 3D today and may stay 3D; new bosses, NPCs, or visual centerpieces can be 3D too.
+
+When picking which approach for a new entity, decide based on the entity, not project-wide policy:
+- One static look or simple spin/cycle → pixel sprite (8 directions from PixelLab, ~24 KB total)
+- Many animation states × directions → 3D rigged model (one GLB scales infinitely)
+- Visual flair, particles, dynamic lighting → 3D
+- Tiny UI sprites, projectiles, structures, mines → pixel sprite
+
+### Pixel sprite assets
+- Folder: `/public/sprites/<entity>/{south, south-east, east, north-east, north, north-west, west, south-west}.png`
+- Source: PixelLab. Standard rotation set is 8 directions.
+- Rendered via `THREE.Sprite` with `NearestFilter` for crisp pixel scaling. Required flags: `transparent: true`, `depthTest: false`, `depthWrite: false`, `alphaTest: 0.1`, `renderOrder` bumped (see SphereDefender.ts for the canonical pattern).
+- Spinning effect: cycle through the 8 directional frames on a timer (sphere uses 0.4 s per frame, ~3.2 s per full spin).
+
+### 3D models (still active for the cyborg today)
+- Folder: `/public/models/<entity>/`
+- For animation-heavy characters, prefer the merged-animation format: `character.glb` (mesh + skeleton) + `animations.glb` (all clips in one file).
+- `MODEL_SCALE` and `MODEL_TILT_X` in `src/entities/Unit.ts` are the first knobs to tweak when model size/orientation is wrong.
+- New models: create → add to `/public/models/` → playtest → exhaust improvements → then add next model.
 
 ### Required model orientation (for the existing Unit pipeline to "just work")
 - Body axis along **+Y** (standard glTF / Meshy default). At MODEL_TILT_X=0 the cyborg appears upright in the 45° tilted view.
