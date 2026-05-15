@@ -34,6 +34,9 @@ export class Unit {
   private isMoving = false
   private readonly moveSpeedPS: number   // world units per second
   private currentAnim: AnimName = 'idle'
+  // Persistent facing — written by move() and faceTarget(), re-applied
+  // after each swapAnim so animation changes don't snap rotation back.
+  private facingY = -Math.PI / 2
 
   static async preload(): Promise<void> {
     const anims: AnimName[] = ['idle', 'running', 'dead']
@@ -85,11 +88,21 @@ export class Unit {
   // Rotate the model to face a world-space point. Mirrors the formula used
   // while moving (atan2 + π/2 to match the model's default -X facing).
   faceTarget(x: number, y: number) {
-    if (!this.bodyGroup) return
     const dx = x - this.logicalX
     const dy = y - this.logicalY
     if (dx * dx + dy * dy < 0.01) return
-    this.bodyGroup.rotation.y = Math.atan2(dy, dx) + Math.PI / 2
+    this.facingY = Math.atan2(dy, dx) + Math.PI / 2
+    if (this.bodyGroup) this.bodyGroup.rotation.y = this.facingY
+  }
+
+  // Where a projectile should leave from on this unit — a point a short
+  // distance in front of the unit at chest height. Spawn-from-belly looks wrong.
+  getMuzzlePoint(): { x: number; y: number } {
+    const forward = this.facingY - Math.PI / 2   // inverse of faceTarget's offset
+    return {
+      x: this.logicalX + Math.cos(forward) * 22,
+      y: this.logicalY + Math.sin(forward) * 22,
+    }
   }
 
   // ── Public API for game logic ──────────────────────────────────────────────
@@ -155,9 +168,9 @@ export class Unit {
       }
 
       // Rotate model to face movement direction
-      if (dist > 0.1 && this.bodyGroup) {
-        const angle = Math.atan2(dy, dx)
-        this.bodyGroup.rotation.y = angle + Math.PI / 2
+      if (dist > 0.1) {
+        this.facingY = Math.atan2(dy, dx) + Math.PI / 2
+        if (this.bodyGroup) this.bodyGroup.rotation.y = this.facingY
       }
     }
 
@@ -191,8 +204,8 @@ export class Unit {
     const clone = skeletonClone(gltf.scene) as THREE.Group
     clone.scale.setScalar(MODEL_SCALE)
     clone.rotation.x = MODEL_TILT_X
-    // Face toward negative-X (toward power core) by default
-    clone.rotation.y = -Math.PI / 2
+    // Apply the unit's persistent facing instead of resetting on every swap.
+    clone.rotation.y = this.facingY
 
     const emissive = new THREE.Color(Config.UNITS[this.type].color)
     clone.traverse(obj => {

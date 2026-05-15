@@ -121,10 +121,11 @@ export class BattlePhase {
     if (nearestSphere) {
       const sphere = nearestSphere
       unit.faceTarget(sphere.worldX, sphere.worldY)
+      const muzzle = unit.getMuzzlePoint()
       const proj = new Projectile(
-        this.scene, unit.worldX, unit.worldY + 20, null,
+        this.scene, muzzle.x, muzzle.y, null,
         sphere.worldX, sphere.worldY + 12,
-        unit.damage, false, 0, 0x00ccff
+        unit.damage, false, 0, 0xff3333
       )
       proj.onHit = () => sphere.takeDamage(unit.damage)
       this.projectiles.push(proj)
@@ -144,10 +145,11 @@ export class BattlePhase {
     if (nearestStruct) {
       const target = nearestStruct
       unit.faceTarget(target.worldX, target.worldY)
+      const muzzle = unit.getMuzzlePoint()
       const proj = new Projectile(
-        this.scene, unit.worldX, unit.worldY + 20, null,
+        this.scene, muzzle.x, muzzle.y, null,
         target.worldX, target.worldY,
-        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0x00ccff
+        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0xff3333
       )
       if (unit.isBomber) {
         const structs = this.structures
@@ -179,11 +181,12 @@ export class BattlePhase {
 
     if (dist <= Config.POWER_CORE.RADIUS + 20) {
       unit.faceTarget(tx, ty)
-      const unitX = unit.worldX
-      const unitY = unit.worldY + 20
+      const muzzle = unit.getMuzzlePoint()
+      const unitX = muzzle.x
+      const unitY = muzzle.y
       const proj = new Projectile(
         this.scene, unitX, unitY, null, tx, ty,
-        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0x00ccff
+        unit.damage, unit.isBomber, unit.isBomber ? Config.UNITS.bomber.aoeRadius : 0, 0xff3333
       )
       const coreRef = this.core
       if (unit.isBomber) {

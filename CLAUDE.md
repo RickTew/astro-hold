@@ -25,6 +25,12 @@
 - `MODEL_SCALE` and `MODEL_TILT_X` in `src/entities/Unit.ts` are the first things to tweak when model size/orientation is wrong
 - New models: create → add to `/public/models/` → playtest → exhaust improvements → then add next model
 
+### Required model orientation (for the existing Unit pipeline to "just work")
+- Body axis along **+Y** (standard glTF / Meshy default). At MODEL_TILT_X=0 the cyborg appears upright in the 45° tilted view.
+- Forward / front face along **+Z** (Meshy default). The unit's default rotation.y faces -X (toward power core) by rotating the +Z front around the +Y body axis.
+- Origin at the **feet** so position (worldX, worldY, 0) lands on the ground.
+- A new humanoid model authored to these conventions plugs into Unit.ts without per-model rotation tweaks. If a model deviates, prefer fixing the asset over per-unit special-cases.
+
 ## Architecture
 - `GameConfig.ts` — all constants, change numbers here first before touching logic
 - `Game.ts` — scene, camera, renderer, state machine (loading → build → battle → win/lose); owns sphere placement flow (sphereSelecting / spherePlaced / sphereGhostMesh)

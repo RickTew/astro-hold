@@ -8,7 +8,9 @@ export class SphereDefender {
   hp: number
   readonly maxHp = 300
   isDead = false
-  readonly range = 200
+  // Sphere outranges most attacker types — it's the 100cr defender. Only the
+  // sniper drone (range 350) outranges it; scout/tank/bomber all lose at distance.
+  readonly range = 300
   readonly damage = 10
 
   private hpBarGroup: THREE.Group
