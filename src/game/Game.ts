@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { Config, UnitType } from './GameConfig'
 import { Background } from '../scene/Background'
-import { PowerCore, preloadPowerCore } from '../entities/PowerCore'
 import { PixelPowerCore, preloadPixelPowerCore } from '../entities/PixelPowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
 import { SpriteUnit, preloadSpriteUnit } from '../entities/SpriteUnit'
@@ -42,10 +41,12 @@ export class Game {
   private phase: Phase = 'loading'
 
   private background!: Background
-  private powerCore!: PowerCore
-  // Extra decorative cores for visual diagnostics (not in gameplay logic).
-  private showcaseCores: PowerCore[] = []
-  private pixelCore: PixelPowerCore | null = null
+  // Gameplay core (passed to BattlePhase). Now a pixel sprite — the GLB
+  // super core had unavoidable back-spike occlusion under the 45° camera.
+  private powerCore!: PixelPowerCore
+  // Reference-size pixel core for visual comparison — same asset at the
+  // smaller original SCREEN_SIZE so the user can pick a final size.
+  private referenceCore: PixelPowerCore | null = null
   private hud!: HUD
   private buildPhase: BuildPhase | null = null
   private battlePhase: BattlePhase | null = null
@@ -124,22 +125,16 @@ export class Game {
       preloadSpriteUnit('cannon', 'cannon'),
       preloadSpriteUnit('grenadier', 'grenadier'),
       preloadSpriteUnit('doublegun', 'doublegun'),
-      preloadPowerCore(),
       preloadPixelPowerCore(),
+      // GLB Power Core preload skipped — switched to pixel sprite. super.glb
+      // + textured.glb + plain.glb stay on disk for future repurposing.
     ])
 
-    // Locked: super is the gameplay core. (textured kept on disk — earmarked
-    // as a future defense-tower asset; plain kept as a fallback option.)
-    this.powerCore = new PowerCore(this.scene, 'super', Config.POWER_CORE.X, Config.POWER_CORE.Y)
-    // Two extra decorative cores for visual diagnostics — same asset at
-    // different positions in the defender zone so the user can confirm what
-    // they're seeing is consistent across camera relationships.
-    this.showcaseCores.push(new PowerCore(this.scene, 'super', -380, 150))
-    this.showcaseCores.push(new PowerCore(this.scene, 'super', -380, -150))
-    // Pixel-sprite alternative for side-by-side comparison. Sprites face the
-    // camera directly so there's no geometric self-occlusion (same reason
-    // the sphere defenders don't lose pieces under the 45° camera).
-    this.pixelCore = new PixelPowerCore(this.scene, -380, 0)
+    // Gameplay core at canonical position, sized larger (200) per user request.
+    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, 200)
+    // Reference core next to it at the original size (130) so the user can
+    // judge whether they prefer big or small.
+    this.referenceCore = new PixelPowerCore(this.scene, -380, 0, 130)
 
     this.hud.showGame()
     this.enterBuildPhase()
@@ -321,9 +316,8 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     this.attackerUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
     this.powerCore?.update(delta)
     this.powerCore?.faceCamera(this.camera)
-    for (const c of this.showcaseCores) { c.update(delta); c.faceCamera(this.camera) }
-    this.pixelCore?.update(delta)
-    this.pixelCore?.faceCamera(this.camera)
+    this.referenceCore?.update(delta)
+    this.referenceCore?.faceCamera(this.camera)
     this.spheres.forEach(s => { s.update(delta); s.faceCamera(this.camera) })
     this.buildPhase?.faceCamera(this.camera)
     this.battlePhase?.update(delta)

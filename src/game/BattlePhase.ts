@@ -4,7 +4,7 @@ import { SpriteUnit } from '../entities/SpriteUnit'
 import { Structure } from '../entities/Structure'
 import { Projectile } from '../entities/Projectile'
 import { Explosion } from '../entities/Explosion'
-import { PowerCore } from '../entities/PowerCore'
+import { PixelPowerCore } from '../entities/PixelPowerCore'
 import { SphereDefender } from '../entities/SphereDefender'
 
 // All attackers are pixel sprites now — the 3D Unit class was retired in
@@ -32,7 +32,7 @@ export class BattlePhase {
 
   constructor(
     private scene: THREE.Scene,
-    private core: PowerCore,
+    private core: PixelPowerCore,
     private units: Attacker[],
     private structures: Structure[],
     private spheres: SphereDefender[] = []

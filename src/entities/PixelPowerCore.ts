@@ -1,44 +1,46 @@
 import * as THREE from 'three'
 import { Config } from '../game/GameConfig'
 
-// 2D-sprite alternative to the GLB-based PowerCore. Same public surface
-// (takeDamage, faceCamera, update, isDead, mesh) so it can drop into the
-// Game/BattlePhase wiring in place of PowerCore if the user prefers it.
+// 2D-sprite alternative to the GLB PowerCore. Billboarded, so it cannot be
+// occluded by its own geometry the way the 3D Meshy export was.
 //
-// Why this exists: the GLB super core has back-half spike occlusion under
-// the fixed 45° camera (the dome cap geometrically hides the spikes on the
-// far side). A billboarded sprite always faces the camera, so there's no
-// far-side geometry to be hidden — same reason the sphere defender doesn't
-// have the problem.
+// State machine:
+//   - alive:  cycles through 8 rotation PNGs (~4 s full spin)
+//   - dying:  one-shot 9-frame explosion (south direction), then hides
 
 const DIRECTIONS = [
   'south', 'south-east', 'east', 'north-east',
   'north', 'north-west', 'west', 'south-west',
 ] as const
-const FRAME_INTERVAL = 0.5    // s per direction → ~4 s full spin (slower than sphere)
-const SCREEN_SIZE = 130       // sprite world-units — sized to match the GLB core's height
+const FRAME_INTERVAL = 0.5             // s per rotation frame → ~4 s full spin
+const EXPLOSION_FRAME_COUNT = 9
+const EXPLOSION_FRAME_INTERVAL = 0.09  // ~0.8 s total death animation
 
-const textures: THREE.Texture[] = []
+const rotTextures: THREE.Texture[] = []
+const explosionTextures: THREE.Texture[] = []
 let loaded = false
 
+function loadTex(url: string): Promise<THREE.Texture> {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(url, tex => {
+      tex.magFilter = THREE.NearestFilter
+      tex.minFilter = THREE.NearestFilter
+      tex.colorSpace = THREE.SRGBColorSpace
+      resolve(tex)
+    }, undefined, reject)
+  })
+}
+
 export async function preloadPixelPowerCore(): Promise<void> {
-  const loader = new THREE.TextureLoader()
-  await Promise.all(DIRECTIONS.map((dir, i) =>
-    new Promise<void>((resolve, reject) => {
-      loader.load(
-        `/sprites/powercore/${dir}.png`,
-        tex => {
-          tex.magFilter = THREE.NearestFilter
-          tex.minFilter = THREE.NearestFilter
-          tex.colorSpace = THREE.SRGBColorSpace
-          textures[i] = tex
-          resolve()
-        },
-        undefined,
-        reject
-      )
-    })
-  ))
+  await Promise.all([
+    ...DIRECTIONS.map(async (dir, i) => {
+      rotTextures[i] = await loadTex(`/sprites/powercore/${dir}.png`)
+    }),
+    ...Array.from({ length: EXPLOSION_FRAME_COUNT }, async (_, i) => {
+      const num = String(i).padStart(3, '0')
+      explosionTextures[i] = await loadTex(`/sprites/powercore/explosion/frame_${num}.png`)
+    }),
+  ])
   loaded = true
 }
 
@@ -46,18 +48,23 @@ export class PixelPowerCore {
   readonly mesh: THREE.Group
   hp: number
   readonly maxHp: number
+  readonly size: number
   private sprite: THREE.Sprite
   private hpBarGroup: THREE.Group
   private hpBar: THREE.Mesh
   private spinTime = 0
   private frameIndex = 0
+  private dying = false
+  private dyingTime = 0
+  private dyingFrame = 0
 
-  constructor(scene: THREE.Scene, x: number, y: number) {
+  constructor(scene: THREE.Scene, x: number, y: number, size = 130) {
+    this.size = size
     this.hp = this.maxHp = Config.POWER_CORE.HP
     this.mesh = new THREE.Group()
     this.mesh.position.set(x, y, 0)
 
-    const firstTex = loaded ? textures[0] : null
+    const firstTex = loaded ? rotTextures[0] : null
     const mat = new THREE.SpriteMaterial({
       map: firstTex,
       transparent: true,
@@ -66,14 +73,13 @@ export class PixelPowerCore {
       alphaTest: 0.1,
     })
     this.sprite = new THREE.Sprite(mat)
-    this.sprite.scale.set(SCREEN_SIZE, SCREEN_SIZE, 1)
-    this.sprite.position.set(0, SCREEN_SIZE * 0.35, 5)   // feet near ground
+    this.sprite.scale.set(size, size, 1)
+    this.sprite.position.set(0, size * 0.35, 5)   // feet near ground
     this.sprite.renderOrder = 10
     this.mesh.add(this.sprite)
 
-    // HP bar above sprite, billboarded.
     this.hpBarGroup = new THREE.Group()
-    this.hpBarGroup.position.set(0, SCREEN_SIZE * 0.78, 0)
+    this.hpBarGroup.position.set(0, size * 0.78, 0)
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
       new THREE.MeshBasicMaterial({ color: 0xcc2222 })
@@ -96,23 +102,60 @@ export class PixelPowerCore {
   }
 
   takeDamage(amount: number) {
+    if (this.dying) return
     this.hp = Math.max(0, this.hp - amount)
     const ratio = this.hp / this.maxHp
     this.hpBar.scale.x = ratio
     this.hpBar.position.x = -(1 - ratio) * 35
     const mat = this.hpBar.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00ff88 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
+    if (this.hp <= 0) this.startDying()
+  }
+
+  private startDying() {
+    this.dying = true
+    this.dyingTime = 0
+    this.dyingFrame = 0
+    if (explosionTextures[0]) {
+      this.sprite.material.map = explosionTextures[0]
+      this.sprite.material.needsUpdate = true
+    }
+    // Hide the HP bar during the death animation.
+    this.hpBarGroup.visible = false
   }
 
   get isDead() { return this.hp <= 0 }
 
   update(delta: number) {
     if (!loaded) return
+
+    if (this.dying) {
+      this.dyingTime += delta
+      const next = Math.min(
+        EXPLOSION_FRAME_COUNT - 1,
+        Math.floor(this.dyingTime / EXPLOSION_FRAME_INTERVAL)
+      )
+      if (next !== this.dyingFrame) {
+        this.dyingFrame = next
+        const tex = explosionTextures[next]
+        if (tex) {
+          this.sprite.material.map = tex
+          this.sprite.material.needsUpdate = true
+        }
+      }
+      // Hide the sprite once we've held the final frame for a beat.
+      if (this.dyingFrame === EXPLOSION_FRAME_COUNT - 1
+          && this.dyingTime > EXPLOSION_FRAME_COUNT * EXPLOSION_FRAME_INTERVAL + 0.4) {
+        this.sprite.visible = false
+      }
+      return
+    }
+
     this.spinTime += delta
     const next = Math.floor(this.spinTime / FRAME_INTERVAL) % DIRECTIONS.length
     if (next !== this.frameIndex) {
       this.frameIndex = next
-      this.sprite.material.map = textures[next]
+      this.sprite.material.map = rotTextures[next]
       this.sprite.material.needsUpdate = true
     }
   }
