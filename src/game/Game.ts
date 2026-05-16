@@ -42,6 +42,8 @@ export class Game {
 
   private background!: Background
   private powerCore!: PowerCore
+  // Extra decorative cores for visual diagnostics (not in gameplay logic).
+  private showcaseCores: PowerCore[] = []
   private hud!: HUD
   private buildPhase: BuildPhase | null = null
   private battlePhase: BattlePhase | null = null
@@ -126,6 +128,11 @@ export class Game {
     // Locked: super is the gameplay core. (textured kept on disk — earmarked
     // as a future defense-tower asset; plain kept as a fallback option.)
     this.powerCore = new PowerCore(this.scene, 'super', Config.POWER_CORE.X, Config.POWER_CORE.Y)
+    // Two extra decorative cores for visual diagnostics — same asset at
+    // different positions in the defender zone so the user can confirm what
+    // they're seeing is consistent across camera relationships.
+    this.showcaseCores.push(new PowerCore(this.scene, 'super', -380, 150))
+    this.showcaseCores.push(new PowerCore(this.scene, 'super', -380, -150))
 
     this.hud.showGame()
     this.enterBuildPhase()
@@ -307,6 +314,7 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     this.attackerUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
     this.powerCore?.update(delta)
     this.powerCore?.faceCamera(this.camera)
+    for (const c of this.showcaseCores) { c.update(delta); c.faceCamera(this.camera) }
     this.spheres.forEach(s => { s.update(delta); s.faceCamera(this.camera) })
     this.buildPhase?.faceCamera(this.camera)
     this.battlePhase?.update(delta)

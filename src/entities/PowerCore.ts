@@ -175,16 +175,19 @@ export class PowerCore {
   update(delta: number) {
     this.pulseTime += delta
 
-    if (this.bodyGroup) this.bodyGroup.rotation.y += ROTATION_RAD_PER_SEC * delta
+    // Rotation disabled: at the 45° game camera, the model's own dome/body
+    // occludes spikes on the far (back) side via normal depth testing. With
+    // rotation enabled, each spike cycled through that occluded zone and
+    // looked like it was disappearing into an invisible obstacle. Static
+    // orientation removes the flicker, even though back-half spikes remain
+    // geometrically hidden behind the dome.
+    void ROTATION_RAD_PER_SEC
+    void delta
 
-    // Pulse only multiplies baseline emissive. Plain export has 0 baseline →
-    // no visible pulse on plain (honest output). Textured/super have authored
-    // emissive → they breathe in their own colors.
     const pulse = 1 + Math.sin(this.pulseTime * 2.2) * 0.3
     for (const b of this.baselines) {
       b.mat.emissiveIntensity = b.emissiveIntensity * pulse
     }
-
     this.pointLight.intensity = 3.2 + Math.sin(this.pulseTime * 2.2) * 0.8
   }
 }
