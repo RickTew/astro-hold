@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { Config, UnitType } from './GameConfig'
 import { Background } from '../scene/Background'
-import { PowerCore } from '../entities/PowerCore'
+import { PowerCore, preloadPowerCore } from '../entities/PowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
 import { Unit } from '../entities/Unit'
 import { SpriteUnit, preloadSpriteUnit } from '../entities/SpriteUnit'
@@ -95,16 +95,22 @@ export class Game {
 
   async init() {
     this.background = new Background(this.scene)
-    this.powerCore = new PowerCore(this.scene)
     this.hud = new HUD()
 
     // Block UI until all visuals are ready, so placements never show the swap.
+    // PowerCore is constructed AFTER preload so the GLB template is in place
+    // when its setVariant() runs — otherwise the first frame would render the
+    // fallback geometry.
     await Promise.all([
       Unit.preload(),
       preloadSphereSprites(),
       preloadSpriteUnit('cannon', 'cannon'),
       preloadSpriteUnit('grenadier', 'grenadier'),
+      preloadPowerCore(),
     ])
+
+    this.powerCore = new PowerCore(this.scene)
+    window.addEventListener('keydown', this.onKeyDown)
 
     this.hud.showGame()
     this.enterBuildPhase()
@@ -422,6 +428,15 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
 
   private onContextMenu = (e: Event) => e.preventDefault()
 
+  // Dev hotkey: T cycles the Power Core between plain and textured GLB
+  // variants so we can A/B them in-game without rebuilding.
+  private onKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 't' && e.key !== 'T') return
+    if (!this.powerCore) return
+    const next = this.powerCore.toggleVariant()
+    console.log(`[PowerCore] variant → ${next}`)
+  }
+
   dispose() {
     cancelAnimationFrame(this.rafId)
     window.removeEventListener('resize', this.onResize)
@@ -430,6 +445,7 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     window.removeEventListener('mousemove', this.onMouseMove)
     window.removeEventListener('mouseup', this.onMouseUp)
     window.removeEventListener('contextmenu', this.onContextMenu)
+    window.removeEventListener('keydown', this.onKeyDown)
     this.buildPhase?.cleanup()
     this.endPlacement()
     this.removeZoneTint('att')

@@ -1,65 +1,73 @@
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { Config } from '../game/GameConfig'
 
-// Power Core = the base the defender is protecting. Visually a chunky angular
-// bunker (box) so it can never be mistaken for a placeable sphere defender.
+// Power Core = the base the defender is protecting. The body is a Meshy GLB.
+// Both a textured and a plain (geometry-only) variant are loaded so the user
+// can hot-swap with the 'T' key during testing to compare them.
+
+export type CoreVariant = 'plain' | 'textured'
+
+const MODELS: Record<CoreVariant, string> = {
+  plain:    '/models/powercore/plain.glb',
+  textured: '/models/powercore/textured.glb',
+}
+
+// Target visible height in world units. Both variants are auto-scaled to this
+// regardless of their native model size, so swapping doesn't change footprint.
+const TARGET_HEIGHT = 55
+
+// Module-level cache populated by preloadPowerCore(). Each entry is the raw
+// gltf.scene from the loader — we clone it per PowerCore instance.
+const templates: Partial<Record<CoreVariant, { scene: THREE.Group; scale: number }>> = {}
+
+export async function preloadPowerCore(): Promise<void> {
+  const loader = new GLTFLoader()
+  await Promise.all((Object.keys(MODELS) as CoreVariant[]).map(key =>
+    new Promise<void>((resolve, reject) => {
+      loader.load(
+        MODELS[key],
+        gltf => {
+          const bbox = new THREE.Box3().setFromObject(gltf.scene)
+          const size = new THREE.Vector3(); bbox.getSize(size)
+          // Meshy export height is on the Y axis (Origin: Bottom, +Y up).
+          const native = size.y || 1
+          templates[key] = { scene: gltf.scene, scale: TARGET_HEIGHT / native }
+          resolve()
+        },
+        undefined,
+        err => { console.warn(`[PowerCore] ${key} failed to load`, err); resolve() }
+      )
+    })
+  ))
+}
+
 export class PowerCore {
   readonly mesh: THREE.Group
   hp: number
   readonly maxHp: number
   private hpBarGroup: THREE.Group
   private hpBar: THREE.Mesh
-  private body: THREE.Mesh
-  private antenna: THREE.Mesh
+  private bodyGroup: THREE.Group | null = null
+  private pointLight: THREE.PointLight
   private pulseTime = 0
+  private currentVariant: CoreVariant = 'plain'
 
   constructor(scene: THREE.Scene) {
     this.hp = this.maxHp = Config.POWER_CORE.HP
     this.mesh = new THREE.Group()
     this.mesh.position.set(Config.POWER_CORE.X, Config.POWER_CORE.Y, 0)
 
-    const size = Config.POWER_CORE.RADIUS * 2.4  // square footprint, slightly larger
+    // Cyan ambient glow contributed by the Power Core itself. Animated in
+    // update() to add a subtle pulse independent of the model's materials —
+    // works whether the GLB has emissive maps or is a plain-geometry export.
+    this.pointLight = new THREE.PointLight(0x00aaff, 3.5, 220)
+    this.pointLight.position.set(0, TARGET_HEIGHT * 0.5, 0)
+    this.mesh.add(this.pointLight)
 
-    // Main body — flat-roofed box, emissive cyan edge glow
-    const bodyGeo = new THREE.BoxGeometry(size, size, size * 0.75)
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x335577,
-      emissive: new THREE.Color(0x0a2233),
-      emissiveIntensity: 0.6,
-      metalness: 0.5,
-      roughness: 0.55,
-    })
-    this.body = new THREE.Mesh(bodyGeo, bodyMat)
-    this.mesh.add(this.body)
-
-    // Edge wire — emissive outline so the cube reads clearly from a distance
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(bodyGeo),
-      new THREE.LineBasicMaterial({ color: 0x00ddff })
-    )
-    this.mesh.add(edges)
-
-    // Antenna spike sticking up out of the top. With the camera at 45° looking
-    // down, world +Y projects to "up" on screen (+Z projects DOWN — that bit
-    // me last build). Long axis along +Y so it reads as a vertical mast.
-    const antGeo = new THREE.BoxGeometry(size * 0.18, size * 0.6, size * 0.18)
-    const antMat = new THREE.MeshStandardMaterial({
-      color: 0x00ffee,
-      emissive: new THREE.Color(0x00aabb),
-      emissiveIntensity: 1.5,
-    })
-    this.antenna = new THREE.Mesh(antGeo, antMat)
-    this.antenna.position.set(0, size * 0.65, 0)
-    this.mesh.add(this.antenna)
-
-    // Point light at antenna tip gives the bunker some ambient illumination
-    const light = new THREE.PointLight(0x00aaff, 3, 160)
-    light.position.set(0, size * 0.5, 0)
-    this.mesh.add(light)
-
-    // HP bar — billboarded to face camera each frame (faceCamera method)
+    // HP bar — billboarded to face camera each frame.
     this.hpBarGroup = new THREE.Group()
-    this.hpBarGroup.position.set(0, size * 1.15, 0)
+    this.hpBarGroup.position.set(0, TARGET_HEIGHT * 1.12, 0)
     const bgBar = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
       new THREE.MeshBasicMaterial({ color: 0xcc2222 })
@@ -74,8 +82,34 @@ export class PowerCore {
     this.hpBarGroup.add(this.hpBar)
     this.mesh.add(this.hpBarGroup)
 
+    this.setVariant('plain')
     scene.add(this.mesh)
   }
+
+  // Swap between 'plain' and 'textured' Meshy exports without rebuilding the
+  // scene. HP bar, light, and damage state are preserved.
+  setVariant(variant: CoreVariant) {
+    if (this.bodyGroup) {
+      this.mesh.remove(this.bodyGroup)
+      this.bodyGroup = null
+    }
+    const tpl = templates[variant]
+    if (!tpl) { this.buildFallback(); return }
+
+    const clone = tpl.scene.clone(true)
+    clone.scale.setScalar(tpl.scale)
+    this.bodyGroup = clone
+    this.mesh.add(clone)
+    this.currentVariant = variant
+  }
+
+  toggleVariant(): CoreVariant {
+    const next: CoreVariant = this.currentVariant === 'plain' ? 'textured' : 'plain'
+    this.setVariant(next)
+    return next
+  }
+
+  get variant(): CoreVariant { return this.currentVariant }
 
   faceCamera(camera: THREE.Camera) {
     this.hpBarGroup.quaternion.copy(camera.quaternion)
@@ -88,26 +122,53 @@ export class PowerCore {
     this.hpBar.position.x = -(1 - ratio) * 35
     const mat = this.hpBar.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00ff88 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
-    this.flashBody()
+    this.flashHit()
   }
 
-  private flashBody() {
-    const mat = this.body.material as THREE.MeshStandardMaterial
-    const savedHex = mat.emissive.getHex()
-    mat.emissive.setHex(0xff2200)
-    mat.emissiveIntensity = 2.5
+  // Briefly tint emissive red on every mesh in the loaded body, and boost
+  // the point light, so the hit reads at any distance regardless of material.
+  private flashHit() {
+    const prevIntensity = this.pointLight.intensity
+    this.pointLight.color.setHex(0xff2200)
+    this.pointLight.intensity = 6
+    const restored: Array<() => void> = []
+    this.bodyGroup?.traverse(obj => {
+      if (!(obj instanceof THREE.Mesh)) return
+      const mat = obj.material as THREE.MeshStandardMaterial
+      if (!('emissive' in mat)) return
+      const savedHex = mat.emissive.getHex()
+      const savedI = mat.emissiveIntensity ?? 1
+      mat.emissive.setHex(0xff2200)
+      mat.emissiveIntensity = 2.5
+      restored.push(() => { mat.emissive.setHex(savedHex); mat.emissiveIntensity = savedI })
+    })
     setTimeout(() => {
-      mat.emissive.setHex(savedHex)
-      mat.emissiveIntensity = 0.6
+      this.pointLight.color.setHex(0x00aaff)
+      this.pointLight.intensity = prevIntensity
+      for (const r of restored) r()
     }, 200)
+  }
+
+  // Visible-from-far fallback used only if both GLBs fail to load.
+  private buildFallback() {
+    const size = Config.POWER_CORE.RADIUS * 2.4
+    const group = new THREE.Group()
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(size, size, size * 0.75),
+      new THREE.MeshStandardMaterial({ color: 0x335577, emissive: 0x00aaff, emissiveIntensity: 0.6 })
+    )
+    box.position.set(0, size / 2, 0)
+    group.add(box)
+    this.bodyGroup = group
+    this.mesh.add(group)
   }
 
   get isDead() { return this.hp <= 0 }
 
   update(delta: number) {
     this.pulseTime += delta
-    // Antenna pulses (just emissive), no rotation — a bunker shouldn't spin
-    const antMat = this.antenna.material as THREE.MeshStandardMaterial
-    antMat.emissiveIntensity = 1.2 + Math.sin(this.pulseTime * 3.5) * 0.4
+    // Gentle 0.35-Hz pulse on the ambient light — keeps the core feeling
+    // alive without poking into model materials.
+    this.pointLight.intensity = 3.5 + Math.sin(this.pulseTime * 2.2) * 0.7
   }
 }
