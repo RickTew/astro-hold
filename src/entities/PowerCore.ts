@@ -76,8 +76,13 @@ export class PowerCore {
     this.pointLight.position.set(0, TARGET_HEIGHT * 0.5, 0)
     this.mesh.add(this.pointLight)
 
+    // HP bar sits well above the model. The earlier 1.12× placed the bar's
+    // screen-Y range right where the back of the antenna spikes project under
+    // a 45° camera, so each spike disappeared when it rotated to the back of
+    // the core. 1.7× puts the bar above every spike projection regardless of
+    // rotation.
     this.hpBarGroup = new THREE.Group()
-    this.hpBarGroup.position.set(0, TARGET_HEIGHT * 1.12, 0)
+    this.hpBarGroup.position.set(0, TARGET_HEIGHT * 1.7, 0)
     const bgBar = new THREE.Mesh(
       new THREE.PlaneGeometry(70, 8),
       new THREE.MeshBasicMaterial({ color: 0xcc2222 })
