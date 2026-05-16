@@ -15,7 +15,7 @@ const MODELS: Record<CoreVariant, string> = {
 
 // Target visible height in world units. Both variants are auto-scaled to this
 // regardless of their native model size, so swapping doesn't change footprint.
-const TARGET_HEIGHT = 55
+const TARGET_HEIGHT = 85
 
 // Module-level cache populated by preloadPowerCore(). Each entry is the raw
 // gltf.scene from the loader — we clone it per PowerCore instance.
@@ -98,6 +98,32 @@ export class PowerCore {
 
     const clone = tpl.scene.clone(true)
     clone.scale.setScalar(tpl.scale)
+
+    // The plain export has no emissive maps and ships as flat gray geometry,
+    // which reads as a featureless silhouette against the brown terrain.
+    // Replace its materials with a darker base + cyan emissive so the core
+    // glows on its own merits and team-reads as the defender's centerpiece.
+    if (variant === 'plain') {
+      clone.traverse(obj => {
+        if (!(obj instanceof THREE.Mesh)) return
+        const baseMat = obj.material as THREE.MeshStandardMaterial
+        // Clone-and-replace rather than mutate so shared materials don't bleed.
+        const tinted = new THREE.MeshStandardMaterial({
+          color: 0x2a3a4a,
+          emissive: new THREE.Color(0x00aaff),
+          emissiveIntensity: 0.9,
+          metalness: 0.55,
+          roughness: 0.45,
+        })
+        // Preserve the original normal/AO maps if Meshy included any geometry-
+        // only normal information (most plain exports do not).
+        if (baseMat && 'normalMap' in baseMat && baseMat.normalMap) {
+          tinted.normalMap = baseMat.normalMap
+        }
+        obj.material = tinted
+      })
+    }
+
     this.bodyGroup = clone
     this.mesh.add(clone)
     this.currentVariant = variant

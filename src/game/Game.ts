@@ -3,7 +3,6 @@ import { Config, UnitType } from './GameConfig'
 import { Background } from '../scene/Background'
 import { PowerCore, preloadPowerCore } from '../entities/PowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
-import { Unit } from '../entities/Unit'
 import { SpriteUnit, preloadSpriteUnit } from '../entities/SpriteUnit'
 import { HUD } from '../ui/HUD'
 import { AIPlayer } from '../ai/AIPlayer'
@@ -46,9 +45,8 @@ export class Game {
   private hud!: HUD
   private buildPhase: BuildPhase | null = null
   private battlePhase: BattlePhase | null = null
-  // Sprite attackers live alongside 3D Unit attackers; BattlePhase reads them
-  // through the shared structural shape (worldX/Y, range, isBomber, etc.).
-  private attackerUnits: Array<Unit | SpriteUnit> = []
+  // All attackers are pixel sprites now (the 3D Meshy cyborg was retired).
+  private attackerUnits: SpriteUnit[] = []
 
   private attCredits = Config.START_CREDITS
   private attZoneMesh: THREE.LineSegments | null = null
@@ -102,7 +100,6 @@ export class Game {
     // when its setVariant() runs — otherwise the first frame would render the
     // fallback geometry.
     await Promise.all([
-      Unit.preload(),
       preloadSphereSprites(),
       preloadSpriteUnit('cannon', 'cannon'),
       preloadSpriteUnit('grenadier', 'grenadier'),
@@ -159,7 +156,7 @@ private enterBuildPhase() {
     const units = this.attackerUnits.length > 0
       ? this.attackerUnits
       : AIPlayer.buildArmy(Config.START_CREDITS).map(t =>
-          this.makeAttacker(t, 420 + Math.random() * 100)
+          new SpriteUnit(this.scene, t, 420 + Math.random() * 100)
         )
     this.attackerUnits = []
 
@@ -169,16 +166,6 @@ private enterBuildPhase() {
     this.battlePhase = new BattlePhase(this.scene, this.powerCore, units, structures, this.spheres)
     this.battlePhase.onWin  = () => { this.phase = 'win';  this.hud.setPhase('win') }
     this.battlePhase.onLose = () => { this.phase = 'lose'; this.hud.setPhase('lose') }
-  }
-
-  // Pick the right body for an attacker type. Pixel-sprite types (cannon,
-  // grenadier) instantiate SpriteUnit; legacy 3D types (scout/tank/bomber/
-  // drone) still use the GLB-based Unit class.
-  private makeAttacker(type: UnitType, x: number, y?: number): Unit | SpriteUnit {
-    if (type === 'cannon' || type === 'grenadier') {
-      return new SpriteUnit(this.scene, type, x, y)
-    }
-    return new Unit(this.scene, type, x, y)
   }
 
   // ── Placement (unified) ──────────────────────────────────────────────────
@@ -192,7 +179,7 @@ private enterBuildPhase() {
       ghost, tint: null,
       zoneXMin: Config.WORLD.LEFT,
       zoneXMax: Config.DEFENDER_MAX_X,
-      marginTop: 50, marginBottom: 50,   // sphere sprite is symmetric, half-height ~45
+      marginTop: 20, marginBottom: 20,   // sphere sprite is symmetric, half-height ~11 after 50% shrink
       onPlace: (x, y) => {
         if (!this.buildPhase) return false
         if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
@@ -219,7 +206,7 @@ private enterBuildPhase() {
         if (this.attCredits < cost) return false
         this.attCredits -= cost
         this.hud.setAttCredits(this.attCredits)
-        this.attackerUnits.push(this.makeAttacker(type, x, y))
+        this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y))
         return false
       },
       onEnd: () => this.hud.setSelectedUnitType(null),

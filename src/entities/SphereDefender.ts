@@ -7,7 +7,7 @@ const SPHERE_DIRECTIONS = [
   'north', 'north-west', 'west', 'south-west',
 ] as const
 const SPHERE_FRAME_INTERVAL = 0.4    // seconds per direction = ~3.2 s per full spin
-const SPHERE_SCREEN_SIZE = 90        // sprite world-units — large enough to read the 108x108 pixel art clearly
+const SPHERE_SCREEN_SIZE = 45        // sprite world-units — sized to match other defender units on screen
 
 const sphereTextures: THREE.Texture[] = []
 let sphereTexturesLoaded = false
@@ -114,10 +114,10 @@ export class SphereDefender {
   private buildHpBar(): { group: THREE.Group; fill: THREE.Mesh } {
     const group = new THREE.Group()
     // Sphere body fills rows 29..80 of the 108px sprite (~52px / 108 ≈ 48% of
-    // the 90 world-unit sprite = ~22 world units half-height). Local +30 sits
-    // just above the body with a small gap, and keeps the bar inside the
-    // fence even when the sphere is placed at the +Y edge of the defender zone.
-    group.position.set(0, 30, 0)
+    // the sprite). At SPHERE_SCREEN_SIZE=45 the body half-height in screen-up
+    // is ~11 world units; local y=15 lands the bar just above the body with a
+    // small gap, and stays inside the +Y fence at the edge of the defender zone.
+    group.position.set(0, 15, 0)
 
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(30, 4),

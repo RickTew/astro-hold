@@ -1,6 +1,8 @@
 import { Config, UnitType } from '../game/GameConfig'
 
-const ALL_TYPES: UnitType[] = ['scout', 'tank', 'bomber', 'drone']
+// Sprite-only roster — the 3D Meshy cyborg (scout) was retired in session 8
+// when we committed to pixel sprites for all combatants.
+const ALL_TYPES: UnitType[] = ['cannon', 'grenadier']
 
 export class AIPlayer {
   static buildArmy(credits: number): UnitType[] {

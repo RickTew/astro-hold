@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import { Config } from './GameConfig'
-import { Unit } from '../entities/Unit'
 import { SpriteUnit } from '../entities/SpriteUnit'
 import { Structure } from '../entities/Structure'
 import { Projectile } from '../entities/Projectile'
@@ -8,9 +7,9 @@ import { Explosion } from '../entities/Explosion'
 import { PowerCore } from '../entities/PowerCore'
 import { SphereDefender } from '../entities/SphereDefender'
 
-// Either body type can be an attacker — both expose the same public surface
-// (worldX/Y, range, damage, isBomber, faceTarget, getMuzzlePoint, etc.).
-type Attacker = Unit | SpriteUnit
+// All attackers are pixel sprites now — the 3D Unit class was retired in
+// session 8. Alias retained for readability in damage/turn methods.
+type Attacker = SpriteUnit
 
 const MINE_DETECT_RADIUS = 65
 

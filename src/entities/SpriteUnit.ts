@@ -99,6 +99,11 @@ export class SpriteUnit {
     this.hpBarGroup = group
     this.hpBarFill = fill
 
+    // Lock initial sprite to whichever direction our bucket math says belongs
+    // to the starting facingAngle — keeps the constructor consistent with
+    // every later update() call.
+    this.updateDirectionSprite()
+
     scene.add(this.mesh)
   }
 
@@ -188,9 +193,11 @@ export class SpriteUnit {
 
   // Pick one of the 8 directional sprites whose facing best matches the unit's
   // current facing angle. Buckets are π/4 wide and centered on each direction.
+  // Offset must be an integer multiple of 8 so the modulo preserves the bucket
+  // value — the earlier `+ TAU * 8` (= +16π ≈ +50.27) shifted every angle by a
+  // non-integer amount and mapped facingAngle=π (west) onto 'south'.
   private updateDirectionSprite() {
-    const TAU = Math.PI * 2
-    const norm = ((this.facingAngle / (Math.PI / 4)) + TAU * 8) % 8
+    const norm = ((this.facingAngle / (Math.PI / 4)) + 16) % 8
     const idx = Math.round(norm) % 8
     const dir = DIRECTIONS[idx]
     if (dir === this.currentDir) return
