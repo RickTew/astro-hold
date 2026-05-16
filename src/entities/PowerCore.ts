@@ -2,15 +2,14 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { Config } from '../game/GameConfig'
 
-// Power Core = the base the defender is protecting. Three Meshy variants
-// (plain / textured / super) are loaded at startup. Game.ts instantiates all
-// three side-by-side so the user can compare without swapping.
+// Power Core = the base the defender is protecting. Currently locked to the
+// 'super' Meshy export (other variants kept on disk for repurposing).
 //
-// Per user feedback (session 9): we deliberately do NOT overwrite Meshy's
-// materials with a procedural cyan emissive. That made the plain export
-// render as a flat blue silhouette. Each variant now shows its honest output;
-// only ambient overlays (point light + orbiting particles + slow Y rotation
-// + pulse on whatever emissive the variant already has) are layered on top.
+// Procedural overlays kept minimal: point light + slow rotation + pulse on
+// the asset's authored emissive. Orbiting particle motes were removed in
+// session 10 — they crossed in front of the model body and read as visual
+// obstructions ("blocking the base / top"). The super core's authored glow
+// is rich enough that no halo effect is needed.
 
 export type CoreVariant = 'plain' | 'textured' | 'super'
 
@@ -25,8 +24,6 @@ const MODELS: Record<CoreVariant, string> = {
 
 const TARGET_HEIGHT = 85
 const ROTATION_RAD_PER_SEC = 0.18
-const PARTICLE_COUNT = 10
-const PARTICLE_RADIUS = TARGET_HEIGHT * 0.55
 
 const templates: Partial<Record<CoreVariant, { scene: THREE.Group; scale: number }>> = {}
 
@@ -57,15 +54,6 @@ type MaterialBaseline = {
   emissiveIntensity: number
 }
 
-interface Particle {
-  mesh: THREE.Mesh
-  angle: number
-  angularSpeed: number
-  yOffset: number
-  yPhase: number
-  yAmp: number
-}
-
 export class PowerCore {
   readonly mesh: THREE.Group
   readonly variant: CoreVariant
@@ -75,9 +63,8 @@ export class PowerCore {
   private hpBar: THREE.Mesh
   private bodyGroup: THREE.Group | null = null
   private pointLight: THREE.PointLight
-  private pulseTime = Math.random() * Math.PI * 2   // phase offset so showcase trio isn't synchronized
+  private pulseTime = Math.random() * Math.PI * 2
   private baselines: MaterialBaseline[] = []
-  private particles: Particle[] = []
 
   constructor(scene: THREE.Scene, variant: CoreVariant, x: number, y: number) {
     this.variant = variant
@@ -88,8 +75,6 @@ export class PowerCore {
     this.pointLight = new THREE.PointLight(0x00aaff, 3.2, 220)
     this.pointLight.position.set(0, TARGET_HEIGHT * 0.5, 0)
     this.mesh.add(this.pointLight)
-
-    this.buildParticles()
 
     this.hpBarGroup = new THREE.Group()
     this.hpBarGroup.position.set(0, TARGET_HEIGHT * 1.12, 0)
@@ -180,29 +165,6 @@ export class PowerCore {
     this.mesh.add(group)
   }
 
-  private buildParticles() {
-    const geo = new THREE.SphereGeometry(1.8, 6, 6)
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x66eeff,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-    })
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const m = new THREE.Mesh(geo, mat)
-      m.renderOrder = 5
-      this.mesh.add(m)
-      this.particles.push({
-        mesh: m,
-        angle: (i / PARTICLE_COUNT) * Math.PI * 2,
-        angularSpeed: 0.6 + Math.random() * 0.6,
-        yOffset: TARGET_HEIGHT * (0.25 + Math.random() * 0.6),
-        yPhase: Math.random() * Math.PI * 2,
-        yAmp: 4 + Math.random() * 4,
-      })
-    }
-  }
-
   get isDead() { return this.hp <= 0 }
 
   update(delta: number) {
@@ -219,13 +181,5 @@ export class PowerCore {
     }
 
     this.pointLight.intensity = 3.2 + Math.sin(this.pulseTime * 2.2) * 0.8
-
-    for (const p of this.particles) {
-      p.angle += p.angularSpeed * delta
-      const x = Math.cos(p.angle) * PARTICLE_RADIUS
-      const z = Math.sin(p.angle) * PARTICLE_RADIUS
-      const y = p.yOffset + Math.sin(this.pulseTime * 2 + p.yPhase) * p.yAmp
-      p.mesh.position.set(x, y, z)
-    }
   }
 }
