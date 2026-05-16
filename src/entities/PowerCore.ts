@@ -14,10 +14,13 @@ import { Config } from '../game/GameConfig'
 
 export type CoreVariant = 'plain' | 'textured' | 'super'
 
+// Only `super` is preloaded for active gameplay. The other two GLBs stay on
+// disk as future defense-tower / fallback assets — flip them back into this
+// map if you need to compare again or repurpose.
 const MODELS: Record<CoreVariant, string> = {
-  plain:    '/models/powercore/plain.glb',
-  textured: '/models/powercore/textured.glb',
-  super:    '/models/powercore/super.glb',
+  super: '/models/powercore/super.glb',
+  plain:    '',
+  textured: '',
 }
 
 const TARGET_HEIGHT = 85
@@ -29,7 +32,8 @@ const templates: Partial<Record<CoreVariant, { scene: THREE.Group; scale: number
 
 export async function preloadPowerCore(): Promise<void> {
   const loader = new GLTFLoader()
-  await Promise.all((Object.keys(MODELS) as CoreVariant[]).map(key =>
+  const active = (Object.keys(MODELS) as CoreVariant[]).filter(k => MODELS[k])
+  await Promise.all(active.map(key =>
     new Promise<void>((resolve) => {
       loader.load(
         MODELS[key],
@@ -74,7 +78,6 @@ export class PowerCore {
   private pulseTime = Math.random() * Math.PI * 2   // phase offset so showcase trio isn't synchronized
   private baselines: MaterialBaseline[] = []
   private particles: Particle[] = []
-  private label: THREE.Mesh | null = null
 
   constructor(scene: THREE.Scene, variant: CoreVariant, x: number, y: number) {
     this.variant = variant
@@ -103,8 +106,6 @@ export class PowerCore {
     this.hpBar.position.z = 0.2
     this.hpBarGroup.add(this.hpBar)
     this.mesh.add(this.hpBarGroup)
-
-    this.buildLabel(variant)
 
     this.installVariant()
     scene.add(this.mesh)
@@ -136,32 +137,8 @@ export class PowerCore {
     this.mesh.add(clone)
   }
 
-  // Small canvas-textured label above the HP bar so each showcase core is
-  // identifiable from the screenshot. Billboards with the HP bar.
-  private buildLabel(name: string) {
-    const canvas = document.createElement('canvas')
-    canvas.width = 256; canvas.height = 48
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = '#00ddff'
-    ctx.font = 'bold 28px monospace'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(name.toUpperCase(), canvas.width / 2, canvas.height / 2)
-    const tex = new THREE.CanvasTexture(canvas)
-    tex.colorSpace = THREE.SRGBColorSpace
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(60, 11),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
-    )
-    plane.position.set(0, TARGET_HEIGHT * 1.05, 0)
-    this.label = plane
-    this.mesh.add(plane)
-  }
-
   faceCamera(camera: THREE.Camera) {
     this.hpBarGroup.quaternion.copy(camera.quaternion)
-    if (this.label) this.label.quaternion.copy(camera.quaternion)
   }
 
   takeDamage(amount: number) {

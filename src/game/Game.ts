@@ -41,10 +41,7 @@ export class Game {
   private phase: Phase = 'loading'
 
   private background!: Background
-  // Gameplay core (passed to BattlePhase for win/lose + damage). The two
-  // showcase cores live alongside it for visual comparison only.
   private powerCore!: PowerCore
-  private showcaseCores: PowerCore[] = []
   private hud!: HUD
   private buildPhase: BuildPhase | null = null
   private battlePhase: BattlePhase | null = null
@@ -109,14 +106,9 @@ export class Game {
       preloadPowerCore(),
     ])
 
-    // Three-up showroom: plain (top), textured (gameplay, middle), super
-    // (bottom). User compares them side-by-side; only the middle one is wired
-    // into BattlePhase for win/lose / damage.
-    const px = Config.POWER_CORE.X
-    const py = Config.POWER_CORE.Y
-    this.showcaseCores.push(new PowerCore(this.scene, 'plain',    px, py + 120))
-    this.powerCore =        new PowerCore(this.scene, 'textured', px, py)
-    this.showcaseCores.push(new PowerCore(this.scene, 'super',    px, py - 120))
+    // Locked: super is the gameplay core. (textured kept on disk — earmarked
+    // as a future defense-tower asset; plain kept as a fallback option.)
+    this.powerCore = new PowerCore(this.scene, 'super', Config.POWER_CORE.X, Config.POWER_CORE.Y)
 
     this.hud.showGame()
     this.enterBuildPhase()
@@ -298,7 +290,6 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     this.attackerUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
     this.powerCore?.update(delta)
     this.powerCore?.faceCamera(this.camera)
-    for (const c of this.showcaseCores) { c.update(delta); c.faceCamera(this.camera) }
     this.spheres.forEach(s => { s.update(delta); s.faceCamera(this.camera) })
     this.buildPhase?.faceCamera(this.camera)
     this.battlePhase?.update(delta)
