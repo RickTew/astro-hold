@@ -63,34 +63,54 @@
       text-align: right;
     }
 
-    /* Bottom bar — single row, scrolls horizontally on narrow windows */
+    /* Bottom bar — now just hosts the READY/BATTLE button. Shops moved up
+       to their own corner panels (top-left = Robots, top-right = Cyborgs)
+       so they never crash into each other. */
     #bottom-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       gap: 10px;
       padding: 10px 16px;
       background: rgba(0, 0, 0, 0.45);
-      overflow-x: auto;
+    }
+
+    /* Robot shop — top-left corner panel below the ROBOTS credits header. */
+    #top-robot-shop {
+      position: absolute;
+      top: 52px;
+      left: 12px;
+      max-width: 52vw;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid #1a4466;
+      background: rgba(0, 8, 20, 0.75);
+    }
+
+    /* Cyborg shop — top-right corner panel below the CYBORGS credits header. */
+    #top-cyborg-shop {
+      position: absolute;
+      top: 52px;
+      right: 12px;
+      max-width: 36vw;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid #441122;
+      background: rgba(20, 0, 8, 0.75);
     }
 
     .shop-panel {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: nowrap;
-      padding: 6px 12px;
-      border: 1px solid #1a4466;
-      background: rgba(0, 8, 20, 0.8);
-      min-width: 0;
-      overflow-x: auto;
+      /* layout handled by #top-robot-shop / #top-cyborg-shop above */
     }
 
     .att-panel {
-      border-color: #441122;
-      background: rgba(20, 0, 8, 0.8);
+      /* tinting handled inline on #top-cyborg-shop */
     }
 
     .panel-label {

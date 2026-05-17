@@ -136,10 +136,11 @@ export class Game {
       // + textured.glb + plain.glb stay on disk for future repurposing.
     ])
 
-    // Pixel power core — 2x2 footprint (100 world units = 2 cells across)
-    // visually scaled up 25% so it reads as the dominant objective piece.
-    // Footprint stays 2x2 so the cell-occupancy math is unchanged.
-    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL * 2.5)
+    // Pixel power core — 2x2 footprint stays at 100 world units of cell
+    // occupancy, but the sprite renders at GRID_CELL * 3 (= 150) so it reads
+    // as the dominant objective piece. Sprite overflows the footprint
+    // visually — fine, it's billboard-only.
+    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL * 3)
 
     // Map-wide strategy grid. Game is shifting toward chess-like turn-based
     // play with one piece per square (see docs/STATS.md). The grid makes the
@@ -288,8 +289,15 @@ private enterBuildPhase() {
       this.phase = 'lose'; this.hud.setPhase('lose')
     }
     this.revealPhase.onComplete = () => {
+      const hadActions = (this.revealPhase?.totalSteps ?? 0) > 0
       this.revealPhase = null
       if (this.phase !== 'reveal') return   // game ended mid-reveal
+      if (!hadActions) {
+        // Stalemate — no piece could act this turn (e.g. no cyborgs placed).
+        // Stop the auto-loop instead of spinning forever; let the player see
+        // the board and decide what to do.
+        return
+      }
       // Clear queued plans so the next auto-reveal uses default actions
       // (cyborgs advance / spheres + towers auto-fire) instead of replaying
       // the original plan turn after turn.

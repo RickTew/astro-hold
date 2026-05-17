@@ -19,7 +19,21 @@ const STRUCTURE_SPRITE_FOLDERS: Partial<Record<StructureType, string>> = {
 const STRUCTURE_HAS_EXPLOSION: Partial<Record<StructureType, true>> = {
   turret: true,
 }
-const SPRITE_SIZE = 50   // one cell
+// Per-type sprite size override. Default = 50 (one cell). Towers render
+// slightly bigger so they read as the dominant defender pieces; Gun preview
+// is smaller per user feedback (sprite was overflowing its cell).
+const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
+  turret: 64,
+  gun:    40,
+}
+const SPRITE_SIZE = 50   // default — one cell
+// Per-type default facing. Tower has full 8 rotations and ships pointing
+// EAST per the planned directional-arc mechanic (player pays to add more
+// facing directions later). Preview pieces only have a single south.png so
+// they stay south.
+const STRUCTURE_DEFAULT_DIR: Partial<Record<StructureType, string>> = {
+  turret: 'east',
+}
 const EXPLOSION_FRAME_COUNT = 4
 const EXPLOSION_FRAME_INTERVAL = 0.09
 
@@ -44,7 +58,8 @@ export async function preloadStructureSprites(): Promise<void> {
   await Promise.all(
     (Object.keys(STRUCTURE_SPRITE_FOLDERS) as StructureType[]).map(async type => {
       const folder = STRUCTURE_SPRITE_FOLDERS[type]!
-      structureTextures.set(type, await loadTex(`/sprites/${folder}/south.png`))
+      const dir = STRUCTURE_DEFAULT_DIR[type] ?? 'south'
+      structureTextures.set(type, await loadTex(`/sprites/${folder}/${dir}.png`))
       if (STRUCTURE_HAS_EXPLOSION[type]) {
         const frames: THREE.Texture[] = []
         for (let i = 0; i < EXPLOSION_FRAME_COUNT; i++) {
@@ -123,7 +138,8 @@ export class Structure {
           alphaTest: 0.1,
         })
         const sprite = new THREE.Sprite(mat)
-        sprite.scale.set(SPRITE_SIZE, SPRITE_SIZE, 1)
+        const sz = STRUCTURE_SPRITE_SIZE[this.type] ?? SPRITE_SIZE
+        sprite.scale.set(sz, sz, 1)
         sprite.position.set(0, 0, 5)
         sprite.renderOrder = 10
         this.mesh.add(sprite)

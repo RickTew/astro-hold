@@ -7,6 +7,8 @@ export class HUD {
   private attCreditsEl!: HTMLElement
   private phaseEl!: HTMLElement
   private bottomBarEl!: HTMLElement
+  private robotShopEl!: HTMLElement
+  private cyborgShopEl!: HTMLElement
   private messageEl!: HTMLElement
   private loadingEl!: HTMLElement
   private planBarEl!: HTMLElement
@@ -31,23 +33,23 @@ export class HUD {
       <div id="credits-display" class="hidden">Credits: <span id="credits-val">200</span></div>
       <div id="team-label-att" class="hidden">CYBORGS</div>
       <div id="att-credits-display" class="hidden">Credits: <span id="att-credits-val">200</span></div>
+      <div id="top-robot-shop" class="shop-panel hidden">
+        <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
+        <button class="shop-btn" data-type="turret">Tower 30cr</button>
+        <button class="shop-btn" data-type="wall">Wall 20cr</button>
+        <button id="dog-btn" class="shop-btn">Dog 40cr</button>
+        <button class="shop-btn preview" data-type="defense">Defense 20cr</button>
+        <button class="shop-btn preview" data-type="gun">Gun 30cr</button>
+        <button class="shop-btn preview" data-type="laser">Laser 40cr</button>
+        <button class="shop-btn preview" data-type="signal">Signal 20cr</button>
+      </div>
+      <div id="top-cyborg-shop" class="shop-panel att-panel hidden">
+        <button class="att-btn" data-type="cannon">Cannon 70cr</button>
+        <button class="att-btn" data-type="grenadier">Grenadier 50cr</button>
+        <button class="att-btn" data-type="doublegun">Double Gun 90cr</button>
+      </div>
       <div id="bottom-bar" class="hidden">
-        <div id="shop" class="shop-panel">
-          <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
-          <button class="shop-btn" data-type="turret">Tower 30cr</button>
-          <button class="shop-btn" data-type="wall">Wall 20cr</button>
-          <button id="dog-btn" class="shop-btn">Dog 40cr</button>
-          <button class="shop-btn preview" data-type="defense">Defense 20cr</button>
-          <button class="shop-btn preview" data-type="gun">Gun 30cr</button>
-          <button class="shop-btn preview" data-type="laser">Laser 40cr</button>
-          <button class="shop-btn preview" data-type="signal">Signal 20cr</button>
-        </div>
         <button id="battle-btn">READY</button>
-        <div id="attacker-shop" class="shop-panel att-panel">
-          <button class="att-btn" data-type="cannon">Cannon 70cr</button>
-          <button class="att-btn" data-type="grenadier">Grenadier 50cr</button>
-          <button class="att-btn" data-type="doublegun">Double Gun 90cr</button>
-        </div>
       </div>
       <div id="plan-bar" class="hidden">
         <div id="plan-instructions">
@@ -65,6 +67,8 @@ export class HUD {
     this.creditsEl        = this.container.querySelector('#credits-val')!
     this.attCreditsEl     = this.container.querySelector('#att-credits-val')!
     this.bottomBarEl      = this.container.querySelector('#bottom-bar')!
+    this.robotShopEl      = this.container.querySelector('#top-robot-shop')!
+    this.cyborgShopEl     = this.container.querySelector('#top-cyborg-shop')!
     this.messageEl        = this.container.querySelector('#game-message')!
     this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
@@ -140,6 +144,8 @@ export class HUD {
       case 'build':
         this.phaseEl.textContent = 'BUILD PHASE'
         this.bottomBarEl.classList.remove('hidden')
+        this.robotShopEl.classList.remove('hidden')
+        this.cyborgShopEl.classList.remove('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
@@ -147,12 +153,16 @@ export class HUD {
       case 'planning':
         this.phaseEl.textContent = 'PLAN PHASE'
         this.bottomBarEl.classList.add('hidden')
+        this.robotShopEl.classList.add('hidden')
+        this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'reveal':
         this.phaseEl.textContent = 'BATTLE'
         this.bottomBarEl.classList.add('hidden')
+        this.robotShopEl.classList.add('hidden')
+        this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')

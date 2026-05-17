@@ -117,26 +117,62 @@ export class RevealPhase {
 
   // Default action for any mobile unit (attacker cyborg OR defender dog).
   // If an enemy is in attack range, fire at the nearest one. Otherwise step
-  // one cell toward the nearest enemy in sight, falling back to a random
-  // adjacent step if nothing's spotted.
+  // one cell toward the nearest enemy in sight. If nothing's in sight,
+  // cyborgs still advance toward the core (their objective) and defender
+  // mobile units (dogs) wander to a random adjacent cell.
   private defaultMobileUnitAction(unit: SpriteUnit): QueuedAction | null {
     const range: number = Config.UNITS[unit.type].range
-    // Fire phase — only if the unit has any range at all.
     if (range > 0) {
       const fireTarget = this.nearestEnemy(unit, range)
       if (fireTarget) {
         return { kind: 'fire', target: { kind: fireTarget.kind, id: fireTarget.id } }
       }
     }
-    // Move phase — pick the nearest enemy within sight as the heading.
     const sight: number = Config.UNITS[unit.type].sightRange ?? range
     const moveTarget = this.nearestEnemy(unit, sight)
     if (moveTarget) {
       const cell = this.pickStepTowardPoint(unit, moveTarget.x, moveTarget.y)
       if (cell) return { kind: 'move', cell }
     }
+    // Nothing in sight. Fallback behaviour by side.
+    if (unit.side === 'attacker' && !this.core.isDead) {
+      // Cyborgs always grind toward the core.
+      const cc = this.core.cellCenters()[0]
+      const cell = this.pickStepTowardPoint(unit, cc.x, cc.y)
+      if (cell) return { kind: 'move', cell }
+    }
+    if (unit.side === 'defender') {
+      // Robots wander when no enemy in sight (per user spec).
+      const cell = this.pickWanderStep(unit)
+      if (cell) return { kind: 'move', cell }
+    }
     return null
   }
+
+  private pickWanderStep(unit: SpriteUnit): CellRef | null {
+    const cs = Config.GRID_CELL
+    const options: CellRef[] = []
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue
+        const x = unit.worldX + dx * cs
+        const y = unit.worldY + dy * cs
+        if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
+        if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
+        if (this.isCellOccupiedAtBattle(x, y, unit)) continue
+        const col = Math.floor((x - Config.WORLD.LEFT) / cs)
+        const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
+        options.push({ col, row })
+      }
+    }
+    if (options.length === 0) return null
+    return options[Math.floor(Math.random() * options.length)]
+  }
+
+  // Total planned steps — Game uses this after onComplete to detect a
+  // zero-action reveal (no pieces capable of acting) so the continuous-battle
+  // loop doesn't spin forever.
+  get totalSteps(): number { return this.steps.length }
 
   // Returns the closest LIVE enemy entity within `maxDist` of unit. Enemy side
   // is inferred from the unit's own side (attacker → defender, defender → attacker).

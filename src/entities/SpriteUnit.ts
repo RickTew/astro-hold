@@ -191,9 +191,11 @@ export class SpriteUnit {
   private deathTime = 0
   private readonly moveSpeedPS: number
 
-  // Initial facing: -X (toward power core). Stored as math angle (0=+X, π/2=+Y).
-  private facingAngle = Math.PI
-  private currentDir: Direction = 'west'
+  // Initial facing: cyborgs face west toward the power core; defender mobile
+  // units (combat dogs) face east toward incoming cyborgs. Stored as a math
+  // angle (0=+X east, π/2=+Y north, π=+X west).
+  private facingAngle: number
+  private currentDir: Direction
 
   // Active animation state, frame index, and elapsed time within the frame.
   private currentState: AnimState = 'idle'
@@ -217,6 +219,10 @@ export class SpriteUnit {
     this.apBudget = Config.UNITS[type].apBudget
     this.apRemaining = this.apBudget
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
+    // Defenders look east toward the cyborg side; attackers look west toward
+    // the core. Drives the initial sprite direction.
+    this.facingAngle = side === 'defender' ? 0 : Math.PI
+    this.currentDir = side === 'defender' ? 'east' : 'west'
 
     const spread = Config.WORLD.TOP - Config.WORLD.BOTTOM - 40
     const y = spawnY ?? (Math.random() - 0.5) * spread
