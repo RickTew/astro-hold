@@ -173,7 +173,16 @@ private enterBuildPhase() {
     this.attCredits = Config.START_CREDITS
     this.hud.setPhase('build')
     this.hud.setAttCredits(this.attCredits)
-    this.buildPhase = new BuildPhase(this.scene, this.camera, this.hud, Config.START_CREDITS)
+    this.buildPhase = new BuildPhase(
+      this.scene, this.camera, this.hud, Config.START_CREDITS,
+      // Cross-system occupancy: structures must respect existing
+      // spheres/cyborgs/core, which BuildPhase doesn't track.
+      (col, row) => {
+        const x = Config.WORLD.LEFT   + col * Config.GRID_CELL + Config.GRID_CELL / 2
+        const y = Config.WORLD.BOTTOM + row * Config.GRID_CELL + Config.GRID_CELL / 2
+        return this.isCellOccupied(x, y)
+      },
+    )
 
     // Thin fence borders mark each zone without covering sprites.
     this.defZoneMesh = this.makeZoneBorder(
@@ -385,7 +394,8 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
 
   // One piece per cell rule (per design — see docs/STATS.md). Pieces snap to
   // exact cell centers, so equality-with-epsilon catches collisions. The
-  // Power Core has a 2x2 footprint and blocks all 4 of its cells.
+  // Power Core has a 2x2 footprint and blocks all 4 of its cells. Also
+  // checks placed structures so the two placement systems can't cohabit.
   private isCellOccupied(x: number, y: number): boolean {
     const E = 1
     for (const s of this.spheres) {
@@ -396,6 +406,10 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     }
     for (const cc of this.powerCore.cellCenters()) {
       if (Math.abs(cc.x - x) < E && Math.abs(cc.y - y) < E) return true
+    }
+    for (const s of this.buildPhase?.getStructures() ?? []) {
+      if (s.isDead) continue
+      if (Math.abs(s.worldX - x) < E && Math.abs(s.worldY - y) < E) return true
     }
     return false
   }

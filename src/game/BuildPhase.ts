@@ -22,7 +22,10 @@ export class BuildPhase {
     private scene: THREE.Scene,
     private camera: THREE.Camera,
     private hud: HUD,
-    startCredits: number
+    startCredits: number,
+    // Cross-system occupancy check — Game injects this so structure placement
+    // can see spheres/cyborgs (which BuildPhase doesn't otherwise know about).
+    private externalOccupied: (col: number, row: number) => boolean = () => false,
   ) {
     this.credits = startCredits
 
@@ -89,7 +92,10 @@ private buildHitPlane(): THREE.Mesh {
   private onMouseMove = (e: MouseEvent) => {
     if (!this.selectedType) { this.hideGhost(); return }
     const cell = this.getCell(e)
-    if (cell && !this.occupied.has(`${cell.col},${cell.row}`)) {
+    const blocked = !cell
+      || this.occupied.has(`${cell.col},${cell.row}`)
+      || this.externalOccupied(cell.col, cell.row)
+    if (cell && !blocked) {
       this.showGhost(cell.wx, cell.wy)
     } else {
       this.hideGhost()
@@ -100,6 +106,7 @@ private buildHitPlane(): THREE.Mesh {
     if (!this.selectedType) return
     const cell = this.getCell(e)
     if (!cell || this.occupied.has(`${cell.col},${cell.row}`)) return
+    if (this.externalOccupied(cell.col, cell.row)) return
 
     const cost = Config.STRUCTURES[this.selectedType].cost
     if (this.credits < cost) return
