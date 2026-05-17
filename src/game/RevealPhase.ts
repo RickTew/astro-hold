@@ -51,6 +51,7 @@ export class RevealPhase {
     private units: SpriteUnit[],
     private structures: Structure[],
     private spheres: SphereDefender[],
+    private defenderUnits: SpriteUnit[] = [],
   ) {
     this.steps = this.buildSteps()
   }
@@ -67,7 +68,18 @@ export class RevealPhase {
       if (u.queuedActions.length > 0) {
         for (const a of u.queuedActions) list.push({ actor: u, action: a })
       } else {
-        const def = this.defaultCyborgAction(u)
+        const def = this.defaultMobileUnitAction(u)
+        if (def) list.push({ actor: u, action: def })
+      }
+    }
+    // Defender mobile units (combat dogs): same default-action logic but
+    // hunting cyborgs rather than defender pieces.
+    for (const u of this.defenderUnits) {
+      if (u.isDead) continue
+      if (u.queuedActions.length > 0) {
+        for (const a of u.queuedActions) list.push({ actor: u, action: a })
+      } else {
+        const def = this.defaultMobileUnitAction(u)
         if (def) list.push({ actor: u, action: def })
       }
     }
@@ -103,38 +115,60 @@ export class RevealPhase {
     return list
   }
 
-  // Default action when a cyborg has no queued plan. If an enemy is in attack
-  // range, fire at the nearest one. Otherwise step one cell toward the core.
-  private defaultCyborgAction(unit: SpriteUnit): QueuedAction | null {
+  // Default action for any mobile unit (attacker cyborg OR defender dog).
+  // If an enemy is in attack range, fire at the nearest one. Otherwise step
+  // one cell toward the nearest enemy in sight, falling back to a random
+  // adjacent step if nothing's spotted.
+  private defaultMobileUnitAction(unit: SpriteUnit): QueuedAction | null {
     const range: number = Config.UNITS[unit.type].range
-    let bestId: string | null = null
-    let bestKind: 'sphere' | 'structure' | 'core' = 'sphere'
-    let bestDist: number = range
-    const consider = (id: string, kind: 'sphere' | 'structure' | 'core', x: number, y: number) => {
-      const d = Math.hypot(x - unit.worldX, y - unit.worldY)
-      if (d <= bestDist) { bestId = id; bestKind = kind; bestDist = d }
-    }
-    for (const s of this.spheres)    if (!s.isDead) consider(s.id, 'sphere',    s.worldX, s.worldY)
-    for (const s of this.structures) if (!s.isDead) consider(s.id, 'structure', s.worldX, s.worldY)
-    if (!this.core.isDead) {
-      // Use closest of the 4 core cells.
-      for (const cc of this.core.cellCenters()) {
-        consider('core', 'core', cc.x, cc.y)
+    // Fire phase — only if the unit has any range at all.
+    if (range > 0) {
+      const fireTarget = this.nearestEnemy(unit, range)
+      if (fireTarget) {
+        return { kind: 'fire', target: { kind: fireTarget.kind, id: fireTarget.id } }
       }
     }
-    if (bestId !== null) {
-      return { kind: 'fire', target: { kind: bestKind, id: bestId } }
+    // Move phase — pick the nearest enemy within sight as the heading.
+    const sight: number = Config.UNITS[unit.type].sightRange ?? range
+    const moveTarget = this.nearestEnemy(unit, sight)
+    if (moveTarget) {
+      const cell = this.pickStepTowardPoint(unit, moveTarget.x, moveTarget.y)
+      if (cell) return { kind: 'move', cell }
     }
-
-    // Nothing in range — advance one cell toward the core.
-    const cell = this.pickStepTowardCore(unit)
-    return cell ? { kind: 'move', cell } : null
+    return null
   }
 
-  private pickStepTowardCore(unit: SpriteUnit): CellRef | null {
+  // Returns the closest LIVE enemy entity within `maxDist` of unit. Enemy side
+  // is inferred from the unit's own side (attacker → defender, defender → attacker).
+  private nearestEnemy(
+    unit: SpriteUnit,
+    maxDist: number,
+  ): { id: string; kind: 'sphere' | 'structure' | 'core' | 'unit'; x: number; y: number; d: number } | null {
+    let bestId: string | null = null
+    let bestKind: 'sphere' | 'structure' | 'core' | 'unit' = 'unit'
+    let bestX = 0, bestY = 0
+    let bestDist = maxDist
+    const consider = (id: string, kind: typeof bestKind, x: number, y: number) => {
+      const d = Math.hypot(x - unit.worldX, y - unit.worldY)
+      if (d <= bestDist) { bestId = id; bestKind = kind; bestX = x; bestY = y; bestDist = d }
+    }
+    if (unit.side === 'attacker') {
+      for (const s of this.spheres)        if (!s.isDead) consider(s.id, 'sphere',    s.worldX, s.worldY)
+      for (const s of this.structures)     if (!s.isDead) consider(s.id, 'structure', s.worldX, s.worldY)
+      for (const d of this.defenderUnits)  if (!d.isDead) consider(d.id, 'unit',      d.worldX, d.worldY)
+      if (!this.core.isDead) {
+        for (const cc of this.core.cellCenters()) consider('core', 'core', cc.x, cc.y)
+      }
+    } else {
+      for (const u of this.units) if (!u.isDead) consider(u.id, 'unit', u.worldX, u.worldY)
+    }
+    return bestId === null ? null : { id: bestId, kind: bestKind, x: bestX, y: bestY, d: bestDist }
+  }
+
+  // Step one cell toward (tx, ty) — picks the adjacent cell that reduces
+  // distance the most and isn't occupied. Returns null if no valid step.
+  private pickStepTowardPoint(unit: SpriteUnit, tx: number, ty: number): CellRef | null {
     const cs = Config.GRID_CELL
-    const tx = this.core.mesh.position.x
-    const ty = this.core.mesh.position.y
     const curDist = Math.hypot(tx - unit.worldX, ty - unit.worldY)
     type Cand = { col: number; row: number; x: number; y: number; d: number }
     const candidates: Cand[] = []
@@ -329,7 +363,9 @@ export class RevealPhase {
         proj.onHit = () => { if (!targetEntity.isDead) targetEntity.takeDamage(damage) }
       }
     } else {
-      // AoE — splash everything in range of the impact point.
+      // AoE — splash everything in range of the impact point. Defender
+      // AoE (turret cannon etc.) damages cyborgs + defender units? No —
+      // friendly fire stays off; AoE only hits enemy side pieces.
       proj.onHit = () => this.applyAoe(aim.x, aim.y, aoeRadius, damage, actor)
     }
 
@@ -338,8 +374,8 @@ export class RevealPhase {
   }
 
   private applyAoe(cx: number, cy: number, radius: number, damage: number, source: Actor) {
-    // Defender AoE (cannon structure / sphere with AoE) hits cyborgs. Attacker
-    // AoE (grenadier) hits defender pieces + the core.
+    // Defender AoE hits cyborgs only. Attacker AoE hits defender pieces +
+    // defender mobile units + the core.
     if (source.side === 'defender') {
       for (const u of this.units) {
         if (u.isDead) continue
@@ -354,7 +390,10 @@ export class RevealPhase {
         if (s.isDead) continue
         if (this.inRadius(s.worldX, s.worldY, cx, cy, radius)) s.takeDamage(damage)
       }
-      // Core takes a hit if any of its 4 cells is inside the splash.
+      for (const u of this.defenderUnits) {
+        if (u.isDead) continue
+        if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) u.takeDamage(damage)
+      }
       if (!this.core.isDead) {
         const cc = this.core.cellCenters()
         const hit = cc.some(p => this.inRadius(p.x, p.y, cx, cy, radius))
@@ -413,7 +452,7 @@ export class RevealPhase {
 
   private resolveTargetEntity(ref: TargetRef): { takeDamage(n: number): void; isDead: boolean } | null {
     if (ref.kind === 'core') return this.core.isDead ? null : this.core
-    const all: Actor[] = [...this.units, ...this.spheres, ...this.structures]
+    const all: Actor[] = [...this.units, ...this.defenderUnits, ...this.spheres, ...this.structures]
     const hit = all.find(p => p.id === ref.id)
     return hit && !hit.isDead ? hit : null
   }
@@ -423,7 +462,7 @@ export class RevealPhase {
       if (this.core.isDead) return null
       return { x: this.core.mesh.position.x, y: this.core.mesh.position.y }
     }
-    const all: Actor[] = [...this.units, ...this.spheres, ...this.structures]
+    const all: Actor[] = [...this.units, ...this.defenderUnits, ...this.spheres, ...this.structures]
     const hit = all.find(p => p.id === ref.id)
     return hit && !hit.isDead ? { x: hit.worldX, y: hit.worldY } : null
   }
@@ -441,6 +480,11 @@ export class RevealPhase {
   private isCellOccupiedAtBattle(x: number, y: number, exclude: Actor): boolean {
     const E = 1
     for (const u of this.units) {
+      if (u === exclude || u.isDead) continue
+      if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
+      if (u.isWalking && Math.abs(u.prevWorldX - x) < E && Math.abs(u.prevWorldY - y) < E) return true
+    }
+    for (const u of this.defenderUnits) {
       if (u === exclude || u.isDead) continue
       if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
       if (u.isWalking && Math.abs(u.prevWorldX - x) < E && Math.abs(u.prevWorldY - y) < E) return true
@@ -494,6 +538,7 @@ export class RevealPhase {
 
   faceCamera(camera: THREE.Camera) {
     for (const u of this.units) u.faceCamera(camera)
+    for (const u of this.defenderUnits) u.faceCamera(camera)
     for (const s of this.spheres) if (!s.isDead) s.faceCamera(camera)
     for (const s of this.structures) if (!s.isDead) s.faceCamera(camera)
   }

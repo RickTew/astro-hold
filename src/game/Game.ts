@@ -49,6 +49,9 @@ export class Game {
   private revealPhase: RevealPhase | null = null
   // All attackers are pixel sprites now (the 3D Meshy cyborg was retired).
   private attackerUnits: SpriteUnit[] = []
+  // Defender-side mobile units (combat dogs today). Separate from spheres
+  // (stationary) and structures.
+  private defenderUnits: SpriteUnit[] = []
   // Structures are owned by Game after the Build phase tears down — Planning
   // and Reveal both read from this array across turns.
   private structures: Structure[] = []
@@ -126,6 +129,7 @@ export class Game {
       preloadSpriteUnit('cannon', 'cannon'),
       preloadSpriteUnit('grenadier', 'grenadier'),
       preloadSpriteUnit('doublegun', 'doublegun'),
+      preloadSpriteUnit('dog', 'dog'),
       preloadPixelPowerCore(),
       preloadStructureSprites(),
       // GLB Power Core preload skipped — switched to pixel sprite. super.glb
@@ -175,6 +179,7 @@ export class Game {
 private enterBuildPhase() {
     this.phase = 'build'
     this.attackerUnits = []
+    this.defenderUnits = []
     this.attCredits = Config.START_CREDITS
     this.hud.setPhase('build')
     this.hud.setAttCredits(this.attCredits)
@@ -205,6 +210,15 @@ private enterBuildPhase() {
       this.buildPhase?.selectStructure(null)
       this.hud.clearStructureSelection()
       this.startSpherePlacement()
+    }
+
+    this.hud.onBuyDog = () => {
+      if (this.placement?.kind === 'dog') { this.endPlacement(); return }
+      const cost = Config.UNITS.dog.cost
+      if (!this.buildPhase || this.buildPhase.getCredits() < cost) return
+      this.buildPhase?.selectStructure(null)
+      this.hud.clearStructureSelection()
+      this.startDogPlacement()
     }
 
     // Build's "READY" button opens the planning phase (first turn).
@@ -265,7 +279,7 @@ private enterBuildPhase() {
     this.hud.onBattle = null   // reveal can't be skipped via the button
 
     this.revealPhase = new RevealPhase(
-      this.scene, this.powerCore, this.attackerUnits, this.structures, this.spheres,
+      this.scene, this.powerCore, this.attackerUnits, this.structures, this.spheres, this.defenderUnits,
     )
     this.revealPhase.onWin = () => {
       this.phase = 'win'; this.hud.setPhase('win')
@@ -280,6 +294,7 @@ private enterBuildPhase() {
       // (cyborgs advance / spheres + towers auto-fire) instead of replaying
       // the original plan turn after turn.
       for (const u of this.attackerUnits) u.clearPlan()
+      for (const u of this.defenderUnits) u.clearPlan()
       for (const s of this.spheres)       s.clearPlan()
       for (const s of this.structures)    s.clearPlan()
       // Chain straight into the next reveal — no PLAN phase between turns.
@@ -309,6 +324,28 @@ private enterBuildPhase() {
         if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
         this.spheres.push(new SphereDefender(this.scene, x, y))
         return false  // multi-place — keep selecting until user cancels or credits run out
+      },
+    }
+  }
+
+  private startDogPlacement() {
+    this.endPlacement()
+    const color = Config.UNITS.dog.color
+    const ghost = this.makeGhostRing(color, 12, 20)
+    ghost.position.set(-400, 0, 1)
+    this.scene.add(ghost)
+    this.placement = {
+      kind: 'dog',
+      ghost, tint: null,
+      zoneXMin: Config.WORLD.LEFT,
+      zoneXMax: Config.DEFENDER_MAX_X,
+      marginTop: 0, marginBottom: 0,
+      onPlace: (x, y) => {
+        if (this.isCellOccupied(x, y)) return false
+        const cost = Config.UNITS.dog.cost
+        if (!this.buildPhase || !this.buildPhase.spendCredits(cost)) return false
+        this.defenderUnits.push(new SpriteUnit(this.scene, 'dog', x, y, 'defender'))
+        return false
       },
     }
   }
@@ -394,6 +431,9 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     for (const u of this.attackerUnits) {
       if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
     }
+    for (const u of this.defenderUnits) {
+      if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
+    }
     for (const cc of this.powerCore.cellCenters()) {
       if (Math.abs(cc.x - x) < E && Math.abs(cc.y - y) < E) return true
     }
@@ -457,6 +497,7 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     this.lastTime = now
 
     this.attackerUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
+    this.defenderUnits.forEach(u => { u.update(delta); u.faceCamera(this.camera) })
     this.powerCore?.update(delta)
     this.powerCore?.faceCamera(this.camera)
     this.spheres.forEach(s => { s.update(delta); s.faceCamera(this.camera) })
@@ -552,6 +593,16 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
         this.spheres.splice(i, 1)
         this.scene.remove(s.mesh)
         this.buildPhase?.addCredits(SPHERE_COST)
+        return true
+      }
+    }
+    for (let i = 0; i < this.defenderUnits.length; i++) {
+      const u = this.defenderUnits[i]
+      const dx = u.worldX - x, dy = u.worldY - y
+      if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        this.defenderUnits.splice(i, 1)
+        this.scene.remove(u.mesh)
+        this.buildPhase?.addCredits(Config.UNITS[u.type].cost)
         return true
       }
     }

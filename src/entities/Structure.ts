@@ -11,7 +11,6 @@ import { playExplosion } from '../audio/sfx'
 const STRUCTURE_SPRITE_FOLDERS: Partial<Record<StructureType, string>> = {
   turret:  'tower',    // Robot_Tower — single canonical tower (replaces tower1/tower2)
   defense: 'defense',  // geodesic dome (preview, no rotations)
-  dog:     'dog',      // mechanical quadruped (preview)
   gun:     'gun',      // twin-barrel turret (preview)
   laser:   'laser',    // twin-laser turret (preview)
   signal:  'signal',   // satellite dish (preview)
@@ -110,7 +109,6 @@ export class Structure {
     switch (this.type) {
       case 'turret':
       case 'defense':
-      case 'dog':
       case 'gun':
       case 'laser':
       case 'signal': {

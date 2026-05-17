@@ -97,6 +97,14 @@ const MANIFEST: Record<string, AnimManifest> = {
     shoot:   { fps: 14, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
     die:     { fps: 8,  loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
   },
+  // Combat Dog (defender). No idle clip — static rotations are used at rest.
+  // No shoot — dog has range 0 and never fires. die uses the 4-frame
+  // explosion copied into every direction folder (reads the same from any
+  // facing since the burst is omnidirectional).
+  dog: {
+    walking: { fps: 8,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
+    die:     { fps: 12, loop: false, presentDirs: ALL_DIRS, frameCount: 4 },
+  },
 }
 
 function loadTexture(url: string): Promise<THREE.Texture> {
@@ -152,6 +160,8 @@ export class SpriteUnit {
   hp: number
   readonly maxHp: number
   readonly type: UnitType
+  // 'attacker' = cyborg, 'defender' = robot. Assigned in constructor.
+  private readonly _side: 'attacker' | 'defender'
   isDead = false
 
   // Plan-then-play turn state. Phase 2 (Planning UI) writes queuedActions and
@@ -193,9 +203,16 @@ export class SpriteUnit {
   // Pending state to enter once the current one-shot finishes (shoot/throw).
   private pendingState: AnimState | null = null
 
-  constructor(scene: THREE.Scene, type: UnitType, spawnX: number, spawnY?: number) {
+  constructor(
+    scene: THREE.Scene,
+    type: UnitType,
+    spawnX: number,
+    spawnY?: number,
+    side: 'attacker' | 'defender' = 'attacker',
+  ) {
     this.type = type
-    this.id = nextActorId('cyborg')
+    this._side = side
+    this.id = nextActorId(side === 'defender' ? 'robot' : 'cyborg')
     this.hp = this.maxHp = Config.UNITS[type].hp
     this.apBudget = Config.UNITS[type].apBudget
     this.apRemaining = this.apBudget
@@ -280,7 +297,7 @@ export class SpriteUnit {
   get prevWorldX() { return this.prevX }
   get prevWorldY() { return this.prevY }
   get isWalking() { return this.isMoving }
-  get side(): 'attacker' { return 'attacker' }
+  get side(): 'attacker' | 'defender' { return this._side }
   get speed()    { return Config.UNITS[this.type].speed }
   get damage()   { return Config.UNITS[this.type].damage }
   get range()    { return Config.UNITS[this.type].range }

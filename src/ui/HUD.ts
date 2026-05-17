@@ -15,6 +15,7 @@ export class HUD {
   onSelectStructure: ((type: StructureType) => void) | null = null
   onSpawnUnit: ((type: UnitType) => void) | null = null
   onBuySphere: (() => void) | null = null
+  onBuyDog: (() => void) | null = null
   onBattle: (() => void) | null = null
 
   constructor() {
@@ -35,11 +36,11 @@ export class HUD {
           <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
           <button class="shop-btn" data-type="turret">Tower 30cr</button>
           <button class="shop-btn" data-type="wall">Wall 20cr</button>
+          <button id="dog-btn" class="shop-btn">Dog 40cr</button>
           <button class="shop-btn preview" data-type="defense">Defense 20cr</button>
           <button class="shop-btn preview" data-type="gun">Gun 30cr</button>
           <button class="shop-btn preview" data-type="laser">Laser 40cr</button>
           <button class="shop-btn preview" data-type="signal">Signal 20cr</button>
-          <button class="shop-btn preview" data-type="dog">Dog 30cr</button>
         </div>
         <button id="battle-btn">READY</button>
         <div id="attacker-shop" class="shop-panel att-panel">
@@ -72,7 +73,11 @@ export class HUD {
       this.onBuySphere?.()
     })
 
-    this.container.querySelectorAll('.shop-btn:not(#sphere-btn)').forEach(btn => {
+    this.container.querySelector('#dog-btn')?.addEventListener('click', () => {
+      this.onBuyDog?.()
+    })
+
+    this.container.querySelectorAll('.shop-btn:not(#sphere-btn):not(#dog-btn)').forEach(btn => {
       btn.addEventListener('click', e => {
         const type = (e.currentTarget as HTMLElement).dataset.type as StructureType
         this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))

@@ -29,7 +29,6 @@ export const Config = {
     wall:    { cost: 20, hp: 300, damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, label: 'Wall   20cr' },
     mine:    { cost: 20, hp: 50,  damage: 60, range: 60,  fireInterval: 0, apBudget: 0, label: 'Mine   20cr' },
     defense: { cost: 20, hp: 80,  damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, label: 'Defense 20cr (preview)' },
-    dog:     { cost: 30, hp: 60,  damage: 15, range: 200, fireInterval: 2, apBudget: 1, label: 'Dog 30cr (preview)' },
     gun:     { cost: 30, hp: 80,  damage: 15, range: 200, fireInterval: 2, apBudget: 1, label: 'Gun 30cr (preview)' },
     laser:   { cost: 40, hp: 70,  damage: 25, range: 300, fireInterval: 3, apBudget: 1, label: 'Laser 40cr (preview)' },
     signal:  { cost: 20, hp: 50,  damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, label: 'Signal 20cr (preview)' },
@@ -46,6 +45,10 @@ export const Config = {
     grenadier: { cost: 50, hp: 110, speed: 75,  damage: 28, range: 220, sightRange: 280, aoeRadius: 65, apBudget: 3, label: 'Grenadier', color: 0x88dd44 },
     // Double Gun — dual hand-cannons, highest direct-fire damage, costlier and slightly squishier than Cannon.
     doublegun: { cost: 90, hp: 160, speed: 65,  damage: 45, range: 230, sightRange: 300, aoeRadius: 0,  apBudget: 3, label: 'Double Gun',color: 0xff8866 },
+    // Combat Dog — DEFENDER mobile unit. Fast, melee, no ranged fire (range 0 →
+    // never fires; just charges and contacts cyborgs). Placed in the defender
+    // zone; the only mobile robot today.
+    dog:       { cost: 40, hp: 80,  speed: 90,  damage: 0,  range: 0,   sightRange: 280, aoeRadius: 0,  apBudget: 3, label: 'Dog',        color: 0x4488aa },
   },
 } as const
 
