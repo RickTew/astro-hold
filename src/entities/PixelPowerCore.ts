@@ -86,13 +86,13 @@ export class PixelPowerCore {
     // floating-overhead UI feel.
     this.hpBarGroup.position.set(0, size * 0.40, 0)
     const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(70, 8),
+      new THREE.PlaneGeometry(50, 5),
       new THREE.MeshBasicMaterial({ color: 0xcc2222 })
     )
     bg.position.z = 0.1
     this.hpBarGroup.add(bg)
     this.hpBar = new THREE.Mesh(
-      new THREE.PlaneGeometry(70, 8),
+      new THREE.PlaneGeometry(50, 5),
       new THREE.MeshBasicMaterial({ color: 0x00ff88 })
     )
     this.hpBar.position.z = 0.2
@@ -111,7 +111,7 @@ export class PixelPowerCore {
     this.hp = Math.max(0, this.hp - amount)
     const ratio = this.hp / this.maxHp
     this.hpBar.scale.x = ratio
-    this.hpBar.position.x = -(1 - ratio) * 35
+    this.hpBar.position.x = -(1 - ratio) * 25   // half of new bar width 50
     const mat = this.hpBar.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00ff88 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     if (this.hp <= 0) this.startDying()

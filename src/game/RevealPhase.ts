@@ -204,10 +204,12 @@ export class RevealPhase {
       return
     }
 
-    // All planned actions consumed — wait for in-flight projectiles to land,
-    // then signal completion so Game can open a fresh Planning phase.
+    // All planned actions consumed — wait for in-flight projectiles AND
+    // explosions to finish, then signal completion. (Previously only waited
+    // on projectiles, so a Grenadier AoE explosion that was still expanding
+    // got orphaned in the scene with nothing to tick it.)
     if (this.idx >= this.steps.length) {
-      if (this.projectiles.length === 0) {
+      if (this.projectiles.length === 0 && this.explosions.length === 0) {
         this.done = true
         this.onComplete?.()
       }

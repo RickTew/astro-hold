@@ -318,7 +318,7 @@ export class SpriteUnit {
     this.hp = Math.max(0, this.hp - amount)
     const ratio = this.hp / this.maxHp
     this.hpBarFill.scale.x = ratio
-    this.hpBarFill.position.x = -(1 - ratio) * 15
+    this.hpBarFill.position.x = -(1 - ratio) * 12   // half of new bar width 24
     const mat = this.hpBarFill.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     if (this.hpRing) this.updateHpRing(ratio)
@@ -495,14 +495,14 @@ export class SpriteUnit {
     group.position.set(0, 22, 0)
 
     const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(30, 4),
+      new THREE.PlaneGeometry(24, 3),
       new THREE.MeshBasicMaterial({ color: 0xcc2222 })
     )
     bg.position.z = 0.1
     group.add(bg)
 
     const fill = new THREE.Mesh(
-      new THREE.PlaneGeometry(30, 4),
+      new THREE.PlaneGeometry(24, 3),
       new THREE.MeshBasicMaterial({ color: 0x00cc44 })
     )
     fill.position.z = 0.2

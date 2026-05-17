@@ -160,16 +160,16 @@ export class Structure {
     // HP bar — grouped so we can billboard the group to face the camera.
     // Walls use their own body as the HP indicator, so the bar stays hidden.
     this.hpBarGroup = new THREE.Group()
-    this.hpBarGroup.position.set(0, 34, 0)
+    this.hpBarGroup.position.set(0, 28, 0)
     const bg = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 5),
+      new THREE.PlaneGeometry(28, 3),
       new THREE.MeshBasicMaterial({ color: 0x222222 })
     )
     bg.position.z = 0.1
     this.hpBarGroup.add(bg)
 
     const fill = new THREE.Mesh(
-      new THREE.PlaneGeometry(40, 5),
+      new THREE.PlaneGeometry(28, 3),
       new THREE.MeshBasicMaterial({ color: 0x00cc44 })
     )
     fill.position.z = 0.2
@@ -201,7 +201,7 @@ export class Structure {
       mat.color.setRGB(0.6 * tint, 0.4 * tint, 0.2 * tint)
     } else {
       this.hpBar.scale.x = ratio
-      this.hpBar.position.x = -(1 - ratio) * 20
+      this.hpBar.position.x = -(1 - ratio) * 14   // half of new bar width 28
       const mat = this.hpBar.material as THREE.MeshBasicMaterial
       mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     }

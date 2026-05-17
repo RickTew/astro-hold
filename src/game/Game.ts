@@ -248,11 +248,17 @@ private enterBuildPhase() {
     this.hud.onBattle = () => this.enterRevealPhase()
   }
 
+  // First BATTLE click → enters reveal. Subsequent reveals auto-chain (no
+  // planning phase in between) until win/lose. Plans queued in the initial
+  // planning phase are honoured on the FIRST reveal; later reveals use default
+  // behaviour (cyborgs advance, spheres/towers auto-fire).
   private enterRevealPhase() {
-    if (!this.planningPhase) return
-    this.planningPhase.dispose()
-    this.planningPhase = null
-    this.hud.setPlanningSelection(null)
+    // First entry comes from planning; auto-chain entries skip this tear-down.
+    if (this.planningPhase) {
+      this.planningPhase.dispose()
+      this.planningPhase = null
+      this.hud.setPlanningSelection(null)
+    }
 
     this.phase = 'reveal'
     this.hud.setPhase('reveal')
@@ -268,9 +274,16 @@ private enterBuildPhase() {
       this.phase = 'lose'; this.hud.setPhase('lose')
     }
     this.revealPhase.onComplete = () => {
-      // Tear down reveal and open a fresh planning turn (only if game still on).
       this.revealPhase = null
-      if (this.phase === 'reveal') this.enterPlanningPhase(false)
+      if (this.phase !== 'reveal') return   // game ended mid-reveal
+      // Clear queued plans so the next auto-reveal uses default actions
+      // (cyborgs advance / spheres + towers auto-fire) instead of replaying
+      // the original plan turn after turn.
+      for (const u of this.attackerUnits) u.clearPlan()
+      for (const s of this.spheres)       s.clearPlan()
+      for (const s of this.structures)    s.clearPlan()
+      // Chain straight into the next reveal — no PLAN phase between turns.
+      this.enterRevealPhase()
     }
   }
 
