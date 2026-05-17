@@ -163,6 +163,10 @@ export class SpriteUnit {
   private sprite: THREE.Sprite
   private hpBarGroup: THREE.Group
   private hpBarFill: THREE.Mesh
+  // A/B test: Double Gun uses a circular ring around its sprite instead of
+  // the floating bar. Other types keep the bar so the two styles can be
+  // compared on the same battlefield.
+  private hpRing: THREE.Mesh | null = null
 
   private logicalX: number
   private logicalY: number
@@ -228,9 +232,45 @@ export class SpriteUnit {
     this.hpBarGroup = group
     this.hpBarFill = fill
 
+    if (this.type === 'doublegun') {
+      // Hide the bar; draw a ring around the sprite that empties as HP drops.
+      this.hpBarGroup.visible = false
+      this.hpRing = this.buildHpRing(1)
+      this.mesh.add(this.hpRing)
+    }
+
     this.playState('idle')
 
     scene.add(this.mesh)
+  }
+
+  private buildHpRing(ratio: number): THREE.Mesh {
+    // Ring sits flat in the X-Y plane (matches the top-down camera). renderOrder
+    // is set BELOW the sprite (which is 10) so the sprite covers the inner
+    // empty area and the visible ring reads as a halo at the piece's edge.
+    const INNER = 28, OUTER = 34
+    const theta = Math.max(0, ratio) * Math.PI * 2
+    const geo = new THREE.RingGeometry(INNER, OUTER, 32, 1, Math.PI / 2, theta)
+    const mat = new THREE.MeshBasicMaterial({
+      color: ringColor(ratio),
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.position.set(0, 0, 2)
+    mesh.renderOrder = 9
+    return mesh
+  }
+
+  private updateHpRing(ratio: number) {
+    if (!this.hpRing) return
+    this.hpRing.geometry.dispose()
+    const theta = Math.max(0, ratio) * Math.PI * 2
+    this.hpRing.geometry = new THREE.RingGeometry(28, 34, 32, 1, Math.PI / 2, theta)
+    ;(this.hpRing.material as THREE.MeshBasicMaterial).color.setHex(ringColor(ratio))
   }
 
   // ── Public API (matches Unit's old surface) ───────────────────────────────
@@ -281,6 +321,7 @@ export class SpriteUnit {
     this.hpBarFill.position.x = -(1 - ratio) * 15
     const mat = this.hpBarFill.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
+    if (this.hpRing) this.updateHpRing(ratio)
     if (this.hp <= 0) this.kill()
   }
 
@@ -470,4 +511,8 @@ export class SpriteUnit {
     this.mesh.add(group)
     return { group, fill }
   }
+}
+
+function ringColor(ratio: number): number {
+  return ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200
 }
