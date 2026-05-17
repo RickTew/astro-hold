@@ -33,8 +33,10 @@ export class HUD {
       <div id="bottom-bar" class="hidden">
         <div id="shop" class="shop-panel">
           <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
+          <button class="shop-btn" data-type="turret">Tower 30cr</button>
+          <button class="shop-btn" data-type="wall">Wall 20cr</button>
         </div>
-        <button id="battle-btn">BATTLE</button>
+        <button id="battle-btn">READY</button>
         <div id="attacker-shop" class="shop-panel att-panel">
           <button class="att-btn" data-type="cannon">Cannon 70cr</button>
           <button class="att-btn" data-type="grenadier">Grenadier 55cr</button>

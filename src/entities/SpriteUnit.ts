@@ -166,7 +166,15 @@ export class SpriteUnit {
 
   private logicalX: number
   private logicalY: number
+  // Source cell during a walk — kept until the mesh visually reaches the new
+  // logical position. BattlePhase reads it via `prevWorldX/Y` so a second
+  // unit can't move into a cell whose previous occupant is still walking
+  // out of it (fixes the visual overlap bug where two cyborgs briefly shared
+  // a tile).
+  private prevX: number
+  private prevY: number
   private isMoving = false
+  private deathTime = 0
   private readonly moveSpeedPS: number
 
   // Initial facing: -X (toward power core). Stored as math angle (0=+X, π/2=+Y).
@@ -194,6 +202,8 @@ export class SpriteUnit {
 
     this.logicalX = spawnX
     this.logicalY = y
+    this.prevX = spawnX
+    this.prevY = y
 
     this.mesh = new THREE.Group()
     this.mesh.position.set(spawnX, y, 0)
@@ -227,6 +237,9 @@ export class SpriteUnit {
 
   get worldX() { return this.logicalX }
   get worldY() { return this.logicalY }
+  get prevWorldX() { return this.prevX }
+  get prevWorldY() { return this.prevY }
+  get isWalking() { return this.isMoving }
   get side(): 'attacker' { return 'attacker' }
   get speed()    { return Config.UNITS[this.type].speed }
   get damage()   { return Config.UNITS[this.type].damage }
@@ -247,6 +260,10 @@ export class SpriteUnit {
   get isBomber() { return this.type === 'bomber' }
 
   moveTo(x: number, y: number) {
+    // Remember where we came from so occupancy checks block the source cell
+    // until our mesh visually reaches the new logical position.
+    this.prevX = this.logicalX
+    this.prevY = this.logicalY
     this.logicalX = x
     this.logicalY = y
     this.isMoving = true
@@ -307,7 +324,14 @@ export class SpriteUnit {
     // plays out before we freeze on the final frame.
     this.advanceFrame(delta)
 
-    if (this.isDead) return
+    if (this.isDead) {
+      // Keep the death pose visible for a beat after the clip clamps, then
+      // hide the mesh so corpses don't pile up. Game logic still filters by
+      // isDead, so hiding the visual is enough.
+      this.deathTime += delta
+      if (this.deathTime > 2 && this.mesh.visible) this.mesh.visible = false
+      return
+    }
 
     if (this.isMoving) {
       const dx = this.logicalX - this.mesh.position.x
@@ -319,6 +343,9 @@ export class SpriteUnit {
         this.mesh.position.x = this.logicalX
         this.mesh.position.y = this.logicalY
         this.isMoving = false
+        // Walk complete — the source cell is no longer occupied by this unit.
+        this.prevX = this.logicalX
+        this.prevY = this.logicalY
         // Drop back to idle ONLY if we're not in a one-shot — shoot/throw will
         // return to its own resolution.
         if (this.currentState === 'walking') this.playState('idle')

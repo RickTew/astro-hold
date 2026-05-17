@@ -44,14 +44,14 @@ export class BattlePhase {
     // Spheres are ticked by Game.ts (not here) so they keep spinning in build phase too.
     for (const u of this.units) u.update(delta)
 
-    if (this.over) return
-
-    // Advance projectiles; apply damage on arrival
+    // Explosions and in-flight projectiles must keep ticking even after the
+    // match ends — otherwise the core-blast ring freezes huge and orange
+    // forever (used to bail out of the loop with `if (over) return` above).
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const hit = this.projectiles[i].update(delta)
       if (hit) {
         const proj = this.projectiles[i]
-        proj.onHit?.()
+        if (!this.over) proj.onHit?.()  // post-over hits would re-damage corpses
         this.explosions.push(new Explosion(this.scene, proj.targetX, proj.targetY, proj.isAoe ? proj.aoeRadius : 20, 0.4))
         // AoE projectiles get the heavy boom; direct hits keep silent at
         // impact (the gunshot at spawn already covered the audio).
@@ -64,6 +64,8 @@ export class BattlePhase {
       this.explosions[i].update(delta)
       if (this.explosions[i].isDone) this.explosions.splice(i, 1)
     }
+
+    if (this.over) return
 
     // Wait for projectiles to land before next turn
     if (this.projectiles.length > 0) return
@@ -124,11 +126,15 @@ export class BattlePhase {
 
   // Cell-occupancy check used by movement to enforce one-piece-per-cell during
   // battle. Pieces sit at exact cell centers so equality-with-epsilon is fine.
+  // When a unit is mid-walk, BOTH its destination (worldX/Y) and its source
+  // (prevWorldX/Y) cells are considered occupied so two pieces never visually
+  // share a tile during the transition.
   private isCellOccupiedInBattle(x: number, y: number, exclude: Attacker): boolean {
     const E = 1
     for (const u of this.units) {
       if (u === exclude || u.isDead) continue
       if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
+      if (u.isWalking && Math.abs(u.prevWorldX - x) < E && Math.abs(u.prevWorldY - y) < E) return true
     }
     for (const s of this.spheres) {
       if (s.isDead) continue

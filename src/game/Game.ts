@@ -128,8 +128,9 @@ export class Game {
       // + textured.glb + plain.glb stay on disk for future repurposing.
     ])
 
-    // Pixel power core at the canonical gameplay position, sized 200.
-    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, 200)
+    // Pixel power core — sized to fit exactly one grid cell (50 world units).
+    // Position is cell-aligned in Config so it occupies a single square.
+    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL)
 
     // Map-wide strategy grid. Game is shifting toward chess-like turn-based
     // play with one piece per square (see docs/STATS.md). The grid makes the
