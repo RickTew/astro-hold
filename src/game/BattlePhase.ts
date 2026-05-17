@@ -144,9 +144,10 @@ export class BattlePhase {
       if (s.isDead) continue
       if (Math.abs(s.worldX - x) < E && Math.abs(s.worldY - y) < E) return true
     }
-    const cx = this.core.mesh.position.x
-    const cy = this.core.mesh.position.y
-    if (Math.abs(cx - x) < E && Math.abs(cy - y) < E) return true
+    // Core has a 2x2 footprint — block all 4 of its cells.
+    for (const cc of this.core.cellCenters()) {
+      if (Math.abs(cc.x - x) < E && Math.abs(cc.y - y) < E) return true
+    }
     return false
   }
 

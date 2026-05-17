@@ -128,9 +128,9 @@ export class Game {
       // + textured.glb + plain.glb stay on disk for future repurposing.
     ])
 
-    // Pixel power core — sized to fit exactly one grid cell (50 world units).
-    // Position is cell-aligned in Config so it occupies a single square.
-    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL)
+    // Pixel power core — 2x2 footprint (100 world units = 2 cells across).
+    // Per the piece-size rule, large pieces step up to the next tier (4 cells).
+    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL * 2)
 
     // Map-wide strategy grid. Game is shifting toward chess-like turn-based
     // play with one piece per square (see docs/STATS.md). The grid makes the
@@ -369,7 +369,8 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
   }
 
   // One piece per cell rule (per design — see docs/STATS.md). Pieces snap to
-  // exact cell centers, so equality-with-epsilon catches collisions.
+  // exact cell centers, so equality-with-epsilon catches collisions. The
+  // Power Core has a 2x2 footprint and blocks all 4 of its cells.
   private isCellOccupied(x: number, y: number): boolean {
     const E = 1
     for (const s of this.spheres) {
@@ -377,6 +378,9 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     }
     for (const u of this.attackerUnits) {
       if (Math.abs(u.worldX - x) < E && Math.abs(u.worldY - y) < E) return true
+    }
+    for (const cc of this.powerCore.cellCenters()) {
+      if (Math.abs(cc.x - x) < E && Math.abs(cc.y - y) < E) return true
     }
     return false
   }

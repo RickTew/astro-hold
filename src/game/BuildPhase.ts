@@ -26,9 +26,17 @@ export class BuildPhase {
   ) {
     this.credits = startCredits
 
-    const pcCol = Math.floor((Config.POWER_CORE.X - Config.WORLD.LEFT) / Config.GRID_CELL)
-    const pcRow = Math.floor((Config.POWER_CORE.Y - Config.WORLD.BOTTOM) / Config.GRID_CELL)
-    this.occupied.add(`${pcCol},${pcRow}`)
+    // Power Core has a 2x2 footprint. Its (X, Y) is the centroid (a grid
+    // intersection), so the 4 cells are at (X ± 25, Y ± 25). Mark all four
+    // as occupied so structures can't be placed underneath it.
+    const half = Config.GRID_CELL / 2
+    for (const cx of [Config.POWER_CORE.X - half, Config.POWER_CORE.X + half]) {
+      for (const cy of [Config.POWER_CORE.Y - half, Config.POWER_CORE.Y + half]) {
+        const c = Math.floor((cx - Config.WORLD.LEFT) / Config.GRID_CELL)
+        const r = Math.floor((cy - Config.WORLD.BOTTOM) / Config.GRID_CELL)
+        this.occupied.add(`${c},${r}`)
+      }
+    }
 
     this.hitPlane = this.buildHitPlane()
 

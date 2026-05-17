@@ -5,10 +5,13 @@ export const Config = {
   GRID_CELL: 50,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
   TURN_INTERVAL: 0.65,   // seconds per battle turn — also drives unit move speed
-  // Cell-aligned position so the core occupies exactly one grid square.
-  // Col 1 row 3 center = (-525, -25). World cells are 50 wide so X/Y must
-  // sit at a (LEFT + col*50 + 25, BOTTOM + row*50 + 25) center.
-  POWER_CORE: { X: -525, Y: -25, HP: 100, RADIUS: 18 },
+  // Power Core uses a 2x2 footprint (4 cells) per the size rule: small pieces
+  // get one cell, large pieces step up to the next tier (4 cells). The (X, Y)
+  // here is the CENTROID of the 2x2 block — it sits on a grid INTERSECTION,
+  // not a cell center. With GRID_CELL=50 and WORLD.LEFT=-600 / BOTTOM=-200,
+  // (-550, 0) is the corner where cols 0/1 meet rows 3/4, so the core covers
+  // cells (0,3), (1,3), (0,4), (1,4).
+  POWER_CORE: { X: -550, Y: 0, HP: 100, RADIUS: 18 },
 
   // Sphere defender — values were previously hardcoded in SphereDefender.ts.
   // Centralized here so the turn system can read apBudget alongside everything else.

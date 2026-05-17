@@ -130,6 +130,21 @@ export class PixelPowerCore {
 
   get isDead() { return this.hp <= 0 }
 
+  // Power Core is a "large" piece — occupies a 2x2 block of grid cells. Its
+  // mesh.position is the centroid (a grid intersection), so the 4 cell
+  // centers are ±half-cell away in both axes.
+  cellCenters(): Array<{ x: number; y: number }> {
+    const cx = this.mesh.position.x
+    const cy = this.mesh.position.y
+    const half = Config.GRID_CELL / 2
+    return [
+      { x: cx - half, y: cy - half },
+      { x: cx + half, y: cy - half },
+      { x: cx - half, y: cy + half },
+      { x: cx + half, y: cy + half },
+    ]
+  }
+
   update(delta: number) {
     if (!loaded) return
 
