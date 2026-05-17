@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { Config, UnitType } from '../game/GameConfig'
+import { QueuedAction, nextActorId } from '../game/TurnTypes'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
 // treat them interchangeably). Body is an 8-direction sprite with per-state
@@ -57,7 +58,16 @@ const animSets: Map<UnitType, UnitAnimSet> = new Map()
 
 // Per-unit manifest — frame counts and FPS chosen to look right at 1.0s-ish
 // loops, matching the per-state frame inventory in /public/sprites/<unit>/.
-type AnimManifest = Partial<Record<AnimState, { fps: number; loop: boolean; presentDirs: readonly Direction[]; frameCount: number }>>
+// `frameCountByDir` lets one direction override the default count when a
+// re-rendered clip ships fewer/more frames than the rest (e.g. doublegun's
+// north walk is 6 frames vs the other directions' 9).
+type AnimManifest = Partial<Record<AnimState, {
+  fps: number
+  loop: boolean
+  presentDirs: readonly Direction[]
+  frameCount: number
+  frameCountByDir?: Partial<Record<Direction, number>>
+}>>
 const MANIFEST: Record<string, AnimManifest> = {
   cannon: {
     // Updated Cyborg_Canon_Hand zip ships all 8 idle directions. Walking
@@ -81,7 +91,9 @@ const MANIFEST: Record<string, AnimManifest> = {
   doublegun: {
     // Full 8 directions per state — no mirroring fallback needed.
     idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
-    walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 9 },
+    // North walk was re-rendered separately at 6 frames (different Meshy
+    // export than the other directions' 9-frame walking clip).
+    walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 9, frameCountByDir: { north: 6 } },
     shoot:   { fps: 14, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
     die:     { fps: 8,  loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
   },
@@ -121,7 +133,8 @@ export async function preloadSpriteUnit(type: UnitType, folder: string): Promise
     // Only request directories that exist on disk; mirroring resolves the rest.
     await Promise.all(def.presentDirs.map(async dir => {
       const dirFrames: THREE.Texture[] = []
-      for (let i = 0; i < def.frameCount; i++) {
+      const count = def.frameCountByDir?.[dir] ?? def.frameCount
+      for (let i = 0; i < count; i++) {
         const num = String(i).padStart(3, '0')
         dirFrames.push(await loadTexture(`/sprites/${folder}/${state}/${dir}/frame_${num}.png`))
       }
@@ -135,10 +148,17 @@ export async function preloadSpriteUnit(type: UnitType, folder: string): Promise
 
 export class SpriteUnit {
   readonly mesh: THREE.Group
+  readonly id: string
   hp: number
   readonly maxHp: number
   readonly type: UnitType
   isDead = false
+
+  // Plan-then-play turn state. Phase 2 (Planning UI) writes queuedActions and
+  // deducts apRemaining; phase 3 (Reveal engine) consumes them.
+  readonly apBudget: number
+  apRemaining: number
+  queuedActions: QueuedAction[] = []
 
   private sprite: THREE.Sprite
   private hpBarGroup: THREE.Group
@@ -163,7 +183,10 @@ export class SpriteUnit {
 
   constructor(scene: THREE.Scene, type: UnitType, spawnX: number, spawnY?: number) {
     this.type = type
+    this.id = nextActorId('cyborg')
     this.hp = this.maxHp = Config.UNITS[type].hp
+    this.apBudget = Config.UNITS[type].apBudget
+    this.apRemaining = this.apBudget
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
 
     const spread = Config.WORLD.TOP - Config.WORLD.BOTTOM - 40
@@ -204,9 +227,22 @@ export class SpriteUnit {
 
   get worldX() { return this.logicalX }
   get worldY() { return this.logicalY }
+  get side(): 'attacker' { return 'attacker' }
   get speed()    { return Config.UNITS[this.type].speed }
   get damage()   { return Config.UNITS[this.type].damage }
   get range()    { return Config.UNITS[this.type].range }
+  // Initiative = speed verbatim. Higher = acts earlier in the reveal.
+  get initiative() { return Config.UNITS[this.type].speed }
+
+  clearPlan() {
+    this.queuedActions = []
+    this.apRemaining = this.apBudget
+  }
+  refillAp() { this.apRemaining = this.apBudget }
+  queueAction(action: QueuedAction, apCost: number) {
+    this.queuedActions.push(action)
+    this.apRemaining -= apCost
+  }
   get isScout()  { return this.type === 'scout' }
   get isBomber() { return this.type === 'bomber' }
 

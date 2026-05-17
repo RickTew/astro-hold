@@ -1,21 +1,37 @@
 import * as THREE from 'three'
 import { Config, StructureType } from '../game/GameConfig'
+import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 
 export class Structure {
   readonly mesh: THREE.Group
+  readonly id: string
   hp: number
   readonly maxHp: number
   readonly type: StructureType
   readonly col: number
   readonly row: number
+
+  // Stationary; sorts late in initiative. apBudget=0 for wall/mine means the
+  // reveal engine will skip them — they stay passive. Turrets/cannons get
+  // apBudget=1 and the reveal engine auto-fires them at their initiative tick
+  // (defender does not queue actions for them in the planning UI).
+  readonly initiative = STATIONARY_INITIATIVE
+  readonly apBudget: number
+  apRemaining: number
+  queuedActions: QueuedAction[] = []
+  get side(): 'defender' { return 'defender' }
+
   private hpBarGroup!: THREE.Group
   private hpBar: THREE.Mesh
 
   constructor(scene: THREE.Scene, type: StructureType, col: number, row: number) {
     this.type = type
+    this.id = nextActorId('struct')
     this.col = col
     this.row = row
     this.hp = this.maxHp = Config.STRUCTURES[type].hp
+    this.apBudget = Config.STRUCTURES[type].apBudget
+    this.apRemaining = this.apBudget
 
     this.mesh = new THREE.Group()
     this.mesh.position.set(this.worldX, this.worldY, 0)
@@ -113,6 +129,16 @@ export class Structure {
   get range()        { return Config.STRUCTURES[this.type].range }
   get damage()       { return Config.STRUCTURES[this.type].damage }
   get fireInterval() { return Config.STRUCTURES[this.type].fireInterval }
+
+  clearPlan() {
+    this.queuedActions = []
+    this.apRemaining = this.apBudget
+  }
+  refillAp() { this.apRemaining = this.apBudget }
+  queueAction(action: QueuedAction, apCost: number) {
+    this.queuedActions.push(action)
+    this.apRemaining -= apCost
+  }
 
   dispose() {
     this.mesh.removeFromParent()

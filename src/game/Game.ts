@@ -8,8 +8,9 @@ import { HUD } from '../ui/HUD'
 import { AIPlayer } from '../ai/AIPlayer'
 import { BuildPhase } from './BuildPhase'
 import { BattlePhase } from './BattlePhase'
+import { PlanningPhase } from './PlanningPhase'
 
-type Phase = 'loading' | 'build' | 'battle' | 'win' | 'lose'
+type Phase = 'loading' | 'build' | 'planning' | 'battle' | 'win' | 'lose'
 
 // Unified placement session — covers both cyborg and sphere placement.
 // Ghost mesh is the authoritative position; never re-raycast at click time.
@@ -45,6 +46,7 @@ export class Game {
   private hud!: HUD
   private buildPhase: BuildPhase | null = null
   private battlePhase: BattlePhase | null = null
+  private planningPhase: PlanningPhase | null = null
   // All attackers are pixel sprites now (the 3D Meshy cyborg was retired).
   private attackerUnits: SpriteUnit[] = []
 
@@ -184,7 +186,10 @@ private enterBuildPhase() {
       this.startSpherePlacement()
     }
 
-    this.hud.onBattle = () => this.enterBattlePhase()
+    // Build phase's "BATTLE" button now opens the planning phase first. The
+    // actual reveal still happens in BattlePhase (phase 3 will swap that for
+    // the initiative-sorted reveal engine).
+    this.hud.onBattle = () => this.enterPlanningPhase()
 
     this.hud.onSpawnUnit = (type) => {
       if (this.placement?.kind === type) { this.endPlacement(); return }
@@ -192,27 +197,77 @@ private enterBuildPhase() {
     }
   }
 
-  private enterBattlePhase() {
+  private enterPlanningPhase() {
     if (!this.buildPhase) return
     this.endPlacement()
     this.removeZoneTint('att')
     this.removeZoneTint('def')
 
+    // Snapshot the structures + units from build phase. After this point the
+    // BuildPhase is gone; planning + battle work off these arrays.
     const structures = this.buildPhase.getStructures()
     this.buildPhase.cleanup()
     this.buildPhase = null
 
-    const units = this.attackerUnits.length > 0
-      ? this.attackerUnits
-      : AIPlayer.buildArmy(Config.START_CREDITS).map(t =>
-          new SpriteUnit(this.scene, t, 420 + Math.random() * 100)
-        )
+    const units = this.attackerUnits
+
+    this.phase = 'planning'
+    this.hud.setPhase('planning')
+
+    this.planningPhase = new PlanningPhase(
+      this.scene, this.spheres, units, structures, this.powerCore,
+    )
+    this.planningPhase.onSelectionChange = info => this.hud.setPlanningSelection(info)
+
+    // From planning, the BATTLE button advances to the actual combat.
+    this.hud.onBattle = () => this.enterBattlePhase(units, structures)
+  }
+
+  private enterBattlePhase(units?: SpriteUnit[], structures?: ReturnType<BuildPhase['getStructures']>) {
+    // Tear down planning UI + overlays if we came through it.
+    if (this.planningPhase) {
+      // Log queued plans so phase 2 can be verified without the reveal engine.
+      // Phase 3 will consume these for real.
+      const dump: Record<string, unknown>[] = []
+      for (const c of (units ?? this.attackerUnits))
+        if (c.queuedActions.length) dump.push({ id: c.id, type: c.type, actions: c.queuedActions })
+      for (const s of this.spheres)
+        if (s.queuedActions.length) dump.push({ id: s.id, kind: 'sphere', actions: s.queuedActions })
+      if (dump.length) console.log('[planning] queued plans →', dump)
+
+      this.planningPhase.dispose()
+      this.planningPhase = null
+      this.hud.setPlanningSelection(null)
+    }
+
+    // Fallback path: enterBattlePhase called without going through planning
+    // (no longer wired, but keep the safety net so direct calls don't crash).
+    if (!units || !structures) {
+      this.endPlacement()
+      this.removeZoneTint('att')
+      this.removeZoneTint('def')
+      if (this.buildPhase) {
+        structures = this.buildPhase.getStructures()
+        this.buildPhase.cleanup()
+        this.buildPhase = null
+      }
+      units = this.attackerUnits
+    }
+
+    // If no cyborgs placed (testing), auto-spawn an AI army so the battle has
+    // something to fight.
+    let battleUnits: SpriteUnit[] = units!
+    if (battleUnits.length === 0) {
+      battleUnits = AIPlayer.buildArmy(Config.START_CREDITS).map(t =>
+        new SpriteUnit(this.scene, t, 420 + Math.random() * 100)
+      )
+    }
     this.attackerUnits = []
 
     this.phase = 'battle'
     this.hud.setPhase('battle')
 
-    this.battlePhase = new BattlePhase(this.scene, this.powerCore, units, structures, this.spheres)
+    this.battlePhase = new BattlePhase(this.scene, this.powerCore, battleUnits, structures!, this.spheres)
     this.battlePhase.onWin  = () => { this.phase = 'win';  this.hud.setPhase('win') }
     this.battlePhase.onLose = () => { this.phase = 'lose'; this.hud.setPhase('lose') }
   }
@@ -418,10 +473,23 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
   }
 
   private onMouseDown = (e: MouseEvent) => {
-    if (e.button === 1 || e.button === 2) {
+    if (e.button === 1) {
       this.isPanning = true
       this.lastPan = { x: e.clientX, y: e.clientY }
     }
+
+    if (e.button === 2 && this.phase === 'planning') {
+      // Right-click in planning = clear queued actions / deselect (handled in
+      // PlanningPhase). Don't enter pan mode.
+      if ((e.target as HTMLElement).closest('#hud')) return
+      this.planningPhase?.onSecondaryClick()
+      return
+    }
+    if (e.button === 2) {
+      this.isPanning = true
+      this.lastPan = { x: e.clientX, y: e.clientY }
+    }
+
     if (e.button === 0 && this.phase === 'build') {
       if ((e.target as HTMLElement).closest('#hud')) return  // ignore HUD clicks
 
@@ -435,6 +503,13 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
         const shouldEnd = this.placement.onPlace(x, y)
         if (shouldEnd) this.endPlacement()
       }
+    }
+
+    if (e.button === 0 && this.phase === 'planning') {
+      if ((e.target as HTMLElement).closest('#hud')) return
+      const world = this.screenToWorld(e.clientX, e.clientY)
+      if (!world) return
+      this.planningPhase?.onPrimaryClick(world.x, world.y, e.shiftKey)
     }
   }
 

@@ -22,7 +22,38 @@ lands.
 - Placement snaps to cell centers automatically. Cell centers are at
   (LEFT + col*50 + 25, BOTTOM + row*50 + 25) for col/row indices.
 
-## Movement / Action Points (proposed, not yet implemented)
+## Turn flow — plan-then-play with initiative reveal (LOCKED)
+
+**Both players queue their whole turn during a Planning phase; clicking
+"Battle" runs the cinematic Reveal.** Players try to outguess each other,
+like poker or RPS with depth — the cinematic payoff is watching plans
+collide.
+
+1. **Plan.** For every piece they own, the player queues actions
+   (move / fire / throw / hold). Each action costs AP; AP is the only
+   budget on what a piece can do this turn.
+2. **Reveal.** The engine sorts every queued piece-action by **Initiative
+   (descending)** and animates them one at a time, regardless of which side
+   they belong to. So a fast cyborg might shoot before a slow defender
+   turret even responds.
+3. **Invalid actions strict-skip.** If your queued target died or your
+   destination cell got taken before your action's turn comes up, your
+   piece does *nothing* that step — a wasted action. No best-effort
+   re-target, no fallback move. Bad predictions are punished hardest;
+   this is the source of the mind-game tension.
+4. After the reveal, planning opens again.
+
+**Initiative source:** uses each piece's existing `speed` value verbatim
+(higher speed = acts earlier). Stationary pieces (Sphere, structures, core)
+get a low fallback (**draft: 10**) — they fire late by default.
+
+**Structures during the reveal:** turrets and cannons **auto-fire on their
+initiative tick** at the closest enemy in range. Defender does not queue
+actions for them; only the Sphere and any future commandable defender
+pieces get queued actions. Walls / mines stay passive. Directional firing
+arcs are a follow-up pass (see [Open design questions](#open-design-questions)).
+
+### Action Points (proposed AP budgets)
 
 Each piece spends Action Points (AP) per turn. Default actions:
 
@@ -33,9 +64,6 @@ Each piece spends Action Points (AP) per turn. Default actions:
 | Throw a grenade (AoE) | 2 |
 | Turn to face a new direction (cyborgs) | 1 |
 | Turn (Sphere) | **0 — Sphere turns are free** |
-
-Turns alternate: Robots → Cyborgs → Robots. Each piece can act multiple times
-per turn limited by its AP budget.
 
 **Line of sight & blocking:**
 - Direct-fire weapons hit the first solid piece/wall on the line. They cannot
@@ -199,20 +227,26 @@ built yet.
 
 ## Open design questions
 
-- **Plan-then-play vs one-action-at-a-time?**
-  Plan-then-play = each side queues all moves, then the engine animates them in
-  order. One-action-at-a-time = chess-like, click move, watch it execute.
-  Need decision before implementing turn system.
+- ~~Plan-then-play vs one-action-at-a-time?~~ **LOCKED: plan-then-play with
+  initiative-interleaved reveal, strict-skip on invalid actions.** See
+  "Turn flow" section above.
+- ~~Same-turn fire by structures?~~ **LOCKED: structures auto-fire on their
+  initiative tick. Defender doesn't queue actions for them.**
+- **Directional firing arcs (planned follow-up).** Structures should be
+  directional, with arc bought at purchase and cost scaling per direction
+  (draft: 1 dir = base cost, +10cr each additional direction; full omni =
+  base + 70cr). This narrows what counts as a "target in range" for the
+  auto-fire check. Will land in a separate pass right after the turn system.
 - **Diagonal movement** — allowed (8-directional) or 4-directional only?
   Sphere should be 8-dir since it can shoot in any direction. Cyborgs?
 - **Turning cost for cyborgs** — should turning take an AP, or piggyback on the
   move? Sphere is free; cyborgs need a tradeoff so they can't pivot+fire freely.
 - **Ammo finite vs unlimited?** Finite ammo per piece + buyable refills creates
   resource pressure but adds inventory tracking.
-- **Same-turn fire by structures?** Turrets fire automatically (AI), or do they
-  need defender to spend an AP on them like other pieces?
 - **Camp wandering frequency** — every turn (too chaotic) or every 2-3 turns
-  (more natural)? Stationary pieces never wander.
+  (more natural)? Stationary pieces never wander. (Currently moot once
+  plan-then-play lands — wander becomes a queued "move random" action only
+  if AI is driving the side.)
 - **Sight range blocking** — do walls / other pieces block sight the same way
   they block projectiles? Probably yes for symmetry, but sniper/spotter pieces
   may need a "elevated sight" exception.

@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { Config } from '../game/GameConfig'
+import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 
 // Pre-rendered pixel-art sphere: 8 directions. Cycling through them on a
 // timer creates the "spinning" effect — far cheaper than the 60 MB GLB.
@@ -35,13 +37,22 @@ export async function preloadSphereSprites(): Promise<void> {
 
 export class SphereDefender {
   readonly mesh: THREE.Group
+  readonly id: string
   worldX: number
   worldY: number
   hp: number
-  readonly maxHp = 300
+  readonly maxHp = Config.SPHERE.hp
   isDead = false
-  readonly range = 300
-  readonly damage = 10
+  readonly range = Config.SPHERE.range
+  readonly damage = Config.SPHERE.damage
+
+  // Stationary piece — always sorts late in initiative. apBudget allows the
+  // sphere to queue multiple shots per turn (live behavior: 3 shots).
+  readonly initiative = STATIONARY_INITIATIVE
+  readonly apBudget = Config.SPHERE.apBudget
+  apRemaining = this.apBudget
+  queuedActions: QueuedAction[] = []
+  get side(): 'defender' { return 'defender' }
 
   private sprite: THREE.Sprite
   private hpBarGroup: THREE.Group
@@ -50,6 +61,7 @@ export class SphereDefender {
   private frameIndex = 0
 
   constructor(scene: THREE.Scene, x: number, y: number) {
+    this.id = nextActorId('sphere')
     this.worldX = x
     this.worldY = y
     this.hp = this.maxHp
@@ -95,6 +107,16 @@ export class SphereDefender {
 
   faceCamera(camera: THREE.Camera) {
     this.hpBarGroup.quaternion.copy(camera.quaternion)
+  }
+
+  clearPlan() {
+    this.queuedActions = []
+    this.apRemaining = this.apBudget
+  }
+  refillAp() { this.apRemaining = this.apBudget }
+  queueAction(action: QueuedAction, apCost: number) {
+    this.queuedActions.push(action)
+    this.apRemaining -= apCost
   }
 
   takeDamage(amount: number) {
