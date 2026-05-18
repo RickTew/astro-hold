@@ -16,6 +16,10 @@ export class Projectile {
   targetX: number
   targetY: number
   onHit: (() => void) | null = null
+  // When true, the reveal loop suppresses the on-landing explosion VFX +
+  // sound. Used by lobbed AoE (Bomber / Grenadier) so the projectile arrives,
+  // onHit spawns a PendingGrenade, and the actual boom happens NEXT turn.
+  silentLanding = false
   // Sprite-projectile arc: scale up then shrink so a top-down lob reads as a
   // toss (Y-axis arc is invisible from straight above).
   private arcBaseSize = 0

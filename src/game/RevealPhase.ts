@@ -7,6 +7,7 @@ import { Structure, getGrenadeTexture } from '../entities/Structure'
 import { PixelPowerCore } from '../entities/PixelPowerCore'
 import { Projectile } from '../entities/Projectile'
 import { Explosion } from '../entities/Explosion'
+import { PendingGrenade } from '../entities/PendingGrenade'
 import { playGunshot, playExplosion } from '../audio/sfx'
 
 // Phase 3 reveal engine: consumes the queued plans the player set up during
@@ -52,8 +53,25 @@ export class RevealPhase {
     private structures: Structure[],
     private spheres: SphereDefender[],
     private defenderUnits: SpriteUnit[] = [],
+    private pendingGrenades: PendingGrenade[] = [],
   ) {
     this.steps = this.buildSteps()
+    this.detonatePendingGrenades()
+  }
+
+  // Resolve all grenades that landed last turn — first thing each reveal does.
+  // Spawns explosion VFX, applies side-aware AoE damage, plays sound, removes
+  // the pending entity. They visually overlap with step 1, which reads as
+  // "the round begins with explosions" — exactly the intended cinematic beat.
+  private detonatePendingGrenades() {
+    if (this.pendingGrenades.length === 0) return
+    for (const g of this.pendingGrenades) {
+      this.explosions.push(new Explosion(this.scene, g.worldX, g.worldY, g.aoeRadius, 0.5))
+      this.applyAoeForSide(g.worldX, g.worldY, g.aoeRadius, g.damage, g.side)
+      g.dispose()
+    }
+    playExplosion()
+    this.pendingGrenades.length = 0
   }
 
   // ── Step list ────────────────────────────────────────────────────────────
@@ -262,6 +280,7 @@ export class RevealPhase {
     // running between steps and after the engine ends.
     this.tickProjectiles(delta)
     this.tickExplosions(delta)
+    for (const g of this.pendingGrenades) g.update(delta)
     for (const u of this.units) u.update(delta)
 
     if (this.done) return
@@ -308,11 +327,16 @@ export class RevealPhase {
       // Skip onHit (damage application) after game over so corpses don't
       // get re-damaged and trigger weird state.
       if (!this.over) proj.onHit?.()
-      this.explosions.push(new Explosion(
-        this.scene, proj.targetX, proj.targetY,
-        proj.isAoe ? proj.aoeRadius : 20, 0.4,
-      ))
-      if (proj.isAoe) playExplosion()
+      // Silent landing = lobbed grenade has arrived but won't blow until next
+      // turn. No explosion VFX, no boom sound — onHit spawned the pending
+      // grenade sprite that now sits on the cell.
+      if (!proj.silentLanding) {
+        this.explosions.push(new Explosion(
+          this.scene, proj.targetX, proj.targetY,
+          proj.isAoe ? proj.aoeRadius : 20, 0.4,
+        ))
+        if (proj.isAoe) playExplosion()
+      }
       this.projectiles.splice(i, 1)
     }
   }
@@ -386,11 +410,14 @@ export class RevealPhase {
     const muzzle = this.actorMuzzle(actor, aim.x, aim.y)
     const damage = this.actorDamage(actor)
     const color = actor.side === 'defender' ? 0xffee00 : 0xff3333
-    // Bomber's projectile uses the Space_Grenade sprite (spinning bowling-
-    // ball) instead of the default colour-coded sphere mesh.
-    const spriteTex = actor instanceof Structure && actor.type === 'bomber'
-      ? getGrenadeTexture()
-      : null
+    // Lobbed AoE = Bomber (defender structure) + Bomber/Grenadier (cyborg
+    // units). These throw a grenade with a 1-turn fuse: projectile lands as
+    // a PendingGrenade sprite, detonates at the start of the next reveal.
+    // Direct-fire AoE (e.g. cannon turret) keeps the original instant-blast
+    // behaviour.
+    const isLobbed = (actor instanceof Structure && actor.type === 'bomber')
+      || (actor instanceof SpriteUnit && (actor.type === 'bomber' || actor.type === 'grenadier'))
+    const spriteTex = isLobbed ? getGrenadeTexture() : null
 
     const proj = new Projectile(
       this.scene, muzzle.x, muzzle.y, null, aim.x, aim.y,
@@ -405,10 +432,21 @@ export class RevealPhase {
       if (targetEntity) {
         proj.onHit = () => { if (!targetEntity.isDead) targetEntity.takeDamage(damage) }
       }
+    } else if (isLobbed) {
+      // Delayed fuse — grenade lands as a pending entity, no damage / no
+      // explosion this turn. Next reveal's detonatePendingGrenades will
+      // resolve it.
+      proj.silentLanding = true
+      const side = actor.side
+      proj.onHit = () => {
+        this.pendingGrenades.push(new PendingGrenade(
+          this.scene, aim.x, aim.y, damage, aoeRadius, side,
+        ))
+      }
     } else {
-      // AoE — splash everything in range of the impact point. Defender
-      // AoE (turret cannon etc.) damages cyborgs + defender units? No —
-      // friendly fire stays off; AoE only hits enemy side pieces.
+      // Direct-fire AoE — splash everything in range of the impact point
+      // immediately. Defender AoE hits cyborgs only; attacker AoE hits
+      // defender pieces + dogs + core.
       proj.onHit = () => this.applyAoe(aim.x, aim.y, aoeRadius, damage, actor)
     }
 
@@ -417,9 +455,13 @@ export class RevealPhase {
   }
 
   private applyAoe(cx: number, cy: number, radius: number, damage: number, source: Actor) {
+    this.applyAoeForSide(cx, cy, radius, damage, source.side)
+  }
+
+  private applyAoeForSide(cx: number, cy: number, radius: number, damage: number, side: 'attacker' | 'defender') {
     // Defender AoE hits cyborgs only. Attacker AoE hits defender pieces +
     // defender mobile units + the core.
-    if (source.side === 'defender') {
+    if (side === 'defender') {
       for (const u of this.units) {
         if (u.isDead) continue
         if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) u.takeDamage(damage)

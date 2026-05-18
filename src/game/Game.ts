@@ -9,6 +9,7 @@ import { BuildPhase } from './BuildPhase'
 import { PlanningPhase } from './PlanningPhase'
 import { RevealPhase } from './RevealPhase'
 import { Structure, preloadStructureSprites } from '../entities/Structure'
+import { PendingGrenade } from '../entities/PendingGrenade'
 
 type Phase = 'loading' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
 
@@ -63,6 +64,11 @@ export class Game {
   // Multi-sphere: now sprite-based (8 directional pixel-art PNGs, ~24 KB total
   // instead of the 60 MB GLB). Pre-loaded in preloadSphereSprites().
   private spheres: SphereDefender[] = []
+
+  // Grenades that landed last reveal — detonated at the start of the next one.
+  // Owned by Game (survives RevealPhase instances) and passed by reference so
+  // each new reveal sees + clears + grows the same array.
+  private pendingGrenades: PendingGrenade[] = []
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
@@ -281,6 +287,7 @@ private enterBuildPhase() {
 
     this.revealPhase = new RevealPhase(
       this.scene, this.powerCore, this.attackerUnits, this.structures, this.spheres, this.defenderUnits,
+      this.pendingGrenades,
     )
     this.revealPhase.onWin = () => {
       this.phase = 'win'; this.hud.setPhase('win')
@@ -683,6 +690,8 @@ private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
     this.removeZoneTint('def')
     for (const s of this.spheres) this.scene.remove(s.mesh)
     this.spheres = []
+    for (const g of this.pendingGrenades) g.dispose()
+    this.pendingGrenades = []
     this.renderer.dispose()
     this.scene.clear()
     this.hud?.dispose()
