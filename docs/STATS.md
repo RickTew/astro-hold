@@ -197,7 +197,7 @@ explosion (omnidirectional; same frames copied into every dir folder).
 | Structure | Cost | HP | Damage | Range | AoE | apBudget | Sprite |
 |---|---|---|---|---|---|---|---|
 | Turret (Tower) | 30 | 80 | 25 | 250 | — | 1 | Robot_Tower (faces east) |
-| Bomber | 70 | 100 | 20 | 200 | 50 | 1 | Robot_Bomber (faces east; fires spinning Space_Grenade). Range 350→200, damage 35→20, AoE 65→50 to prevent map-wide auto-wipes. |
+| Bomber | 70 | 100 | 20 | 200 | 50 | 1 | Robot_Bomber. Ammo 3 bombs/game. Throws proximity traps onto empty cells. 120° east-facing wedge. |
 | Wall | 20 | 300 | 0 | 0 | — | 0 | Brown box that shrinks from the top as it takes damage (no HP bar; the body IS the HP indicator) |
 | Cannon | 60 | 120 | 40 | 280 | 45 | 1 | LEGACY — no shop button, type kept for compatibility |
 | Mine | 20 | 50 | 60 | 60 | 70 | 0 | Detonates when a cyborg moves on top |
@@ -232,8 +232,9 @@ Defender loses if Power Core HP reaches 0.
 | Unit | Cost | HP | Speed | Damage | Atk range | Sight | AoE | AP | Behavior |
 |---|---|---|---|---|---|---|---|---|---|
 | **Cannon** | 70 | 180 | 55 | 35 | 240 | 320 | — | 3 | Aggressive — advance to attack range, hold, fire |
-| **Grenadier** | **50** | 110 | 75 | 20 | 180 | 280 | 45 | 3 | Standoff — keep distance, lob proximity grenades. E/W idle uses static-rotation fallback (asset export bug). Stats nerfed for strategy parity. |
-| **Double Gun** | 90 | 160 | 65 | 45 | 230 | 300 | — | 3 | Aggressive — heavy direct fire from medium range |
+| **Grenadier** | **50** | 110 | 75 | 20 | 180 | 280 | 45 | 3 | Standoff — keep distance, lob proximity grenades. Can DIFFUSE adjacent armed enemy bombs (1 AP). Green sprite tint. |
+| **Double Gun** | 90 | 160 | 65 | 45 | 230 | 300 | — | 3 | Aggressive — heavy direct fire from medium range. Warm-orange sprite tint. |
+| **Hulk** | 100 | 280 | 35 | 55 | 70 | 220 | — | 2 | Melee bruiser — heaviest HP / damage, slowest speed, must close to punch range. Slam-attack-in-front animation is in the bundle, special-action mechanic is a follow-up. |
 
 Cyborgs spawn in the attacker zone (x > 200) and need to traverse the
 battlefield to reach the Power Core at (-550, 0). All cyborg costs are

@@ -745,3 +745,203 @@ Targeted to idle only — other states might need the same trick.
    behavior tag (Sniper / Sneaky / Suicide rush).
 8. **Stalemate handling** — currently a reveal with 0 actions just halts
    the loop silently. Could show a "no one can act" toast or auto-restart.
+
+---
+
+## Session 11 (2026-05-18) — Strategy-not-RTS rework, bomb economy, Hulk
+
+The whole list from session 10's "next-session opening moves" landed,
+plus a major design pivot triggered by playtest feedback: pieces have
+**limited per-game ammo**, **reactive AI flees armed bombs**, **bombs
+have a 1-turn arming delay + 3-turn lifespan**, **all movement is
+cardinal-only**. New unit: **Cyborg Hulk** (melee bruiser).
+
+### Direction decisions (locked this session)
+1. **D&D-style strategy, NOT RTS.** Pinned in
+   [feedback_strategy_not_rts](memory). Every offensive piece has an
+   `ammo` budget for the WHOLE game (not per turn). Once a tower is
+   out, it's inert. Once a bomber has thrown 3 bombs, it's spent.
+   Forces strategic shot allocation — the player can't spam.
+2. **Bomb economy** went through 3 iterations in one session:
+   - v1: simple AoE on impact (felt instant + RTS-y)
+   - v2: 1-turn-fuse "delayed detonation" (still kind of RTS — bomb is
+     a guaranteed hit on whoever stood on the cell)
+   - v3 (locked): **proximity trap with arming delay + lifetime**. Lobs
+     onto an empty cell, lands UNARMED (dim grey, dim opacity), arms
+     at end-of-turn (hot red, fast pulse), proximity-triggers if any
+     enemy enters AoE, auto-detonates after 3 armed reveals as failsafe.
+     One bomb per thrower at a time.
+3. **Reactive AI** for moving units. `pickStepTowardPoint` scores each
+   candidate cell by `distance + 2 × armedBombDamageInCell` so units
+   sidestep primed bombs rather than walking in. Direct-fire pieces
+   prefer shooting armed enemy bombs from outside the AoE
+   (`nearestSafeArmedBomb`). Grenadier-specific: diffuses an adjacent
+   armed enemy bomb (1 AP, no damage, bomb vanishes) — thematic
+   counter to enemy traps.
+4. **Cardinal-only movement (N/S/E/W).** Diagonals removed for all
+   standard pieces. Future special characters opt into 8-dir movement
+   via `Config.UNITS[type].allowDiagonalMove = true`. Pinned in
+   [feedback_movement_rules](memory).
+5. **Tower fire arcs** — structures fire in a 120° wedge (±60°). Each
+   structure has a `fireFacings: number[]` array; defenders default
+   facing east toward the cyborg corridor. Pay-per-extra-facing UI
+   deferred.
+6. **Initiative model retained.** Higher initiative acts first; stationary
+   defenders = 100, mobile units use their `speed` stat. User confirmed
+   this beats simple side-alternation for strategic depth.
+
+### New / changed files
+- `src/entities/PendingGrenade.ts` — proximity bomb entity with `armed`
+  flag, `turnsArmed` counter, owner ID, side-aware target check. Lives
+  on Game so it survives RevealPhase instances.
+- `src/game/TurnTypes.ts` — `QueuedActionKind` adds `'diffuse'`,
+  `TargetKind` adds `'bomb'`. `AP_COST.diffuse = 1`.
+- `src/entities/Projectile.ts` — `silentLanding` flag suppresses
+  on-landing explosion VFX (used by lobbed grenades that spawn pending
+  entities instead). Sprite-projectile arc: scale-up-then-shrink mid
+  flight, factor 0.35 (was 0.7 — bomb was ballooning past its cell).
+- `src/game/RevealPhase.ts` — major rework. New helpers:
+  `lobbedThrowerAction`, `pickBombThrowCell`, `isCellEmptyForBomb`,
+  `nearestSafeArmedBomb`, `nearestArmedEnemyBombInRange`,
+  `targetInFireArc`, `cellBombDanger`, `applyAoeForSide`,
+  `detonatePendingGrenade`, `expireOldBombs`, `executeDiffuse`.
+  `executeAttack` consumes ammo via `decrementActorAmmo`.
+  `tickPendingGrenades` proximity-trigger on every frame.
+- `src/game/Game.ts` — owns `pendingGrenades: PendingGrenade[]`,
+  passes by reference into every new RevealPhase. Tracks
+  `noProgressReveals` — surfaces stalemate after 5 reveals with no
+  combat. Tryrefund now also handles structures (was missing).
+- `src/game/BuildPhase.ts` — **refactored**: removed the side
+  `occupied` Set that was going stale on refund. Occupancy is now
+  derived live from `coreCells` (frozen) + `structures` (live) +
+  `externalOccupied` callback. Single source of truth.
+- `src/ui/HUD.ts` — Play Again button on win/lose/stalemate overlays
+  (uses `window.location.reload()` — simplest reliable reset). New
+  `showStalemate()`. Hulk shop button.
+- `src/entities/SpriteUnit.ts` — `SPRITE_TINT` table tints grenadier
+  (light green) and doublegun (warm orange) via SpriteMaterial.color.
+  Hulk manifest entry (sparse coverage: walking 4 cardinal, shoot 2
+  E/W, throw 4 cardinal — slam-attack-in-front is bundled but unused).
+- `src/entities/Structure.ts` — `fireFacings: number[]` and
+  `ammoRemaining: number`.
+- `src/entities/SphereDefender.ts` — `ammoRemaining: number`.
+- `src/game/GameConfig.ts` — `ammo` added to every UNITS / STRUCTURES
+  / SPHERE entry. Bomber nerfed (range 350→200, damage 35→20,
+  AoE 65→50). Hulk added (cost 100, hp 280, dmg 55, range 70 melee,
+  ammo 5).
+- `public/sprites/hulk/` — full asset bundle (rotations + 4 anims).
+
+### Ammo budgets (locked)
+| Piece | Ammo |
+|---|---|
+| Sphere | 8 |
+| Turret | 6 |
+| Cannon (legacy) | 4 |
+| Bomber | 3 |
+| Mine | 1 |
+| Gun / Laser preview | 5 |
+| Dog | 5 |
+| Scout | 6 |
+| Tank | 5 |
+| Cyborg Bomber | 3 |
+| Drone | 8 |
+| Cannon | 4 |
+| Grenadier | 3 |
+| Double Gun | 5 |
+| **Hulk** | **5** |
+| Wall / Defense / Signal | 0 (don't shoot) |
+
+### Bug fixes
+- **Refund leaves cell locked** — BuildPhase had its own `occupied`
+  Set that wasn't synced when Game.tryRefund spliced structures out.
+  Now derived live; no sync to break.
+- **Infinite dog wander loop** — when everyone was out of ammo, the
+  dog kept wandering and `totalSteps > 0` kept the auto-loop alive
+  forever. Now `RevealPhase.combatThisReveal` tracks shots/throws/
+  diffuses/mines; Game halts the loop with stalemate after 5
+  consecutive no-combat reveals.
+- **Bombs sitting forever as ignored traps** — added `turnsArmed`
+  counter on PendingGrenade. Game ticks at end-of-reveal, RevealPhase
+  force-detonates at `turnsArmed >= 3` at start of next reveal.
+- **Bomb visual was too subtle** — yellow→white wasn't readable.
+  Unarmed is now dim grey at 55% opacity, armed is hot red at 100%.
+- **Grenadier idle east-facing bug** — both 'east' and 'west' idle
+  presentDirs dropped. Falls back to the correctly-oriented static
+  rotation PNGs.
+- **Bomber placement rejection** — same root cause as the refund
+  occupied-set bug. Fixed by the BuildPhase refactor.
+
+### Visual / UX polish
+- Unified placement ghost — every placement (sphere / dog / cyborg /
+  structure) now uses the same 48×48 green square. No more mix of
+  circle rings + green squares.
+- Grenadier sprite gets a green wash so it doesn't blur with Cannon.
+- Doublegun gets a warm orange wash.
+- In-flight grenade smaller (base 22→16) + lower arc (0.7→0.35).
+- Play Again button on win / lose / stalemate overlay.
+
+### Cyborg Hulk
+First melee bruiser. Stats: cost 100, HP 280, damage 55, range 70
+(melee), speed 35 (slowest), ammo 5, AP 2. Has 4 anims (walking_slow,
+attacks_with_powerful_punch, slam_attack_in_front, exosuit_falls_apart).
+Slam animation is in the bundle but the **slam-attack mechanic isn't
+wired yet** — task #21 (needs a new QueuedActionKind 'slam' that hits
+a 1-cell-forward 3-wide wedge).
+
+### Repo state at session end
+- Branch `main` at `6ee5070`, pushed to GitHub, deployed to prod.
+- Build clean (`pnpm build`). Bundle: ~70 KB index + 526 KB Three.js.
+- Live: https://astrohold3.vercel.app
+- Pending tasks for the next session:
+  - #5 Asset commissions (Gun + Defense dome — user picks winners)
+  - #7 More cyborg / robot variety (Sniper / Assassin / Berserker — user)
+  - #21 Cyborg Hulk slam-attack special action
+  - #22 Combat history / event log UI (D&D-style turn log)
+
+### Lessons / patterns to remember
+- **`as const` on Config blocks ergonomic optional fields.** When I
+  added per-unit `allowDiagonalMove`, every UNITS entry needed it OR a
+  cast at read-time. Cast was cleaner: `(Config.UNITS[t] as
+  { allowDiagonalMove?: boolean }).allowDiagonalMove === true`.
+- **Side state-sets break when external code mutates the underlying
+  array.** BuildPhase's `occupied` Set was the second time this
+  pattern bit. Lesson: derive live from authoritative arrays instead
+  of caching parallel state. Same lesson Spheres learned in session 9.
+- **Visual subtlety is the enemy of readable game state.** Yellow vs
+  white was indistinguishable in playtest. Dim grey @ low opacity vs
+  hot red @ full opacity reads instantly. Pick the bigger contrast.
+- **3 iterations on the bomb in one session is the correct loop.**
+  Each playtest exposed an implicit assumption (RTS-y instant blast →
+  delayed-fuse for planning → proximity trap with lifetime). Don't
+  ship the first version of a mechanic and walk away.
+
+### Suggested next-session opening moves
+1. **Slam-attack special action (#21)** — Hulk has the animation in
+   bundle. Add `QueuedActionKind 'slam'` targeting a CellRef in the
+   direction of the unit's facing. AP cost 2. Hits all enemies in the
+   3-cell-wide wedge 1 cell forward. AI prefers slam over punch when
+   2+ enemies cluster in front.
+2. **Combat history log (#22)** — right-side panel showing event
+   stream per reveal: "Sphere fires at Grenadier (8 dmg) / Grenadier
+   throws bomb at (12,4) / Bomber bomb detonates, kills Cannon".
+   Helps user debug AI behavior + reads like a D&D combat log.
+3. **Tower extra facings UI** — player pays credits during BUILD to add
+   a second/third facing to a tower. Hover the tower → click a compass
+   rose to add a wedge. Needs Structure mutator + cost balance.
+4. **Asset commissions (#5)** — user to pick winners from the preview
+   pieces (Gun / Defense dome / Laser / Signal) and order 8-direction
+   renders.
+5. **More cyborg / robot variety (#7)** — Sniper (long-range one-shot,
+   1 ammo), Assassin (move 2 cells, sneaky), Berserker (frenzy mode
+   when below 30% HP). Each needs sprites + a behavior tag.
+6. **Sphere placement-ghost shows fire-arc preview** during BUILD —
+   show the 120° wedge before the player commits, so they understand
+   that an east-facing tower won't protect the north flank.
+7. **Bomb spawn cell affordance** — currently bombs target empty cells
+   the AI picks. Player has no visibility into where bombs will land.
+   Add a faint "planned throw cell" indicator during PLAN phase for
+   queued throws.
+8. **Hulk balance pass** after playtest** — if 280 HP + 55 dmg melee
+   is too strong, drop HP first; if too weak, give him diagonal
+   movement (he's the special-character carve-out from the
+   no-diagonals rule).

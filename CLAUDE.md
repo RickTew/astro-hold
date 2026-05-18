@@ -1,12 +1,17 @@
 # AstroHold — Project Rules for Claude
 
-## Status: cinematic plan-then-play turn engine LIVE (session 10)
-Chess-like turn-based grid strategy. The full **plan-then-play** turn engine
-shipped this session — both sides queue all actions during a Planning phase,
-clicking BATTLE animates them one piece-action at a time sorted by Initiative
-(descending). After the first BATTLE click, reveals **auto-chain** until
-win/lose — the player just watches. "We are now watching the space battle take
-place" is the locked model.
+## Status: D&D-style strategy engine LIVE (session 11)
+Chess-like turn-based grid strategy with cinematic plan-then-watch reveal.
+Both sides queue all actions during PLAN; clicking BATTLE animates them one
+piece-action at a time sorted by Initiative DESC. After the first BATTLE
+click, reveals **auto-chain** until win / lose / stalemate — the player just
+watches. **NOT an RTS.** Mechanics are tuned for D&D-style strategy:
+- **Limited per-game ammo** on every offensive piece. Once spent, it's inert.
+- **Cardinal-only movement** (N/S/E/W) by default. Special characters opt in
+  to diagonals via `Config.UNITS[type].allowDiagonalMove = true`.
+- **Reactive AI** — units flee armed bomb AoEs, prefer shooting bombs from
+  outside the radius, grenadiers diffuse adjacent enemy bombs.
+- **Bomb counterplay always exists** — flee, shoot, or diffuse.
 
 **One piece per cell, strict.** Large pieces (Power Core today) use a 2x2
 footprint per the size rule. Long-term plan and current balance numbers live
@@ -101,8 +106,10 @@ session 8 in DEVNOTES.
 ## Architecture
 - `GameConfig.ts` — all constants + per-piece stats. Per-unit fields:
   `cost`, `hp`, `speed`, `damage`, `range`, `sightRange`, `aoeRadius`,
-  `apBudget`, `label`, `color`. Structures also have `aoeRadius`.
-  Sphere config in `Config.SPHERE`.
+  `apBudget`, `ammo`, `label`, `color`. Structures also have
+  `aoeRadius` + `ammo`. Sphere config in `Config.SPHERE` (also has
+  `ammo`). Optional `allowDiagonalMove?: boolean` per unit (cast at
+  read site since Config is `as const`).
 - `Game.ts` — scene, camera, renderer, state machine
   (`'loading' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'`),
   unified `PlacementSession`, grid snap, cross-system `isCellOccupied`
@@ -118,23 +125,39 @@ session 8 in DEVNOTES.
   actions + auto-fire for structures + default fallback actions for
   unplanned mobile units. Steps through at ~600ms per action with
   strict-skip on invalid. Auto-loops via `Game.enterRevealPhase` until
-  win/lose (or stalemate). Exposes `totalSteps` so Game can detect
-  zero-action reveals and halt the loop.
+  win/lose/stalemate. Exposes `totalSteps` (for zero-action stalemate)
+  and `combatThisReveal` (for "no combat for N turns" stalemate — Game
+  halts after 5 no-combat reveals so the dog can't wander forever).
+- `PendingGrenade.ts` — proximity-trap bomb. Lobbed AoE units (Bomber,
+  Grenadier) spawn one when their thrown projectile lands. Has
+  `armed` (false on land, true at end-of-reveal — gives opponents
+  a planning turn), `turnsArmed` (auto-detonate at 3 to stop ignored
+  traps), `ownerId` (one-per-thrower gate), `side` (proximity check
+  only triggers on enemies). Visual: dim grey @ 55% opacity when
+  unarmed, hot red @ 100% when armed.
 - `BuildPhase.ts` — credit ledger + structure placement. Takes a
   cross-system occupancy callback from Game so structures respect
-  spheres / cyborgs / dogs / core cells.
+  spheres / cyborgs / dogs / core cells. Occupancy is derived LIVE
+  from `coreCells` (frozen 2x2 core footprint) + `structures` (the
+  live array) + `externalOccupied` callback. **Do NOT add a parallel
+  occupied Set** — the old one went stale on refund and locked cells
+  forever; live derivation has no sync to break.
 - `PixelPowerCore.ts` — gameplay core. 2x2 footprint via
   `cellCenters()`. 8 rotation PNGs + 9-frame death explosion.
 - `SphereDefender.ts` — defender hero. 8 rotation PNGs + 4-frame death
   explosion. Stationary.
-- `SpriteUnit.ts` — every mobile unit (cyborgs + Combat Dog).
+- `SpriteUnit.ts` — every mobile unit (cyborgs + Combat Dog + Hulk).
   Configurable `side` param ('attacker' | 'defender'). Per-state
   per-direction animation frames with horizontal-mirror fallback.
   `playAttackAnim()` triggers shoot/throw state before projectile spawn.
+  `SPRITE_TINT` table colours specific cyborg types (Grenadier green,
+  Doublegun warm orange) so roles read at a glance.
 - `Structure.ts` — tower / bomber / wall / mine / cannon / preview
   pieces. Pixel sprite layout with per-type folder, size, default
   direction, and explosion. `getGrenadeTexture()` exposes the shared
-  Space_Grenade sprite for the Bomber's projectile.
+  Space_Grenade sprite for the Bomber's projectile. Has
+  `fireFacings: number[]` (math-angle array; default `[0]` = east);
+  RevealPhase only auto-fires at targets within ±60° of any facing.
 - `Projectile.ts` — sphere mesh by default, optional `spriteTexture`
   parameter turns it into a spinning `THREE.Sprite` (Bomber's grenade).
 - `HUD.ts` — DOM overlay. Shops split into `#top-robot-shop` (top-left)
@@ -165,18 +188,44 @@ is the position authority — never re-raycast at click time.
 
 ## Battle movement (RevealPhase)
 - One cell per turn (Move action = 1 AP).
-- `RevealPhase.pickStepTowardPoint` picks the adjacent cell (of 8)
-  closest to the target that's not blocked by `isCellOccupiedAtBattle`
-  AND reduces distance to the target.
+- **Cardinal-only by default** (N/S/E/W). A unit with
+  `Config.UNITS[type].allowDiagonalMove = true` opts into 8 directions
+  — reserved for special characters (e.g. Hulk in a future pass).
+- `RevealPhase.pickStepTowardPoint` picks the adjacent cell that
+  reduces distance to the target AND has the lowest combined danger
+  score: `distance + 2 × armedEnemyBombDamageInCell`. Units sidestep
+  primed bomb AoE rather than walking in.
 - **Default action when no queued plan** (`defaultMobileUnitAction`):
-  - Fire if any enemy in attack range (range > 0).
+  - Grenadier: if armed enemy bomb within 1.5 cells → DIFFUSE it
+    (1 AP, bomb vanishes with a puff, no damage).
+  - Lobbed thrower (Bomber/Grenadier): throw a proximity bomb at the
+    best empty cell near the nearest enemy (one bomb per thrower on
+    the field at a time; ammo-gated).
+  - Direct-fire piece with armed enemy bomb in range AND outside its
+    AoE: SHOOT the bomb (detonates harmlessly to us).
+  - Else fire at nearest enemy in attack range (ammo-gated).
   - Else move toward nearest enemy in sight.
   - **Fallback** if nothing's in sight: cyborgs march toward the core
-    anyway; defender mobile units (dogs) wander to a random adjacent cell
-    (per user spec — "robots wander when no target").
+    anyway; defender mobile units (dogs) wander to a random adjacent cell.
 - `isCellOccupiedAtBattle` checks BOTH current and `prevWorldX/Y` cells
   for any walking unit so two pieces never visually share a tile during
   transit.
+
+## Ammo + counterplay (D&D-style strategy)
+- Every offensive piece has an `ammo` budget in Config — total shots /
+  throws for the entire game (NOT per turn). Once 0, the piece is
+  inert (still alive, still blocks cells, just can't attack). Forces
+  shot-allocation decisions. See STATS.md for current numbers.
+- `RevealPhase.decrementActorAmmo` runs after every fired/thrown
+  action. `actor.ammoRemaining` lives on SpriteUnit / SphereDefender /
+  Structure.
+- Bombs are proximity traps with a 1-turn arming delay and a 3-turn
+  armed-lifetime failsafe (see PendingGrenade.ts). Counterplay:
+  - **Flee:** pickStepTowardPoint penalizes armed-bomb cells.
+  - **Shoot:** direct-fire pieces detonate bombs from outside their AoE.
+  - **Diffuse:** Grenadier-only safe-remove at melee range.
+- `TargetRef.kind = 'bomb'` lets the targeting system reference a
+  PendingGrenade by its id.
 
 ## Sound
 - `playGunshot()` after every non-AoE projectile spawn (cyborg attacks,
