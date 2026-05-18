@@ -8,7 +8,13 @@ const ROWS = 8  // 400 / 50 — used for placement bounds checking, not for any 
 
 export class BuildPhase {
   private structures: Structure[] = []
-  private occupied = new Set<string>()
+  // Power Core 2x2 footprint cells. Built once in the constructor and never
+  // mutated — these are always blocked regardless of structure placement.
+  // We previously kept a per-structure `occupied` Set too, but it could go
+  // stale when Game.tryRefund spliced a structure out of `structures`. Now
+  // structure occupancy is derived live in isCellBlocked() so there's no
+  // sync to break.
+  private coreCells = new Set<string>()
   private selectedType: StructureType | null = null
   private credits: number
 
@@ -30,14 +36,13 @@ export class BuildPhase {
     this.credits = startCredits
 
     // Power Core has a 2x2 footprint. Its (X, Y) is the centroid (a grid
-    // intersection), so the 4 cells are at (X ± 25, Y ± 25). Mark all four
-    // as occupied so structures can't be placed underneath it.
+    // intersection), so the 4 cells are at (X ± 25, Y ± 25).
     const half = Config.GRID_CELL / 2
     for (const cx of [Config.POWER_CORE.X - half, Config.POWER_CORE.X + half]) {
       for (const cy of [Config.POWER_CORE.Y - half, Config.POWER_CORE.Y + half]) {
         const c = Math.floor((cx - Config.WORLD.LEFT) / Config.GRID_CELL)
         const r = Math.floor((cy - Config.WORLD.BOTTOM) / Config.GRID_CELL)
-        this.occupied.add(`${c},${r}`)
+        this.coreCells.add(`${c},${r}`)
       }
     }
 
@@ -89,13 +94,20 @@ private buildHitPlane(): THREE.Mesh {
     return { col, row, wx, wy }
   }
 
+  // Live occupancy check. Single source of truth — no Sets that can go
+  // out of sync when structures are removed.
+  private isCellBlocked(col: number, row: number): boolean {
+    if (this.coreCells.has(`${col},${row}`)) return true
+    for (const s of this.structures) {
+      if (!s.isDead && s.col === col && s.row === row) return true
+    }
+    return this.externalOccupied(col, row)
+  }
+
   private onMouseMove = (e: MouseEvent) => {
     if (!this.selectedType) { this.hideGhost(); return }
     const cell = this.getCell(e)
-    const blocked = !cell
-      || this.occupied.has(`${cell.col},${cell.row}`)
-      || this.externalOccupied(cell.col, cell.row)
-    if (cell && !blocked) {
+    if (cell && !this.isCellBlocked(cell.col, cell.row)) {
       this.showGhost(cell.wx, cell.wy)
     } else {
       this.hideGhost()
@@ -105,15 +117,13 @@ private buildHitPlane(): THREE.Mesh {
   private onClick = (e: MouseEvent) => {
     if (!this.selectedType) return
     const cell = this.getCell(e)
-    if (!cell || this.occupied.has(`${cell.col},${cell.row}`)) return
-    if (this.externalOccupied(cell.col, cell.row)) return
+    if (!cell || this.isCellBlocked(cell.col, cell.row)) return
 
     const cost = Config.STRUCTURES[this.selectedType].cost
     if (this.credits < cost) return
 
     this.credits -= cost
     this.hud.setCredits(this.credits)
-    this.occupied.add(`${cell.col},${cell.row}`)
     this.structures.push(new Structure(this.scene, this.selectedType, cell.col, cell.row))
   }
 

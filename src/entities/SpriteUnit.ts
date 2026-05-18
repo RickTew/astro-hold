@@ -17,6 +17,14 @@ export type AnimState = 'idle' | 'walking' | 'shoot' | 'throw' | 'die'
 
 // Sprite world size — matches the perceived height of the prior 3D cyborg.
 const SPRITE_SIZE = 60
+
+// Per-cyborg-type colour tint. Grenadier gets a green wash so it doesn't
+// read as the same dark-armoured cyborg as Cannon. Doublegun gets warm
+// orange. Untinted types use 0xffffff (multiplicative identity).
+const SPRITE_TINT: Partial<Record<UnitType, number>> = {
+  grenadier: 0xb0ffb0,
+  doublegun: 0xffd0a0,
+}
 // How far ahead of the unit a projectile should leave from. Tuned so shots
 // emerge from the weapon hand, not the chest/stomach.
 const MUZZLE_FORWARD = 26
@@ -252,6 +260,11 @@ export class SpriteUnit {
     const set = animSets.get(type)
     const mat = new THREE.SpriteMaterial({
       map: set?.staticTextures.get('west') ?? null,
+      // Per-type colour tint so unit roles read clearly even at a glance.
+      // Multiplied against the sprite, so grenadier gets a green wash and
+      // doublegun gets a warm orange wash without changing the source art.
+      // Cannon / dog / etc. stay neutral (white = identity).
+      color: SPRITE_TINT[type] ?? 0xffffff,
       transparent: true,
       depthTest: false,
       depthWrite: false,

@@ -38,6 +38,22 @@ const MINE_DETECT_RADIUS = 65
 // extra facings to the structure's fireFacings array.
 const FIRE_ARC_HALF_RAD = (60 * Math.PI) / 180
 
+// Max reveals an armed bomb stays on the field before force-detonating. Plus
+// the 1-reveal arming delay = ~4 reveals total lifespan. Stops bombs from
+// becoming ignored permanent traps when both sides flee them indefinitely.
+const ARMED_LIFETIME = 3
+
+// 4 cardinal neighbors (N/S/E/W). All standard units move on this grid —
+// no diagonals — making positioning sharper and slower-paced. A future
+// special-character unit can opt into 8-direction movement via the
+// per-unit allowDiagonalMove flag in Config.
+const CARDINAL_STEPS: readonly [number, number][] = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+]
+const DIAGONAL_STEPS: readonly [number, number][] = [
+  ...CARDINAL_STEPS, [1, 1], [1, -1], [-1, 1], [-1, -1],
+]
+
 export class RevealPhase {
   private steps: PlannedStep[]
   private idx = 0
@@ -47,6 +63,11 @@ export class RevealPhase {
   private explosions: Explosion[] = []
   private done = false
   private over = false   // win or lose triggered — wait for projectiles to settle then complete
+  // True if any combat-relevant event happened during this reveal: shots
+  // fired, bombs detonated, mines triggered, grenadier diffuse. Game uses
+  // this to detect a "no-progress" stalemate when all sides are out of
+  // ammo and movement loops indefinitely.
+  combatThisReveal = false
 
   onComplete: (() => void) | null = null
   onWin: (() => void) | null = null
@@ -62,6 +83,18 @@ export class RevealPhase {
     private pendingGrenades: PendingGrenade[] = [],
   ) {
     this.steps = this.buildSteps()
+    // Force-detonate bombs that have outlived their fuse. Done before any
+    // step runs so the explosions read as "the bomb you left out finally
+    // went off" — happens at the start of the new reveal.
+    this.expireOldBombs()
+  }
+
+  private expireOldBombs() {
+    for (const g of [...this.pendingGrenades]) {
+      if (g.armed && g.turnsArmed >= ARMED_LIFETIME) {
+        this.detonatePendingGrenade(g)
+      }
+    }
   }
 
   // ── Step list ────────────────────────────────────────────────────────────
@@ -197,18 +230,15 @@ export class RevealPhase {
   private pickWanderStep(unit: SpriteUnit): CellRef | null {
     const cs = Config.GRID_CELL
     const options: CellRef[] = []
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue
-        const x = unit.worldX + dx * cs
-        const y = unit.worldY + dy * cs
-        if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
-        if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
-        if (this.isCellOccupiedAtBattle(x, y, unit)) continue
-        const col = Math.floor((x - Config.WORLD.LEFT) / cs)
-        const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
-        options.push({ col, row })
-      }
+    for (const [dx, dy] of CARDINAL_STEPS) {
+      const x = unit.worldX + dx * cs
+      const y = unit.worldY + dy * cs
+      if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
+      if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
+      if (this.isCellOccupiedAtBattle(x, y, unit)) continue
+      const col = Math.floor((x - Config.WORLD.LEFT) / cs)
+      const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
+      options.push({ col, row })
     }
     if (options.length === 0) return null
     return options[Math.floor(Math.random() * options.length)]
@@ -253,25 +283,28 @@ export class RevealPhase {
   // enemy bombs covering this cell). Bomb damage dominates pure distance
   // so a unit will sidestep instead of walking through a primed AoE — but
   // if every legal step is dangerous, it still picks the least-bad one.
+  //
+  // Cardinal-only by default — units pick from N/S/E/W neighbors. Future
+  // diagonal-capable units (e.g., Hulk) gate on Config.UNITS[type]
+  // .allowDiagonalMove and unlock the 8-cell search.
   private pickStepTowardPoint(unit: SpriteUnit, tx: number, ty: number): CellRef | null {
     const cs = Config.GRID_CELL
     const curDist = Math.hypot(tx - unit.worldX, ty - unit.worldY)
     type Cand = { col: number; row: number; x: number; y: number; d: number; danger: number }
     const candidates: Cand[] = []
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue
-        const x = unit.worldX + dx * cs
-        const y = unit.worldY + dy * cs
-        if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
-        if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
-        const col = Math.floor((x - Config.WORLD.LEFT) / cs)
-        const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
-        const d = Math.hypot(tx - x, ty - y)
-        if (d >= curDist) continue   // must reduce distance
-        if (this.isCellOccupiedAtBattle(x, y, unit)) continue
-        candidates.push({ col, row, x, y, d, danger: this.cellBombDanger(x, y, unit.side) })
-      }
+    const allowDiagonal = (Config.UNITS[unit.type] as { allowDiagonalMove?: boolean }).allowDiagonalMove === true
+    const steps = allowDiagonal ? DIAGONAL_STEPS : CARDINAL_STEPS
+    for (const [dx, dy] of steps) {
+      const x = unit.worldX + dx * cs
+      const y = unit.worldY + dy * cs
+      if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
+      if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
+      const col = Math.floor((x - Config.WORLD.LEFT) / cs)
+      const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
+      const d = Math.hypot(tx - x, ty - y)
+      if (d >= curDist) continue   // must reduce distance
+      if (this.isCellOccupiedAtBattle(x, y, unit)) continue
+      candidates.push({ col, row, x, y, d, danger: this.cellBombDanger(x, y, unit.side) })
     }
     if (candidates.length === 0) return null
     // Score = distance + (danger weight). Weight tuned so any non-zero
@@ -570,6 +603,7 @@ export class RevealPhase {
     g.dispose()
     const idx = this.pendingGrenades.indexOf(g)
     if (idx >= 0) this.pendingGrenades.splice(idx, 1)
+    this.combatThisReveal = true
   }
 
   private shouldDetonateGrenade(g: PendingGrenade): boolean {
@@ -634,6 +668,7 @@ export class RevealPhase {
     const idx = this.pendingGrenades.indexOf(bomb)
     if (idx >= 0) this.pendingGrenades.splice(idx, 1)
     actor.faceTarget(bomb.worldX, bomb.worldY)
+    this.combatThisReveal = true
   }
 
   private executeMove(actor: Actor, cell: CellRef) {
@@ -667,8 +702,9 @@ export class RevealPhase {
     const range = this.actorRange(actor)
     if (dist > range) return   // strict skip — out of range now
 
-    // The shot is going to fire — burn one round of ammo.
+    // The shot is going to fire — burn one round of ammo + mark combat.
     this.decrementActorAmmo(actor)
+    this.combatThisReveal = true
 
     // Cyborg attack animation; spheres/structures don't have shoot anims yet.
     if (actor instanceof SpriteUnit) {
@@ -791,6 +827,7 @@ export class RevealPhase {
         if (this.inRadius(u.worldX, u.worldY, s.worldX, s.worldY, radius)) u.takeDamage(dmg)
       }
       s.takeDamage(9999)   // mine self-destructs on trigger
+      this.combatThisReveal = true
     }
   }
 

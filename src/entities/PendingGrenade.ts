@@ -18,6 +18,10 @@ export class PendingGrenade {
   // a planning window). RevealPhase.onComplete flips this to true at end
   // of turn. armed=true: live proximity trigger.
   armed = false
+  // Reveals the bomb has spent in the armed state. Game.advanceTurn() bumps
+  // this each end-of-reveal. RevealPhase force-detonates at turnsArmed >=
+  // ARMED_LIFETIME so bombs don't sit on the field forever as ignored traps.
+  turnsArmed = 0
 
   constructor(
     scene: THREE.Scene,
@@ -34,13 +38,14 @@ export class PendingGrenade {
     const tex = getGrenadeTexture()
     const mat = new THREE.SpriteMaterial({
       map: tex ?? null,
-      // Yellow tint while unarmed, white when armed. Without a texture
-      // (preload race) fall back to orange so it's still visible.
-      color: tex ? 0xffe066 : 0xff5500,
+      // Dim grey + low opacity while UNARMED so the player visually reads
+      // "not yet live". Armed flips to bright white + full opacity in arm().
+      color: tex ? 0x666666 : 0x999999,
+      opacity: 0.55,
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      alphaTest: 0.1,
+      alphaTest: 0.05,
     })
     this.sprite = new THREE.Sprite(mat)
     this.sprite.scale.set(baseSize, baseSize, 1)
@@ -49,10 +54,24 @@ export class PendingGrenade {
     scene.add(this.sprite)
   }
 
+  // Called once at end-of-reveal to flip unarmed → armed. No-op on subsequent
+  // calls (use advanceTurn to increment the armed-lifetime counter).
   arm() {
     if (this.armed) return
     this.armed = true
-    this.sprite.material.color.setHex(0xffffff)
+    this.sprite.material.color.setHex(0xff5544)   // hot-red glow = "live"
+    this.sprite.material.opacity = 1
+  }
+
+  // End-of-reveal tick. Arms unarmed bombs, then bumps turnsArmed for the
+  // already-armed ones. RevealPhase checks turnsArmed against ARMED_LIFETIME
+  // at the start of the next reveal to force-detonate expired bombs.
+  advanceTurn() {
+    if (!this.armed) {
+      this.arm()
+      return
+    }
+    this.turnsArmed++
   }
 
   update(delta: number) {

@@ -69,6 +69,11 @@ export class Game {
   // Owned by Game (survives RevealPhase instances) and passed by reference so
   // each new reveal sees + clears + grows the same array.
   private pendingGrenades: PendingGrenade[] = []
+  // Tracks reveals in a row that had zero combat events (no shots, no bombs,
+  // no diffuses). After NO_PROGRESS_LIMIT consecutive idle reveals, the
+  // auto-loop halts with a stalemate — prevents the "robot dog wanders
+  // forever while everyone else is out of ammo" lockup.
+  private noProgressReveals = 0
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
@@ -297,16 +302,22 @@ private enterBuildPhase() {
     }
     this.revealPhase.onComplete = () => {
       const hadActions = (this.revealPhase?.totalSteps ?? 0) > 0
+      const hadCombat = this.revealPhase?.combatThisReveal === true
       this.revealPhase = null
-      // Arm every freshly-landed bomb so they're live proximity traps from
-      // the next reveal onward. The arming-delay window (this reveal) gives
-      // the opposing side a planning turn to flee / diffuse the threat.
-      for (const g of this.pendingGrenades) g.arm()
+      // End-of-reveal bomb tick: unarmed → armed, already-armed gets its
+      // turnsArmed counter bumped. RevealPhase force-detonates expired bombs
+      // at the start of the next reveal (see ARMED_LIFETIME there).
+      for (const g of this.pendingGrenades) g.advanceTurn()
+      // Tick the no-combat counter. Wandering / advancing without anyone
+      // ever shooting is a deadlock — call stalemate after a few rounds so
+      // the auto-loop can't spin indefinitely.
+      this.noProgressReveals = hadCombat ? 0 : this.noProgressReveals + 1
       if (this.phase !== 'reveal') return   // game ended mid-reveal
-      if (!hadActions) {
-        // Stalemate — no piece could act this turn (no cyborgs left,
-        // everyone out of ammo, or no in-sight targets + no legal moves).
-        // Stop the auto-loop and surface a Play Again affordance.
+      const NO_PROGRESS_LIMIT = 5
+      if (!hadActions || this.noProgressReveals >= NO_PROGRESS_LIMIT) {
+        // Stalemate: either no piece could act this turn, or no combat has
+        // happened for several reveals in a row (everyone out of ammo /
+        // can't reach a target). Halt the auto-loop and show Play Again.
         this.hud.showStalemate()
         return
       }
@@ -412,9 +423,16 @@ private enterBuildPhase() {
     p.onEnd?.()
   }
 
-private makeGhostRing(color: number, inner: number, outer: number): THREE.Mesh {
-    const geo = new THREE.RingGeometry(inner, outer, 24)
-    const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+// Single ghost style for every placement (spheres / dogs / cyborgs / etc).
+  // Used to be a coloured ring; replaced with a cell-aligned green square so
+  // the placement UX matches the structure-placement ghost from BuildPhase.
+  // `color` is ignored — kept in the signature for caller compatibility.
+  private makeGhostRing(_color: number, _inner: number, _outer: number): THREE.Mesh {
+    const size = Config.GRID_CELL - 2
+    const geo = new THREE.PlaneGeometry(size, size)
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88, side: THREE.DoubleSide, transparent: true, opacity: 0.25,
+    })
     return new THREE.Mesh(geo, mat)
   }
 
