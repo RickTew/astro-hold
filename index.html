@@ -245,6 +245,71 @@
     }
     .plan-sel-queue em { color: #556677; }
 
+    /* Compass-rose popup — opens with shift+click on a placed firing structure
+       during BUILD. Lets the player pay credits to add extra fire-arc facings.
+       Positioned absolutely; Game projects the structure's world position to
+       screen coords and pins the rose there on open. */
+    #compass-rose {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: grid;
+      grid-template-columns: repeat(3, 44px);
+      grid-template-rows: auto repeat(3, 44px);
+      gap: 4px;
+      padding: 8px;
+      background: rgba(0, 8, 20, 0.92);
+      border: 1px solid #2266aa;
+      box-shadow: 0 0 18px rgba(0, 80, 160, 0.45);
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: #aaccdd;
+    }
+    #compass-rose .rose-title {
+      grid-column: 1 / 4;
+      text-align: center;
+      color: #88ccff;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+    #compass-rose .rose-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      cursor: pointer;
+      background: #0a1e33;
+      border: 1px solid #1a4466;
+      color: #88bbdd;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1;
+    }
+    #compass-rose .rose-btn:hover { background: #102840; border-color: #2266aa; }
+    #compass-rose .rose-btn.active {
+      background: #0e3055;
+      border-color: #00aaff;
+      color: #00eeff;
+      cursor: default;
+      text-shadow: 0 0 6px #00aaff;
+    }
+    #compass-rose .rose-btn.unaffordable {
+      opacity: 0.4;
+      cursor: not-allowed;
+      filter: grayscale(0.4);
+    }
+    #compass-rose .rose-btn .rose-arrow { font-size: 16px; line-height: 1; }
+    #compass-rose .rose-btn .rose-cost  { font-size: 9px; color: #99cc66; }
+    #compass-rose .rose-btn .rose-on    { font-size: 8px; color: #66ccff; letter-spacing: 1px; }
+    #compass-rose .rose-center {
+      background: transparent;
+      border: 1px dashed #335577;
+      color: #6699bb;
+      font-size: 9px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: default;
+    }
+
     /* Combat history log — right-rail D&D turn log. Visible during BATTLE
        and the win/lose overlay so the player can review what happened. Hidden
        during BUILD (the cyborg shop occupies this corner) and PLAN (the

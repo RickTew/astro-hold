@@ -103,10 +103,10 @@ export class Structure {
   // ammo 0 since they don't shoot.
   ammoRemaining: number
   // Fire-arc facings (math angles, 0=east, π/2=north, π=west, 3π/2=south).
-  // Defender towers ship facing EAST (toward incoming cyborgs); RevealPhase
+  // Defender towers ship facing EAST (toward incoming cyborgs). RevealPhase
   // only auto-fires at targets that fall within ±FIRE_ARC_HALF of any
-  // direction in this array. UI to pay-per-extra-direction is a follow-up;
-  // for now every firing structure has exactly one facing.
+  // direction in this array. Player can pay credits during BUILD to add
+  // extra facings via the compass-rose popup; see Structure.addFacing.
   fireFacings: number[] = [0]
   queuedActions: QueuedAction[] = []
   get side(): 'defender' { return 'defender' }
@@ -296,6 +296,23 @@ export class Structure {
     this.apRemaining = this.apBudget
   }
   refillAp() { this.apRemaining = this.apBudget }
+
+  // Add a new fire-arc facing (math angle, radians). No-op if the structure
+  // already covers that direction. Caller is responsible for charging credits.
+  // Returns true if a new facing was added, false if it was a duplicate.
+  addFacing(angle: number): boolean {
+    // Normalize to [0, 2π) so duplicate detection is consistent regardless of
+    // which side of zero the caller passes.
+    const TAU = Math.PI * 2
+    const norm = ((angle % TAU) + TAU) % TAU
+    const EPS = 0.01
+    for (const f of this.fireFacings) {
+      const fn = ((f % TAU) + TAU) % TAU
+      if (Math.abs(fn - norm) < EPS) return false
+    }
+    this.fireFacings.push(norm)
+    return true
+  }
   queueAction(action: QueuedAction, apCost: number) {
     this.queuedActions.push(action)
     this.apRemaining -= apCost

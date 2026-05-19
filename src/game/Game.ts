@@ -86,6 +86,10 @@ export class Game {
   // can see how much of the field one sphere covers before committing. Reused
   // — created once, show/hide as the placement session starts/ends.
   private placementArcPreview!: FireArcPreview
+  // Compass-rose state — set when the player shift+clicks a placed firing
+  // structure during BUILD. The rose's DOM lives in the HUD; Game owns the
+  // structure reference + arc overlay that mirrors its fireFacings array.
+  private editingStructure: Structure | null = null
 
   // Camera pan/zoom state
   private isPanning = false
@@ -260,6 +264,72 @@ private enterBuildPhase() {
       this.endPlacement()
       this.buildPhase?.selectStructure(type)
     }
+
+    // Compass-rose: clicking a cardinal direction buys an extra fire arc on
+    // the currently-edited structure. Credits are charged here, the rose UI
+    // re-renders to reflect the new facing, and the arc overlay updates.
+    this.hud.onAddFacing = (angle) => this.tryBuyFacing(angle)
+  }
+
+  // Compass-rose purchase. Returns true on success. Silently rejects if the
+  // facing already exists, the structure went away, or credits ran out (the
+  // unaffordable styling already greys those buttons, but defend anyway).
+  private tryBuyFacing(angle: number): boolean {
+    const s = this.editingStructure
+    if (!s || s.isDead) { this.closeCompassRose(); return false }
+    if (!this.buildPhase) { this.closeCompassRose(); return false }
+    const cost = Config.EXTRA_FACING_COST
+    if (this.buildPhase.getCredits() < cost) return false
+    const added = s.addFacing(angle)
+    if (!added) return false
+    this.buildPhase.spendCredits(cost)
+    this.refreshEditingArcPreview()
+    this.hud.refreshCompassRose({
+      name: this.structureDisplayLabel(s),
+      activeFacings: s.fireFacings,
+      cost,
+      credits: this.buildPhase.getCredits(),
+    })
+    return true
+  }
+
+  // Open the compass rose for a placed structure during BUILD. Skipped for
+  // walls / mines / signal (no firing) and any preview pieces that won't
+  // actually shoot. Anchored at the structure's screen-projected coords.
+  private openCompassRose(s: Structure) {
+    const stats = Config.STRUCTURES[s.type]
+    if (!stats || stats.range <= 0 || stats.ammo <= 0) return
+    this.editingStructure = s
+    const screen = this.worldToScreen(s.worldX, s.worldY)
+    this.hud.showCompassRose(screen.x, screen.y, {
+      name: this.structureDisplayLabel(s),
+      activeFacings: s.fireFacings,
+      cost: Config.EXTRA_FACING_COST,
+      credits: this.buildPhase?.getCredits() ?? 0,
+    })
+    this.refreshEditingArcPreview()
+  }
+
+  private closeCompassRose() {
+    if (!this.editingStructure) return
+    this.editingStructure = null
+    this.hud.hideCompassRose()
+    this.placementArcPreview.hide()
+  }
+
+  // Show the live arc-preview overlay for whatever structure the compass rose
+  // is currently open on, reflecting its full fireFacings array. Shares the
+  // placement-preview overlay so only one is on-screen at a time.
+  private refreshEditingArcPreview() {
+    const s = this.editingStructure
+    if (!s) { this.placementArcPreview.hide(); return }
+    this.placementArcPreview.showWedge(s.worldX, s.worldY, s.range, s.fireFacings)
+  }
+
+  // Strip the "30cr" suffix from the Config label so the rose title reads
+  // cleanly ("Turret arcs" instead of "Turret 30cr arcs").
+  private structureDisplayLabel(s: Structure): string {
+    return Config.STRUCTURES[s.type].label.replace(/\s*\d+cr.*$/, '').trim()
   }
 
   // Called once from BUILD (initial = true) and then again after every reveal
@@ -268,6 +338,7 @@ private enterBuildPhase() {
     if (initial) {
       if (!this.buildPhase) return
       this.endPlacement()
+      this.closeCompassRose()
       this.removeZoneTint('att')
       this.removeZoneTint('def')
       this.structures = this.buildPhase.getStructures()
@@ -542,6 +613,16 @@ private enterBuildPhase() {
     return new THREE.Vector2(target.x, target.y)
   }
 
+  // Inverse of screenToWorld for points at z=0. Used to anchor the compass-rose
+  // popup over a clicked structure in pixel coordinates.
+  private worldToScreen(wx: number, wy: number): { x: number; y: number } {
+    const v = new THREE.Vector3(wx, wy, 0).project(this.camera)
+    return {
+      x: (v.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+    }
+  }
+
   start() {
     this.lastTime = performance.now()
     this.loop()
@@ -619,8 +700,27 @@ private enterBuildPhase() {
     if (e.button === 0 && this.phase === 'build') {
       if ((e.target as HTMLElement).closest('#hud')) return  // ignore HUD clicks
 
-      // Refund-and-remove if clicking on an already-placed sphere or cyborg.
+      // If the compass rose is open, any click outside it closes the rose and
+      // consumes the click — don't refund or place on a "click away" gesture.
+      if (this.hud.isCompassRoseOpen()) {
+        this.closeCompassRose()
+        return
+      }
+
       const world = this.screenToWorld(e.clientX, e.clientY)
+
+      // Shift+click on an existing firing structure → open the compass rose
+      // (extra fire-arc purchase). Falls through to normal place/refund if
+      // the click doesn't land on a structure.
+      if (e.shiftKey && world) {
+        const s = this.findStructureNear(world.x, world.y)
+        if (s) {
+          this.openCompassRose(s)
+          return
+        }
+      }
+
+      // Refund-and-remove if clicking on an already-placed sphere or cyborg.
       if (world && this.tryRefund(world.x, world.y)) return
 
       if (this.placement) {
@@ -637,6 +737,20 @@ private enterBuildPhase() {
       if (!world) return
       this.planningPhase?.onPrimaryClick(world.x, world.y, e.shiftKey)
     }
+  }
+
+  // Locate a live structure whose centre falls within ~half a cell of the
+  // clicked world position. Used by the compass-rose shift+click detection
+  // during BUILD. Returns null if nothing's there.
+  private findStructureNear(x: number, y: number): Structure | null {
+    const R_SQ = 35 * 35   // mirrors REFUND_RADIUS_SQ — same "hit" hitbox
+    const structs = this.buildPhase?.getStructures() ?? this.structures
+    for (const s of structs) {
+      if (s.isDead) continue
+      const dx = s.worldX - x, dy = s.worldY - y
+      if (dx * dx + dy * dy < R_SQ) return s
+    }
+    return null
   }
 
   // Click on a placed sphere or cyborg → remove + refund. Returns true if

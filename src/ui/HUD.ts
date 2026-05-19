@@ -20,12 +20,16 @@ export class HUD {
   // Sticky empty-state marker so we know whether to wipe the "(combat will
   // appear here…)" placeholder on first append.
   private combatLogEmpty = true
+  private compassRoseEl: HTMLElement | null = null
 
   onSelectStructure: ((type: StructureType) => void) | null = null
   onSpawnUnit: ((type: UnitType) => void) | null = null
   onBuySphere: (() => void) | null = null
   onBuyDog: (() => void) | null = null
   onBattle: (() => void) | null = null
+  // Compass-rose callback. Game decides whether the purchase succeeds (cost,
+  // credits, duplicate facing); HUD just forwards the click intent.
+  onAddFacing: ((angle: number) => void) | null = null
 
   constructor() {
     this.container = document.getElementById('hud')!
@@ -243,6 +247,111 @@ export class HUD {
   hideMessage() {
     this.messageEl.classList.add('hidden')
     this.messageEl.innerHTML = ''
+  }
+
+  // ── Compass rose ─────────────────────────────────────────────────────────
+
+  // Open the rose at a fixed screen position. activeFacings is the list of
+  // currently-active math-angles (0=east, π/2=north, etc); cost is the price
+  // to add ONE new facing; credits is the player's current balance (drives
+  // the unaffordable greyout). The 'name' label is the structure type shown
+  // in the title row.
+  showCompassRose(screenX: number, screenY: number, opts: {
+    name: string
+    activeFacings: ReadonlyArray<number>
+    cost: number
+    credits: number
+  }) {
+    this.hideCompassRose()
+    const el = document.createElement('div')
+    el.id = 'compass-rose'
+    el.style.left = `${screenX}px`
+    el.style.top  = `${screenY}px`
+    el.innerHTML = this.buildRoseInnerHtml(opts)
+    el.addEventListener('mousedown', e => e.stopPropagation())   // don't trigger outside-close on rose clicks
+    el.querySelectorAll<HTMLElement>('.rose-btn[data-angle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) return
+        if (btn.classList.contains('unaffordable')) return
+        const angle = parseFloat(btn.dataset.angle!)
+        this.onAddFacing?.(angle)
+      })
+    })
+    this.container.appendChild(el)
+    this.compassRoseEl = el
+  }
+
+  hideCompassRose() {
+    if (this.compassRoseEl) {
+      this.compassRoseEl.remove()
+      this.compassRoseEl = null
+    }
+  }
+
+  isCompassRoseOpen(): boolean { return this.compassRoseEl !== null }
+
+  // Re-render the rose's button states without recreating the DOM element.
+  // Called by Game after a successful addFacing so the newly-active direction
+  // flips to its "active" style and the cost recalculates.
+  refreshCompassRose(opts: {
+    name: string
+    activeFacings: ReadonlyArray<number>
+    cost: number
+    credits: number
+  }) {
+    if (!this.compassRoseEl) return
+    this.compassRoseEl.innerHTML = this.buildRoseInnerHtml(opts)
+    this.compassRoseEl.querySelectorAll<HTMLElement>('.rose-btn[data-angle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.classList.contains('active')) return
+        if (btn.classList.contains('unaffordable')) return
+        const angle = parseFloat(btn.dataset.angle!)
+        this.onAddFacing?.(angle)
+      })
+    })
+  }
+
+  private buildRoseInnerHtml(opts: {
+    name: string
+    activeFacings: ReadonlyArray<number>
+    cost: number
+    credits: number
+  }): string {
+    // Order: top row blank/N/blank, middle W/center/E, bottom blank/S/blank.
+    // Cardinal labels in compass terms (top-down view): N = +Y (up on screen),
+    // E = +X (right), S = -Y (down), W = -X (left). Math angles: E=0, N=π/2,
+    // W=π, S=-π/2 (or 3π/2 normalized).
+    const dirs: Array<{ key: string; angle: number; arrow: string; pos: number }> = [
+      { key: 'N', angle:  Math.PI / 2,  arrow: '↑', pos: 2 },
+      { key: 'W', angle:  Math.PI,      arrow: '←', pos: 4 },
+      { key: 'E', angle:  0,            arrow: '→', pos: 6 },
+      { key: 'S', angle: -Math.PI / 2,  arrow: '↓', pos: 8 },
+    ]
+    const TAU = Math.PI * 2
+    const isActive = (a: number) =>
+      opts.activeFacings.some(f => {
+        const fn = ((f % TAU) + TAU) % TAU
+        const an = ((a % TAU) + TAU) % TAU
+        return Math.abs(fn - an) < 0.01
+      })
+    // Build the 3x3 grid by position index (1..9). Corners + center get fillers.
+    const cells: string[] = []
+    for (let i = 1; i <= 9; i++) {
+      if (i === 5) {
+        cells.push('<div class="rose-center">' + opts.activeFacings.length + '/4</div>')
+        continue
+      }
+      const d = dirs.find(x => x.pos === i)
+      if (!d) { cells.push('<div></div>'); continue }
+      if (isActive(d.angle)) {
+        cells.push(`<div class="rose-btn active" data-angle="${d.angle}"><span class="rose-arrow">${d.arrow}</span><span class="rose-on">ON</span></div>`)
+      } else if (opts.credits < opts.cost) {
+        cells.push(`<div class="rose-btn unaffordable" data-angle="${d.angle}"><span class="rose-arrow">${d.arrow}</span><span class="rose-cost">+${opts.cost}cr</span></div>`)
+      } else {
+        cells.push(`<div class="rose-btn" data-angle="${d.angle}"><span class="rose-arrow">${d.arrow}</span><span class="rose-cost">+${opts.cost}cr</span></div>`)
+      }
+    }
+    return `<div class="rose-title">${opts.name} arcs</div>` + cells.join('')
   }
 
   // Append one reveal's worth of combat-log entries under a "── Turn N ──"

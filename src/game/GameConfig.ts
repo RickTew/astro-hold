@@ -5,6 +5,11 @@ export const Config = {
   GRID_CELL: 50,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
   TURN_INTERVAL: 0.65,   // seconds per battle turn — also drives unit move speed
+  // Cost to add an extra fire-arc facing to a directional structure (turret /
+  // bomber / cannon / gun / laser). Player opens the compass-rose popup by
+  // shift+clicking the structure during BUILD. Flat per-direction cost — a
+  // 4-arc tower runs 30 base + 3*30 = 120cr total.
+  EXTRA_FACING_COST: 30,
   // Power Core uses a 2x2 footprint (4 cells) per the size rule: small pieces
   // get one cell, large pieces step up to the next tier (4 cells). The (X, Y)
   // here is the CENTROID of the 2x2 block — it sits on a grid INTERSECTION,
