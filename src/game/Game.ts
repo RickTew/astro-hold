@@ -306,9 +306,15 @@ private enterBuildPhase() {
   // Open the compass rose for a placed structure during BUILD. Skipped for
   // walls / mines / signal (no firing) and any preview pieces that won't
   // actually shoot. Anchored at the structure's screen-projected coords.
+  // Cancels any active sphere/dog/cyborg placement AND the structure shop
+  // selection so the rose is a focused edit mode — clicks while it's open
+  // won't accidentally drop a new piece in the background.
   private openCompassRose(s: Structure) {
     const stats = Config.STRUCTURES[s.type]
     if (!stats || stats.range <= 0 || stats.ammo <= 0) return
+    this.endPlacement()
+    this.buildPhase?.selectStructure(null)
+    this.hud.clearStructureSelection()
     this.editingStructure = s
     const screen = this.worldToScreen(s.worldX, s.worldY)
     this.hud.showCompassRose(screen.x, screen.y, {
@@ -829,6 +835,15 @@ private enterBuildPhase() {
         structs.splice(i, 1)
         s.dispose()
         this.buildPhase?.addCredits(Config.STRUCTURES[s.type].cost)
+        // Clear the active shop selection — otherwise BuildPhase's `click`
+        // handler fires AFTER our mousedown, sees the cell is now empty, and
+        // places a fresh structure of the selected type. To the player that
+        // looks like the click "didn't remove" the piece. Spheres/dogs use
+        // a different placement system so they don't have this issue.
+        this.buildPhase?.selectStructure(null)
+        this.hud.clearStructureSelection()
+        // Also tear down the rose if it was editing this structure.
+        if (this.editingStructure === s) this.closeCompassRose()
         return true
       }
     }
