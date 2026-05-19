@@ -245,6 +245,41 @@
     }
     .plan-sel-queue em { color: #556677; }
 
+    /* Combat history log — right-rail D&D turn log. Visible during BATTLE
+       and the win/lose overlay so the player can review what happened. Hidden
+       during BUILD (the cyborg shop occupies this corner) and PLAN (the
+       plan-selection panel does). */
+    #combat-log {
+      position: absolute;
+      top: 60px;
+      right: 12px;
+      width: 280px;
+      max-height: calc(100vh - 160px);
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid #224466;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #99bbcc;
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    #combat-log .log-turn {
+      color: #ffcc66;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin: 6px 0 4px;
+      border-bottom: 1px dashed #443322;
+      padding-bottom: 2px;
+    }
+    #combat-log .log-turn:first-child { margin-top: 0; }
+    #combat-log .log-entry { padding: 1px 0; }
+    #combat-log .log-entry.defender { color: #88bbdd; }
+    #combat-log .log-entry.attacker { color: #dd8888; }
+    #combat-log .log-entry.neutral  { color: #ffaa44; font-weight: bold; }
+    #combat-log .log-empty { color: #556677; font-style: italic; }
+
     #game-message {
       position: absolute;
       top: 50%; left: 50%;

@@ -74,6 +74,10 @@ export class Game {
   // auto-loop halts with a stalemate — prevents the "robot dog wanders
   // forever while everyone else is out of ammo" lockup.
   private noProgressReveals = 0
+  // Monotonic counter for the combat-history log. First reveal after PLAN
+  // is Turn 1; auto-chained reveals bump from there. Never reset within a
+  // game — Play Again is a full reload.
+  private revealTurn = 1
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
@@ -304,6 +308,13 @@ private enterBuildPhase() {
     this.revealPhase.onComplete = () => {
       const hadActions = (this.revealPhase?.totalSteps ?? 0) > 0
       const hadCombat = this.revealPhase?.combatThisReveal === true
+      // Flush this reveal's events to the combat-history log BEFORE we lose
+      // the reference. Even a 0-action reveal gets a header (the player sees
+      // "Turn N — no activity") so the lock-step between gameplay and log
+      // stays obvious.
+      const entries = this.revealPhase?.combatLog ?? []
+      this.hud.appendCombatLog(this.revealTurn, entries)
+      this.revealTurn++
       this.revealPhase = null
       // End-of-reveal bomb tick: unarmed → armed, already-armed gets its
       // turnsArmed counter bumped. RevealPhase force-detonates expired bombs

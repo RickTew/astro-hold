@@ -24,6 +24,16 @@ interface PlannedStep {
   action: QueuedAction
 }
 
+// One line in the D&D-style turn log. Side drives the row colour in the HUD
+// (defender = blue, attacker = red, neutral = grey). RevealPhase emits these
+// as actions resolve; Game flushes them to the HUD after each reveal completes.
+export interface CombatLogEntry {
+  side: 'defender' | 'attacker' | 'neutral'
+  text: string
+}
+
+interface AoeSummary { hits: number; damageDealt: number; kills: number }
+
 // Seconds per action in the reveal. Slow enough that the player can read each
 // step ("ok the sphere just fired at the cannon"), fast enough that a full
 // turn doesn't drag. Projectile flight may exceed this — projectiles keep
@@ -69,6 +79,10 @@ export class RevealPhase {
   // ammo and movement loops indefinitely.
   combatThisReveal = false
 
+  // D&D-style turn log. Each combat-relevant event pushes one entry here as
+  // it resolves. Game reads this after onComplete and forwards it to the HUD.
+  readonly combatLog: CombatLogEntry[] = []
+
   onComplete: (() => void) | null = null
   onWin: (() => void) | null = null
   onLose: (() => void) | null = null
@@ -92,7 +106,7 @@ export class RevealPhase {
   private expireOldBombs() {
     for (const g of [...this.pendingGrenades]) {
       if (g.armed && g.turnsArmed >= ARMED_LIFETIME) {
-        this.detonatePendingGrenade(g)
+        this.detonatePendingGrenade(g, 'expired')
       }
     }
   }
@@ -665,14 +679,23 @@ export class RevealPhase {
 
   // Apply a pending grenade's blast (explosion VFX + side-aware AoE + sound)
   // and remove it from the field. Shared by proximity trigger + shoot-the-bomb.
-  private detonatePendingGrenade(g: PendingGrenade) {
+  // `trigger` is optional: 'proximity' (someone stepped on it), 'expired' (the
+  // ARMED_LIFETIME fuse blew), or the Actor who shot it.
+  private detonatePendingGrenade(g: PendingGrenade, trigger: Actor | 'proximity' | 'expired' = 'proximity') {
     this.explosions.push(new Explosion(this.scene, g.worldX, g.worldY, g.aoeRadius, 0.5))
-    this.applyAoeForSide(g.worldX, g.worldY, g.aoeRadius, g.damage, g.side)
+    const summary = this.applyAoeForSide(g.worldX, g.worldY, g.aoeRadius, g.damage, g.side)
     playExplosion()
     g.dispose()
     const idx = this.pendingGrenades.indexOf(g)
     if (idx >= 0) this.pendingGrenades.splice(idx, 1)
     this.combatThisReveal = true
+    const cause =
+      trigger === 'proximity' ? 'proximity-triggered'
+      : trigger === 'expired' ? 'fuse expired'
+      : `shot by ${this.actorLabel(trigger)}`
+    this.log(g.side, summary.hits === 0
+      ? `Bomb detonates (${cause}) — no targets in blast`
+      : `Bomb detonates (${cause}) — ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
   }
 
   private shouldDetonateGrenade(g: PendingGrenade): boolean {
@@ -770,38 +793,39 @@ export class RevealPhase {
     // slam animation cadence so the boom lands as the Hulk's fist connects.
     const damage = (Config.UNITS.hulk as { slamDamage: number }).slamDamage
     const E = 1
+    let hits = 0, kills = 0
     for (const wc of wedgeCells) {
       this.explosions.push(new Explosion(this.scene, wc.x, wc.y, 22, 0.35))
-      // Hit any enemy whose cell-centre overlaps this wedge cell.
+      const hit = (t: { isDead: boolean; takeDamage(n: number): void }) => {
+        if (t.isDead) return
+        t.takeDamage(damage); hits++
+        if (t.isDead) kills++
+      }
       if (actor.side === 'attacker') {
         for (const s of this.spheres) {
-          if (s.isDead) continue
-          if (Math.abs(s.worldX - wc.x) < E && Math.abs(s.worldY - wc.y) < E) s.takeDamage(damage)
+          if (!s.isDead && Math.abs(s.worldX - wc.x) < E && Math.abs(s.worldY - wc.y) < E) hit(s)
         }
         for (const st of this.structures) {
-          if (st.isDead) continue
-          if (Math.abs(st.worldX - wc.x) < E && Math.abs(st.worldY - wc.y) < E) st.takeDamage(damage)
+          if (!st.isDead && Math.abs(st.worldX - wc.x) < E && Math.abs(st.worldY - wc.y) < E) hit(st)
         }
         for (const du of this.defenderUnits) {
-          if (du.isDead) continue
-          if (Math.abs(du.worldX - wc.x) < E && Math.abs(du.worldY - wc.y) < E) du.takeDamage(damage)
+          if (!du.isDead && Math.abs(du.worldX - wc.x) < E && Math.abs(du.worldY - wc.y) < E) hit(du)
         }
         if (!this.core.isDead) {
           for (const cc of this.core.cellCenters()) {
-            if (Math.abs(cc.x - wc.x) < E && Math.abs(cc.y - wc.y) < E) {
-              this.core.takeDamage(damage)
-              break
-            }
+            if (Math.abs(cc.x - wc.x) < E && Math.abs(cc.y - wc.y) < E) { hit(this.core); break }
           }
         }
       } else {
         for (const u of this.units) {
-          if (u.isDead) continue
-          if (Math.abs(u.worldX - wc.x) < E && Math.abs(u.worldY - wc.y) < E) u.takeDamage(damage)
+          if (!u.isDead && Math.abs(u.worldX - wc.x) < E && Math.abs(u.worldY - wc.y) < E) hit(u)
         }
       }
     }
     playExplosion()
+    this.log(actor.side, hits === 0
+      ? `${this.actorLabel(actor)} slams the ground (no targets)`
+      : `${this.actorLabel(actor)} slams ${hits} target${hits === 1 ? '' : 's'} (−${hits * damage}${kills > 0 ? `, ${kills} killed` : ''})`)
   }
 
   // Grenadier safe-remove of an armed enemy bomb. The bomb just vanishes —
@@ -823,6 +847,7 @@ export class RevealPhase {
     if (idx >= 0) this.pendingGrenades.splice(idx, 1)
     actor.faceTarget(bomb.worldX, bomb.worldY)
     this.combatThisReveal = true
+    this.log(actor.side, `${this.actorLabel(actor)} diffuses an armed bomb`)
   }
 
   private executeMove(actor: Actor, cell: CellRef) {
@@ -899,14 +924,26 @@ export class RevealPhase {
         // pending grenade from the field cleanly.
         const bomb = this.pendingGrenades.find(g => g.id === ref.id)
         if (bomb && bomb.armed) {
-          proj.onHit = () => this.detonatePendingGrenade(bomb)
+          proj.onHit = () => this.detonatePendingGrenade(bomb, actor)
         }
+        this.log(actor.side, `${this.actorLabel(actor)} shoots at an armed bomb`)
       } else {
         // Direct fire — resolve target entity NOW (at fire time) and damage on
         // hit. If the target died before the projectile lands, no damage.
         const targetEntity = this.resolveTargetEntity(ref)
+        const targetLabel = targetEntity ? this.targetLabel(targetEntity) : 'target'
         if (targetEntity) {
-          proj.onHit = () => { if (!targetEntity.isDead) targetEntity.takeDamage(damage) }
+          proj.onHit = () => {
+            if (targetEntity.isDead) {
+              this.log(actor.side, `${this.actorLabel(actor)}'s shot at ${targetLabel} finds the target already down`)
+              return
+            }
+            targetEntity.takeDamage(damage)
+            const killed = targetEntity.isDead
+            this.log(actor.side, `${this.actorLabel(actor)} hits ${targetLabel} (−${damage}${killed ? `, killed` : ''})`)
+          }
+        } else {
+          this.log(actor.side, `${this.actorLabel(actor)} fires (target lost)`)
         }
       }
     } else if (isLobbed) {
@@ -917,53 +954,72 @@ export class RevealPhase {
       proj.silentLanding = true
       const side = actor.side
       const ownerId = actor.id
+      const ownerLabel = this.actorLabel(actor)
       proj.onHit = () => {
         this.pendingGrenades.push(new PendingGrenade(
           this.scene, aim.x, aim.y, damage, aoeRadius, side, ownerId,
         ))
       }
+      const cell = (action as { cell: CellRef }).cell
+      this.log(actor.side, `${ownerLabel} throws a bomb to (${cell.col}, ${cell.row})`)
     } else {
       // Direct-fire AoE — splash everything in range of the impact point
       // immediately. Defender AoE hits cyborgs only; attacker AoE hits
       // defender pieces + dogs + core.
-      proj.onHit = () => this.applyAoe(aim.x, aim.y, aoeRadius, damage, actor)
+      const sourceLabel = this.actorLabel(actor)
+      const sourceSide = actor.side
+      proj.onHit = () => {
+        const summary = this.applyAoe(aim.x, aim.y, aoeRadius, damage, actor)
+        this.log(sourceSide, summary.hits === 0
+          ? `${sourceLabel} AoE bursts harmlessly`
+          : `${sourceLabel} AoE — ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+      }
     }
 
     this.projectiles.push(proj)
     if (!isAoe) playGunshot()
   }
 
-  private applyAoe(cx: number, cy: number, radius: number, damage: number, source: Actor) {
-    this.applyAoeForSide(cx, cy, radius, damage, source.side)
+  private applyAoe(cx: number, cy: number, radius: number, damage: number, source: Actor): AoeSummary {
+    return this.applyAoeForSide(cx, cy, radius, damage, source.side)
   }
 
-  private applyAoeForSide(cx: number, cy: number, radius: number, damage: number, side: 'attacker' | 'defender') {
-    // Defender AoE hits cyborgs only. Attacker AoE hits defender pieces +
-    // defender mobile units + the core.
+  // Splash damage application. Returns the number of pieces hit, total damage
+  // dealt, and how many of those hits were killing blows — log lines read
+  // these to format the post-action summary.
+  private applyAoeForSide(cx: number, cy: number, radius: number, damage: number, side: 'attacker' | 'defender'): AoeSummary {
+    let hits = 0, kills = 0
+    const hit = (target: { isDead: boolean; takeDamage(n: number): void }) => {
+      if (target.isDead) return
+      target.takeDamage(damage)
+      hits++
+      if (target.isDead) kills++
+    }
     if (side === 'defender') {
       for (const u of this.units) {
         if (u.isDead) continue
-        if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) u.takeDamage(damage)
+        if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) hit(u)
       }
     } else {
       for (const s of this.spheres) {
         if (s.isDead) continue
-        if (this.inRadius(s.worldX, s.worldY, cx, cy, radius)) s.takeDamage(damage)
+        if (this.inRadius(s.worldX, s.worldY, cx, cy, radius)) hit(s)
       }
       for (const s of this.structures) {
         if (s.isDead) continue
-        if (this.inRadius(s.worldX, s.worldY, cx, cy, radius)) s.takeDamage(damage)
+        if (this.inRadius(s.worldX, s.worldY, cx, cy, radius)) hit(s)
       }
       for (const u of this.defenderUnits) {
         if (u.isDead) continue
-        if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) u.takeDamage(damage)
+        if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) hit(u)
       }
       if (!this.core.isDead) {
         const cc = this.core.cellCenters()
-        const hit = cc.some(p => this.inRadius(p.x, p.y, cx, cy, radius))
-        if (hit) this.core.takeDamage(damage)
+        const inside = cc.some(p => this.inRadius(p.x, p.y, cx, cy, radius))
+        if (inside) hit(this.core)
       }
     }
+    return { hits, damageDealt: hits * damage, kills }
   }
 
   private checkMineTriggers(unit: SpriteUnit, x: number, y: number) {
@@ -976,12 +1032,17 @@ export class RevealPhase {
       this.explosions.push(new Explosion(this.scene, s.worldX, s.worldY, radius, 0.7))
       playExplosion()
       const dmg = Config.STRUCTURES.mine.damage
+      let hits = 0, kills = 0
       for (const u of this.units) {
         if (u.isDead) continue
-        if (this.inRadius(u.worldX, u.worldY, s.worldX, s.worldY, radius)) u.takeDamage(dmg)
+        if (this.inRadius(u.worldX, u.worldY, s.worldX, s.worldY, radius)) {
+          u.takeDamage(dmg); hits++
+          if (u.isDead) kills++
+        }
       }
       s.takeDamage(9999)   // mine self-destructs on trigger
       this.combatThisReveal = true
+      this.log('defender', `Mine triggers — ${this.actorLabel(unit)} step set it off${hits > 0 ? ` (${hits} hit, −${hits * dmg}${kills > 0 ? `, ${kills} killed` : ''})` : ' (no other targets)'}`)
     }
   }
 
@@ -991,12 +1052,14 @@ export class RevealPhase {
     if (this.over) return
     if (this.core.isDead) {
       this.over = true
+      this.log('neutral', 'POWER CORE DESTROYED')
       this.applyCoreBlast()
       this.onLose?.()
       return
     }
     if (this.units.every(u => u.isDead)) {
       this.over = true
+      this.log('neutral', 'All cyborgs eliminated')
       this.onWin?.()
     }
   }
@@ -1122,5 +1185,30 @@ export class RevealPhase {
     for (const u of this.defenderUnits) u.faceCamera(camera)
     for (const s of this.spheres) if (!s.isDead) s.faceCamera(camera)
     for (const s of this.structures) if (!s.isDead) s.faceCamera(camera)
+  }
+
+  // ── Combat log helpers ──────────────────────────────────────────────────
+
+  private log(side: 'defender' | 'attacker' | 'neutral', text: string) {
+    this.combatLog.push({ side, text })
+  }
+
+  private actorLabel(a: AnyTarget): string {
+    if (a instanceof PixelPowerCore) return 'Power Core'
+    if (a instanceof SphereDefender) return 'Sphere'
+    if (a instanceof SpriteUnit) return Config.UNITS[a.type].label
+    // STRUCTURES[type].label is "Bomber 70cr" — strip the cost suffix.
+    return Config.STRUCTURES[a.type].label.replace(/\s*\d+cr.*$/, '').trim()
+  }
+
+  // Lookup for fire-target entities. Resolves to the same label as actorLabel
+  // for now but kept separate so a future change (e.g. include cell coords
+  // for the core's hit cell) only touches the target path.
+  private targetLabel(t: { isDead: boolean }): string {
+    if (t instanceof PixelPowerCore) return 'Power Core'
+    if (t instanceof SphereDefender) return 'Sphere'
+    if (t instanceof SpriteUnit) return Config.UNITS[t.type].label
+    if (t instanceof Structure)  return Config.STRUCTURES[t.type].label.replace(/\s*\d+cr.*$/, '').trim()
+    return 'target'
   }
 }

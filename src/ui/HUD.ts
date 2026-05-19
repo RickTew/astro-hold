@@ -1,5 +1,6 @@
 import { Config, StructureType, UnitType } from '../game/GameConfig'
 import type { PlanningSelectionInfo } from '../game/PlanningPhase'
+import type { CombatLogEntry } from '../game/RevealPhase'
 
 const SPHERE_COST = 100   // mirrors Game.SPHERE_COST
 
@@ -15,6 +16,10 @@ export class HUD {
   private loadingEl!: HTMLElement
   private planBarEl!: HTMLElement
   private planSelectionEl!: HTMLElement
+  private combatLogEl!: HTMLElement
+  // Sticky empty-state marker so we know whether to wipe the "(combat will
+  // appear here…)" placeholder on first append.
+  private combatLogEmpty = true
 
   onSelectStructure: ((type: StructureType) => void) | null = null
   onSpawnUnit: ((type: UnitType) => void) | null = null
@@ -63,6 +68,7 @@ export class HUD {
         <button id="plan-battle-btn">BATTLE</button>
       </div>
       <div id="plan-selection" class="hidden"></div>
+      <div id="combat-log" class="hidden"><div class="log-empty">(combat events appear here as the battle plays)</div></div>
       <div id="game-message" class="hidden"></div>
     `
 
@@ -76,6 +82,7 @@ export class HUD {
     this.messageEl        = this.container.querySelector('#game-message')!
     this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
+    this.combatLogEl      = this.container.querySelector('#combat-log')!
 
     this.container.querySelector('#sphere-btn')?.addEventListener('click', () => {
       this.onBuySphere?.()
@@ -176,6 +183,7 @@ export class HUD {
         this.cyborgShopEl.classList.remove('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
+        this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'planning':
@@ -184,6 +192,7 @@ export class HUD {
         this.robotShopEl.classList.add('hidden')
         this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.remove('hidden')
+        this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'reveal':
@@ -193,6 +202,7 @@ export class HUD {
         this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
+        this.combatLogEl.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'win':
@@ -233,6 +243,32 @@ export class HUD {
   hideMessage() {
     this.messageEl.classList.add('hidden')
     this.messageEl.innerHTML = ''
+  }
+
+  // Append one reveal's worth of combat-log entries under a "── Turn N ──"
+  // header. Auto-scrolls to the bottom so the latest action is in view; trims
+  // the DOM to the last ~200 entries so long battles don't bloat memory.
+  appendCombatLog(turn: number, entries: ReadonlyArray<CombatLogEntry>) {
+    if (entries.length === 0) return
+    if (this.combatLogEmpty) {
+      this.combatLogEl.innerHTML = ''
+      this.combatLogEmpty = false
+    }
+    const header = document.createElement('div')
+    header.className = 'log-turn'
+    header.textContent = `── Turn ${turn} ──`
+    this.combatLogEl.appendChild(header)
+    for (const e of entries) {
+      const row = document.createElement('div')
+      row.className = `log-entry ${e.side}`
+      row.textContent = e.text
+      this.combatLogEl.appendChild(row)
+    }
+    const MAX_ROWS = 220
+    while (this.combatLogEl.childElementCount > MAX_ROWS) {
+      this.combatLogEl.removeChild(this.combatLogEl.firstChild!)
+    }
+    this.combatLogEl.scrollTop = this.combatLogEl.scrollHeight
   }
 
   setPlanningSelection(info: PlanningSelectionInfo | null) {
