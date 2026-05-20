@@ -90,14 +90,22 @@ export class HUD {
       <div id="combat-log" class="hidden"><div class="log-empty">(combat events appear here as the battle plays)</div></div>
       <div id="game-message" class="hidden"></div>
       <div id="side-picker" class="hidden">
-        <div class="sp-card-row">
-          <div class="sp-card" data-side="defender">
-            <div class="sp-team">ROBOTS</div>
-            <div class="sp-role">DEFEND THE CORE</div>
+        <div class="sp-title">ASTROHOLD</div>
+        <div class="sp-headline">CHOOSE YOUR SIDE</div>
+        <div class="sp-cards">
+          <div class="sp-card def" data-side="defender">
+            <div class="sp-team-name">ROBOTS</div>
+            <div class="sp-role">DEFEND THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
+            <div class="sp-tagline">Spheres, towers, walls, and dogs.<br/>Hold the line — let nothing through.</div>
+            <div class="sp-cta">PLAY ROBOTS</div>
           </div>
           <div class="sp-card att" data-side="attacker">
-            <div class="sp-team">CYBORGS</div>
-            <div class="sp-role">DESTROY THE CORE</div>
+            <div class="sp-team-name">CYBORGS</div>
+            <div class="sp-role">DESTROY THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
+            <div class="sp-tagline">Cannons, snipers, grenadiers, hulks.<br/>Push west — break the defenders.</div>
+            <div class="sp-cta">PLAY CYBORGS</div>
           </div>
         </div>
       </div>

@@ -421,58 +421,209 @@
        player can't see or interact with opponent intel. */
     .ai-side { display: none !important; }
 
-    /* Side picker — barebones full-screen overlay shown after asset preload.
-       Player clicks one card to commit to a side. Intentionally minimal
-       until we agree on a real HUD direction. */
+    /* ── Side picker (full-screen modal shown after asset preload) ───────
+       Two team cards with hero sprite + role tagline + CTA button. */
     #side-picker {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.85);
+      gap: 48px;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.06) 0%, transparent 1px),
+        radial-gradient(circle at 75% 70%, rgba(255, 255, 255, 0.04) 0%, transparent 1px),
+        radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 1px),
+        radial-gradient(ellipse at center, rgba(12, 18, 32, 0.92) 0%, rgba(0, 0, 0, 0.98) 70%);
+      font-family: 'Courier New', monospace;
       z-index: 100;
     }
-    #side-picker .sp-card-row { display: flex; gap: 32px; }
-    #side-picker .sp-card {
-      width: 260px;
-      padding: 36px 28px;
-      background: rgba(0, 8, 20, 0.85);
-      border: 2px solid #2266aa;
-      color: #cce8ff;
-      text-align: center;
+    #side-picker .sp-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 14px;
+      letter-spacing: 12px;
+      color: #6ac4ff;
+      text-shadow: 0 0 14px rgba(0, 160, 240, 0.45);
+    }
+    #side-picker .sp-title::before,
+    #side-picker .sp-title::after {
+      content: '';
+      width: 70px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #6ac4ff);
+      opacity: 0.55;
+    }
+    #side-picker .sp-title::after { background: linear-gradient(90deg, #6ac4ff, transparent); }
+    #side-picker .sp-headline {
+      font-size: 30px;
+      letter-spacing: 14px;
+      color: #e6f3ff;
+      text-shadow: 0 0 22px rgba(60, 140, 220, 0.7), 0 1px 0 rgba(0, 0, 0, 0.8);
+      margin-top: -36px;
+    }
+    #side-picker .sp-cards {
+      display: flex;
+      gap: 48px;
+      align-items: stretch;
+    }
+    .sp-card {
+      position: relative;
+      width: 340px;
+      padding: 26px 28px 30px;
+      background:
+        repeating-linear-gradient(60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
+        repeating-linear-gradient(-60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
+        linear-gradient(180deg, #2a323d 0%, #161a22 45%, #0a0d13 100%);
+      border: 2px solid #2b4d72;
+      color: #d8ecff;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      text-align: center;
+      transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
+      box-shadow:
+        0 0 24px rgba(0, 160, 240, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.10) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.55) inset,
+        0 0 32px rgba(0, 160, 240, 0.45) inset;
     }
-    #side-picker .sp-card.att {
-      background: rgba(20, 0, 8, 0.85);
-      border-color: #aa2244;
-      color: #ffd6d6;
+    .sp-card.att {
+      background:
+        repeating-linear-gradient(60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
+        repeating-linear-gradient(-60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
+        linear-gradient(180deg, #2a323d 0%, #161a22 45%, #0a0d13 100%);
+      border-color: #7a2630;
+      color: #ffdadc;
+      box-shadow:
+        0 0 24px rgba(230, 70, 70, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.10) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.55) inset,
+        0 0 32px rgba(230, 70, 70, 0.45) inset;
     }
-    #side-picker .sp-card:hover {
-      transform: translateY(-2px);
-      border-color: #66ccff;
-      box-shadow: 0 0 18px rgba(0, 140, 220, 0.5);
+    .sp-card:hover {
+      transform: translateY(-3px);
+      border-color: #6ac4ff;
+      box-shadow:
+        0 0 36px rgba(0, 160, 240, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.10) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.55) inset,
+        0 0 44px rgba(0, 160, 240, 0.45) inset;
     }
-    #side-picker .sp-card.att:hover {
-      border-color: #ff6688;
-      box-shadow: 0 0 18px rgba(220, 60, 80, 0.5);
+    .sp-card.att:hover {
+      border-color: #ff8c8c;
+      box-shadow:
+        0 0 36px rgba(230, 70, 70, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.10) inset,
+        0 -1px 0 rgba(0, 0, 0, 0.55) inset,
+        0 0 44px rgba(230, 70, 70, 0.45) inset;
     }
-    #side-picker .sp-team {
-      font-size: 26px;
-      letter-spacing: 6px;
+    .sp-card .sp-team-name {
+      font-size: 28px;
       font-weight: bold;
-      color: #66ccff;
-      margin-bottom: 6px;
+      letter-spacing: 8px;
+      color: #6ac4ff;
+      text-shadow: 0 0 14px rgba(0, 160, 240, 0.45);
+      margin-bottom: 4px;
     }
-    #side-picker .sp-card.att .sp-team { color: #ff6688; }
-    #side-picker .sp-role {
-      font-size: 11px;
+    .sp-card.att .sp-team-name {
+      color: #ff8c8c;
+      text-shadow: 0 0 14px rgba(230, 70, 70, 0.45);
+    }
+    .sp-card .sp-role {
+      font-size: 10px;
       letter-spacing: 3px;
-      color: #88aabb;
+      color: #8aaecc;
+      margin-bottom: 22px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(106, 196, 255, 0.20);
     }
-    #side-picker .sp-card.att .sp-role { color: #cc9494; }
+    .sp-card.att .sp-role {
+      color: #cc9494;
+      border-bottom-color: rgba(255, 140, 140, 0.20);
+    }
+    .sp-card .sp-hero {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 22px;
+      background:
+        radial-gradient(ellipse at 50% 45%, rgba(50, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
+        linear-gradient(180deg, #050810 0%, #020407 100%);
+      border: 1px solid #2a3140;
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 3px 6px rgba(0, 0, 0, 0.55) inset,
+        0 0 18px rgba(0, 160, 240, 0.45);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .sp-card.att .sp-hero {
+      background:
+        radial-gradient(ellipse at 50% 45%, rgba(100, 50, 50, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
+        linear-gradient(180deg, #100408 0%, #060203 100%);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 3px 6px rgba(0, 0, 0, 0.55) inset,
+        0 0 18px rgba(230, 70, 70, 0.45);
+    }
+    .sp-card .sp-hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      transform: scale(1.4);
+    }
+    .sp-card .sp-tagline {
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      line-height: 1.6;
+      color: #8aaecc;
+      margin-bottom: 22px;
+      min-height: 40px;
+    }
+    .sp-card.att .sp-tagline { color: #cc9494; }
+    .sp-card .sp-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 5px;
+      color: #d8ecff;
+      background: linear-gradient(180deg, #143a60 0%, #082040 60%, #03101e 100%);
+      border: 2px solid #6ac4ff;
+      box-shadow:
+        0 0 0 1px rgba(108, 196, 255, 0.25) inset,
+        0 1px 0 rgba(255, 255, 255, 0.12) inset,
+        0 -2px 4px rgba(0, 0, 0, 0.40) inset,
+        0 0 14px rgba(0, 160, 240, 0.45);
+    }
+    .sp-card.att .sp-cta {
+      color: #ffdadc;
+      background: linear-gradient(180deg, #5a121c 0%, #2a0408 60%, #100204 100%);
+      border-color: #ff8c8c;
+      box-shadow:
+        0 0 0 1px rgba(255, 138, 138, 0.25) inset,
+        0 1px 0 rgba(255, 255, 255, 0.12) inset,
+        0 -2px 4px rgba(0, 0, 0, 0.40) inset,
+        0 0 14px rgba(230, 70, 70, 0.45);
+    }
+    .sp-card:hover .sp-cta { box-shadow:
+      0 0 0 1px rgba(108, 196, 255, 0.50) inset,
+      0 1px 0 rgba(255, 255, 255, 0.16) inset,
+      0 -2px 4px rgba(0, 0, 0, 0.40) inset,
+      0 0 22px rgba(0, 160, 240, 0.45);
+    }
+    .sp-card.att:hover .sp-cta { box-shadow:
+      0 0 0 1px rgba(255, 138, 138, 0.50) inset,
+      0 1px 0 rgba(255, 255, 255, 0.16) inset,
+      0 -2px 4px rgba(0, 0, 0, 0.40) inset,
+      0 0 22px rgba(230, 70, 70, 0.45);
+    }
   </style>
 </head>
 <body>
