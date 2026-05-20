@@ -42,28 +42,47 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding: 8px 12px 10px;
+      padding: 10px 14px 12px;
       background:
         linear-gradient(180deg, rgba(8,20,40,0.92) 0%, rgba(4,10,22,0.88) 100%);
-      border: 1px solid #1a4466;
-      box-shadow: 0 0 16px rgba(0, 80, 160, 0.25) inset;
-      /* Notched corners → command-deck silhouette */
-      clip-path: polygon(
-        12px 0,
-        calc(100% - 12px) 0,
-        100% 12px,
-        100% calc(100% - 12px),
-        calc(100% - 12px) 100%,
-        12px 100%,
-        0 calc(100% - 12px),
-        0 12px
-      );
+      border: 1px solid #2a5a8c;
+      box-shadow:
+        0 0 18px rgba(0, 90, 180, 0.30) inset,
+        0 0 12px rgba(0, 80, 160, 0.20);
+    }
+    /* L-shaped corner brackets — gives the command-deck silhouette without
+       the clip-path aliasing. Two brackets on each panel (top-left + bottom-
+       right) so the eye reads "framed" without overloading the corners. */
+    .team-panel::before,
+    .team-panel::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #66aaff;
+      pointer-events: none;
+    }
+    .team-panel::before {
+      top: -1px; left: -1px;
+      border-right: none;
+      border-bottom: none;
+    }
+    .team-panel::after {
+      bottom: -1px; right: -1px;
+      border-left: none;
+      border-top: none;
     }
     .team-panel.att {
       background:
         linear-gradient(180deg, rgba(40,8,16,0.92) 0%, rgba(22,4,8,0.88) 100%);
-      border-color: #661122;
-      box-shadow: 0 0 16px rgba(160, 0, 40, 0.25) inset;
+      border-color: #8c2a3a;
+      box-shadow:
+        0 0 18px rgba(180, 0, 40, 0.30) inset,
+        0 0 12px rgba(160, 0, 40, 0.20);
+    }
+    .team-panel.att::before,
+    .team-panel.att::after {
+      border-color: #ff7a7a;
     }
 
     .team-panel .panel-header {
@@ -127,28 +146,35 @@
       box-shadow: 0 0 10px rgba(0, 180, 255, 0.55);
     }
     .shop-icon-btn .icon {
-      width: 38px;
-      height: 38px;
+      width: 56px;
+      height: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid rgba(102, 170, 255, 0.25);
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(102, 170, 255, 0.35);
     }
+    /* Sprites have transparent padding around the character. transform:scale
+       blows past the natural object-fit:contain sizing so the subject fills
+       the tile and reads at a glance. pixelated rendering keeps the upscale
+       crisp instead of bilinear-blurry. */
     .shop-icon-btn .icon img {
       width: 100%;
       height: 100%;
       object-fit: contain;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
+      transform: scale(1.6);
+      transform-origin: center;
     }
     .shop-icon-btn .icon-wall {
-      width: 32px;
-      height: 32px;
+      width: 48px;
+      height: 48px;
       background: repeating-linear-gradient(
         45deg,
-        #557799 0 4px,
-        #334455 4px 8px
+        #6688aa 0 5px,
+        #334455 5px 10px
       );
       border: 1px solid #88aacc;
     }
@@ -182,7 +208,7 @@
       box-shadow: 0 0 10px rgba(255, 90, 110, 0.55);
     }
     .team-panel.att .shop-icon-btn .icon {
-      border-color: rgba(255, 102, 102, 0.25);
+      border-color: rgba(255, 122, 122, 0.40);
     }
 
     /* Preview pieces — single-angle pending full rotations. Dashed border
