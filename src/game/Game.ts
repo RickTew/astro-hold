@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, UnitType } from './GameConfig'
+import { Config, StructureType, UnitType } from './GameConfig'
 import { Background } from '../scene/Background'
 import { PixelPowerCore, preloadPixelPowerCore } from '../entities/PixelPowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
@@ -11,8 +11,9 @@ import { RevealPhase } from './RevealPhase'
 import { Structure, preloadStructureSprites } from '../entities/Structure'
 import { PendingGrenade } from '../entities/PendingGrenade'
 import { FireArcPreview } from '../entities/FireArcPreview'
+import { OpponentAI, OpponentSide } from '../ai/OpponentAI'
 
-type Phase = 'loading' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
+type Phase = 'loading' | 'pick-side' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
 
 // Unified placement session — covers both cyborg and sphere placement.
 // Ghost mesh is the authoritative position; never re-raycast at click time.
@@ -79,6 +80,11 @@ export class Game {
   // is Turn 1; auto-chained reveals bump from there. Never reset within a
   // game — Play Again is a full reload.
   private revealTurn = 1
+
+  // Single-player mode: the player picks one side at load; the other side
+  // runs on autopilot via OpponentAI. Set after the side picker resolves.
+  private playerSide: OpponentSide | null = null
+  private opponentAI: OpponentAI | null = null
 
   // Single source of truth for any active placement.
   private placement: PlacementSession | null = null
@@ -175,7 +181,90 @@ export class Game {
     this.scene.add(this.makeMapGrid())
 
     this.hud.showGame()
+    this.enterPickSide()
+  }
+
+  // After loading, the player chooses which team to play. The other team is
+  // handed off to OpponentAI. Game.enterBuildPhase fires only after a side
+  // is committed so the AI can take its first BUILD turn alongside the player.
+  private enterPickSide() {
+    this.phase = 'pick-side'
+    this.hud.onPickSide = (side) => this.onSidePicked(side)
+    this.hud.showSidePicker()
+  }
+
+  private onSidePicked(side: OpponentSide) {
+    if (this.playerSide) return  // re-entry guard
+    this.playerSide = side
+    const aiSide: OpponentSide = side === 'defender' ? 'attacker' : 'defender'
+    this.opponentAI = new OpponentAI(aiSide, this.aiApi(aiSide))
+    this.hud.setPlayerSide(side)
     this.enterBuildPhase()
+  }
+
+  // Build the AI's spend-and-spawn API. `side` is the AI's side (the OPPOSITE
+  // of playerSide). All credit access routes through the canonical source for
+  // that side — BuildPhase for defenders, Game.attCredits for attackers.
+  private aiApi(side: OpponentSide) {
+    return {
+      getCredits: () => side === 'defender'
+        ? (this.buildPhase?.getCredits() ?? 0)
+        : this.attCredits,
+      spendCredits: (amount: number): boolean => {
+        if (side === 'defender') return this.buildPhase?.spendCredits(amount) ?? false
+        if (this.attCredits < amount) return false
+        this.attCredits -= amount
+        this.hud.setAttCredits(this.attCredits)
+        return true
+      },
+      spawnSphere: (x: number, y: number) => this.aiSpawnSphere(x, y),
+      spawnDefenderUnit: (type: UnitType, x: number, y: number) =>
+        this.aiSpawnDefenderUnit(type, x, y),
+      spawnAttackerUnit: (type: UnitType, x: number, y: number) =>
+        this.aiSpawnAttackerUnit(type, x, y),
+      spawnStructure: (type: StructureType, col: number, row: number) =>
+        this.aiSpawnStructure(type, col, row),
+      isCellOccupied: (x: number, y: number) => this.isCellOccupied(x, y),
+    }
+  }
+
+  // AI spawn primitives — mouse-free counterparts to the placement system.
+  // All include a final occupancy check so the AI can never double-place a
+  // cell even if its scoring function got something wrong.
+  private aiSpawnSphere(x: number, y: number): boolean {
+    if (!this.buildPhase) return false
+    if (this.isCellOccupied(x, y)) return false
+    if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
+    this.spheres.push(new SphereDefender(this.scene, x, y))
+    return true
+  }
+  private aiSpawnDefenderUnit(type: UnitType, x: number, y: number): boolean {
+    if (!this.buildPhase) return false
+    if (this.isCellOccupied(x, y)) return false
+    const cost = Config.UNITS[type]?.cost ?? 0
+    if (!this.buildPhase.spendCredits(cost)) return false
+    this.defenderUnits.push(new SpriteUnit(this.scene, type, x, y, 'defender'))
+    return true
+  }
+  private aiSpawnAttackerUnit(type: UnitType, x: number, y: number): boolean {
+    if (this.isCellOccupied(x, y)) return false
+    const cost = Config.UNITS[type]?.cost ?? 0
+    if (this.attCredits < cost) return false
+    this.attCredits -= cost
+    this.hud.setAttCredits(this.attCredits)
+    this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y))
+    return true
+  }
+  private aiSpawnStructure(type: StructureType, col: number, row: number): boolean {
+    if (!this.buildPhase) return false
+    const cell = Config.GRID_CELL
+    const x = Config.WORLD.LEFT   + col * cell + cell / 2
+    const y = Config.WORLD.BOTTOM + row * cell + cell / 2
+    if (this.isCellOccupied(x, y)) return false
+    const cost = Config.STRUCTURES[type]?.cost ?? 0
+    if (!this.buildPhase.spendCredits(cost)) return false
+    this.buildPhase.getStructures().push(new Structure(this.scene, type, col, row))
+    return true
   }
 
   private makeMapGrid(): THREE.LineSegments {
@@ -279,6 +368,10 @@ private enterBuildPhase() {
       this.editingStructure = null
       this.placementArcPreview.hide()
     }
+
+    // Hand the AI side its BUILD turn now that credits + structure storage
+    // are wired. Runs once per game (BUILD is one-shot in this chess flow).
+    this.opponentAI?.runBuildTurn()
   }
 
   // Compass-rose purchase. Returns true on success. Silently rejects if the

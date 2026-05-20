@@ -6,12 +6,17 @@ const SPHERE_COST = 100   // mirrors Game.SPHERE_COST
 
 export class HUD {
   private container: HTMLElement
-  private creditsEl!: HTMLElement
-  private attCreditsEl!: HTMLElement
+  // Credit displays live in TWO places now: the player's full panel and the
+  // opponent's slim readout. We update both unconditionally; CSS hides
+  // whichever one isn't visible for the chosen side, so callers don't have
+  // to know which is active.
+  private creditsEls: HTMLElement[] = []
+  private attCreditsEls: HTMLElement[] = []
   private phaseEl!: HTMLElement
-  private bottomBarEl!: HTMLElement
+  private topBarEl!: HTMLElement
   private robotShopEl!: HTMLElement
   private cyborgShopEl!: HTMLElement
+  private sidePickerEl!: HTMLElement
   private messageEl!: HTMLElement
   private loadingEl!: HTMLElement
   private planBarEl!: HTMLElement
@@ -31,6 +36,9 @@ export class HUD {
   onBuySphere: (() => void) | null = null
   onBuyDog: (() => void) | null = null
   onBattle: (() => void) | null = null
+  // Side picker — fired after the player clicks their team card. Game uses
+  // this to set playerSide and wire up the OpponentAI.
+  onPickSide: ((side: 'defender' | 'attacker') => void) | null = null
   // Compass-rose callbacks. Game decides whether the purchase succeeds (cost,
   // credits, duplicate facing); HUD just forwards the click intent.
   onAddFacing: ((angle: number) => void) | null = null
@@ -48,6 +56,8 @@ export class HUD {
   }
 
   private build() {
+    const corners = '<div class="corner-bracket tl"></div><div class="corner-bracket tr"></div><div class="corner-bracket bl"></div><div class="corner-bracket br"></div>'
+
     const robotBtn = (id: string, label: string, cost: number, icon: string, opts: { preview?: boolean; dataType?: string } = {}) => {
       const cls = `shop-icon-btn${opts.preview ? ' preview' : ''}`
       const attrs = opts.dataType ? ` data-type="${opts.dataType}"` : ''
@@ -63,11 +73,33 @@ export class HUD {
     this.container.innerHTML = `
       <div id="loading-screen">LOADING ASSETS...</div>
 
+      <div id="side-picker" class="hidden">
+        <div class="sp-title">ASTROHOLD</div>
+        <div class="sp-headline">CHOOSE YOUR SIDE</div>
+        <div class="sp-cards">
+          <div class="sp-card def" data-side="defender" role="button" tabindex="0">
+            <div class="sp-team-name">ROBOTS</div>
+            <div class="sp-role">DEFEND THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
+            <div class="sp-tagline">Spheres, towers, walls, and dogs.<br/>Hold the line — let nothing through.</div>
+            <div class="sp-cta">PLAY ROBOTS</div>
+          </div>
+          <div class="sp-card att" data-side="attacker" role="button" tabindex="0">
+            <div class="sp-team-name">CYBORGS</div>
+            <div class="sp-role">DESTROY THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
+            <div class="sp-tagline">Cannons, snipers, grenadiers, hulks.<br/>Push west — break the defenders.</div>
+            <div class="sp-cta">PLAY CYBORGS</div>
+          </div>
+        </div>
+      </div>
+
       <div id="top-bar" class="hidden">
         <div id="robot-panel" class="team-panel def">
+          ${corners}
           <div class="panel-header">
             <span class="team-name">ROBOTS</span>
-            <span class="team-credits">Credits: <span id="credits-val">200</span></span>
+            <span class="team-credits">CR<span class="cr-num" id="credits-val">200</span></span>
           </div>
           <div class="panel-grid">
             ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
@@ -82,15 +114,36 @@ export class HUD {
           </div>
         </div>
 
+        <div id="cyborg-readout" class="opponent-readout att">
+          <div class="opp-row-1">
+            <span class="opp-name">CYBORGS</span>
+            <span class="opp-tag">AI</span>
+          </div>
+          <div class="opp-row-2">
+            <span>Credits</span><span class="opp-cr"><span id="att-credits-val">200</span>cr</span>
+          </div>
+        </div>
+
         <div id="center-controls">
           <div id="phase-display">BUILD</div>
           <button id="battle-btn">READY</button>
         </div>
 
+        <div id="robot-readout" class="opponent-readout def">
+          <div class="opp-row-1">
+            <span class="opp-name">ROBOTS</span>
+            <span class="opp-tag">AI</span>
+          </div>
+          <div class="opp-row-2">
+            <span>Credits</span><span class="opp-cr"><span id="credits-val-readout">200</span>cr</span>
+          </div>
+        </div>
+
         <div id="cyborg-panel" class="team-panel att">
+          ${corners}
           <div class="panel-header">
             <span class="team-name">CYBORGS</span>
-            <span class="team-credits">Credits: <span id="att-credits-val">200</span></span>
+            <span class="team-credits">CR<span class="cr-num" id="att-credits-val-panel">200</span></span>
           </div>
           <div class="panel-grid">
             ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
@@ -115,15 +168,34 @@ export class HUD {
 
     this.loadingEl        = this.container.querySelector('#loading-screen')!
     this.phaseEl          = this.container.querySelector('#phase-display')!
-    this.creditsEl        = this.container.querySelector('#credits-val')!
-    this.attCreditsEl     = this.container.querySelector('#att-credits-val')!
-    this.bottomBarEl      = this.container.querySelector('#top-bar')!
+    this.topBarEl         = this.container.querySelector('#top-bar')!
     this.robotShopEl      = this.container.querySelector('#robot-panel')!
     this.cyborgShopEl     = this.container.querySelector('#cyborg-panel')!
+    this.sidePickerEl     = this.container.querySelector('#side-picker')!
     this.messageEl        = this.container.querySelector('#game-message')!
     this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
     this.combatLogEl      = this.container.querySelector('#combat-log')!
+
+    // Defender credits show in the robot panel header (when playing robots)
+    // and in the opponent-readout (when playing cyborgs). Both get updated.
+    this.creditsEls = [
+      this.container.querySelector('#credits-val'),
+      this.container.querySelector('#credits-val-readout'),
+    ].filter(Boolean) as HTMLElement[]
+    this.attCreditsEls = [
+      this.container.querySelector('#att-credits-val-panel'),
+      this.container.querySelector('#att-credits-val'),
+    ].filter(Boolean) as HTMLElement[]
+
+    // Side picker — clicking either card sets the player's side. Mouse-only
+    // per the no-keyboard rule, so we don't bind Enter/Space here.
+    this.container.querySelectorAll<HTMLElement>('#side-picker .sp-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const side = card.dataset.side as 'defender' | 'attacker'
+        this.onPickSide?.(side)
+      })
+    })
 
     this.container.querySelector('#sphere-btn')?.addEventListener('click', () => {
       this.onBuySphere?.()
@@ -159,17 +231,33 @@ export class HUD {
 
   showGame() {
     this.loadingEl.classList.add('hidden')
-    // Team labels + credits + phase display now live inside #top-bar, which
-    // setPhase() un-hides at the start of the build phase. Nothing extra to do.
+    // Team labels + credits + phase display live inside #top-bar, which
+    // setPhase() un-hides at the start of the build phase. Nothing extra here.
+  }
+
+  // Reveal the side picker. Game listens via onPickSide for the chosen team
+  // and proceeds into BUILD once the player commits.
+  showSidePicker() {
+    this.loadingEl.classList.add('hidden')
+    this.sidePickerEl.classList.remove('hidden')
+  }
+
+  // Lock in the player's chosen side. Adds the gating class on #top-bar that
+  // hides the AI side's full panel and shows the slim opponent readout. Must
+  // be called before setPhase('build') for the first turn.
+  setPlayerSide(side: 'defender' | 'attacker') {
+    this.sidePickerEl.classList.add('hidden')
+    this.topBarEl.classList.remove('player-defender', 'player-attacker')
+    this.topBarEl.classList.add(side === 'defender' ? 'player-defender' : 'player-attacker')
   }
 
   setCredits(amount: number) {
-    this.creditsEl.textContent = String(amount)
+    for (const el of this.creditsEls) el.textContent = String(amount)
     this.refreshAffordability('robots', amount)
   }
 
   setAttCredits(amount: number) {
-    this.attCreditsEl.textContent = String(amount)
+    for (const el of this.attCreditsEls) el.textContent = String(amount)
     this.refreshAffordability('cyborgs', amount)
   }
 
@@ -210,15 +298,15 @@ export class HUD {
   }
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
-    // #top-bar (label `bottomBarEl` for historical reasons) hosts the team
-    // panels + the center READY/BATTLE button. It's visible during BUILD and
-    // PLANNING, hidden during reveal so the battlefield is unobstructed.
+    // #top-bar hosts the team panels + the center READY/BATTLE button. It's
+    // visible during BUILD and PLANNING, hidden during reveal so the
+    // battlefield is unobstructed.
     const battleBtn = this.container.querySelector<HTMLButtonElement>('#battle-btn')!
     switch (phase) {
       case 'build':
         this.phaseEl.textContent = 'BUILD'
         battleBtn.textContent = 'READY'
-        this.bottomBarEl.classList.remove('hidden')
+        this.topBarEl.classList.remove('hidden')
         // Both team panels stay mounted; the per-side gating happens at the
         // panel level later (player-isolated views). For now, both visible.
         this.robotShopEl.classList.remove('disabled')
@@ -231,7 +319,7 @@ export class HUD {
       case 'planning':
         this.phaseEl.textContent = 'PLAN'
         battleBtn.textContent = 'BATTLE'
-        this.bottomBarEl.classList.remove('hidden')
+        this.topBarEl.classList.remove('hidden')
         // Disable the shop grids during planning — no new pieces, only orders.
         this.robotShopEl.classList.add('disabled')
         this.cyborgShopEl.classList.add('disabled')
@@ -241,7 +329,7 @@ export class HUD {
         break
       case 'reveal':
         this.phaseEl.textContent = 'BATTLE'
-        this.bottomBarEl.classList.add('hidden')
+        this.topBarEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.remove('hidden')
