@@ -19,192 +19,259 @@
     }
     #hud * { pointer-events: auto; }
 
-    #phase-display {
+    /* ── Top bar (BUILD + PLAN) ─────────────────────────────────────────── */
+    /* Three-column strip: ROBOTS panel (L) · centre controls (READY/PLAN)
+       · CYBORGS panel (R). Sits at the top so the battlefield below stays
+       unobstructed. Background gradient + clipped corners give it the
+       sci-fi command-deck feel from the mockup. */
+    #top-bar {
       position: absolute;
-      top: 18px; left: 50%;
-      transform: translateX(-50%);
-      font-size: 22px;
-      letter-spacing: 4px;
-      color: #66ccff;
-      text-shadow: 0 0 12px #0088ff;
+      top: 0; left: 0; right: 0;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: stretch;
+      gap: 14px;
+      padding: 10px 14px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.45) 80%, transparent 100%);
+      pointer-events: none;
+    }
+    #top-bar > * { pointer-events: auto; }
+
+    .team-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 12px 10px;
+      background:
+        linear-gradient(180deg, rgba(8,20,40,0.92) 0%, rgba(4,10,22,0.88) 100%);
+      border: 1px solid #1a4466;
+      box-shadow: 0 0 16px rgba(0, 80, 160, 0.25) inset;
+      /* Notched corners → command-deck silhouette */
+      clip-path: polygon(
+        12px 0,
+        calc(100% - 12px) 0,
+        100% 12px,
+        100% calc(100% - 12px),
+        calc(100% - 12px) 100%,
+        12px 100%,
+        0 calc(100% - 12px),
+        0 12px
+      );
+    }
+    .team-panel.att {
+      background:
+        linear-gradient(180deg, rgba(40,8,16,0.92) 0%, rgba(22,4,8,0.88) 100%);
+      border-color: #661122;
+      box-shadow: 0 0 16px rgba(160, 0, 40, 0.25) inset;
     }
 
-    #team-label-def {
-      position: absolute;
-      top: 8px; left: 20px;
-      font-size: 13px;
-      letter-spacing: 3px;
+    .team-panel .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(102, 170, 255, 0.25);
+    }
+    .team-panel.att .panel-header {
+      border-bottom-color: rgba(255, 102, 102, 0.25);
+    }
+    .team-panel .team-name {
+      font-size: 14px;
       color: #66aaff;
       text-shadow: 0 0 8px #0066cc;
     }
-
-    #team-label-att {
-      position: absolute;
-      top: 8px; right: 20px;
-      font-size: 13px;
-      letter-spacing: 3px;
+    .team-panel.att .team-name {
       color: #ff6666;
       text-shadow: 0 0 8px #cc0000;
-      text-align: right;
     }
-
-    #credits-display {
-      position: absolute;
-      top: 26px; left: 20px;
-      font-size: 14px;
+    .team-panel .team-credits {
+      font-size: 13px;
       color: #aaddff;
     }
+    .team-panel.att .team-credits { color: #ffaaaa; }
 
-    #att-credits-display {
-      position: absolute;
-      top: 26px; right: 20px;
-      font-size: 14px;
-      color: #ffaaaa;
-      text-align: right;
+    .team-panel .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
     }
 
-    /* Bottom bar — now just hosts the READY/BATTLE button. Shops moved up
-       to their own corner panels (top-left = Robots, top-right = Cyborgs)
-       so they never crash into each other. */
-    #bottom-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
+    /* Icon shop button — image-led tile with label + cost beneath. */
+    .shop-icon-btn {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: rgba(0, 0, 0, 0.45);
-    }
-
-    /* Robot shop — top-left corner panel below the ROBOTS credits header. */
-    #top-robot-shop {
-      position: absolute;
-      top: 52px;
-      left: 12px;
-      max-width: 52vw;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px;
-      border: 1px solid #1a4466;
-      background: rgba(0, 8, 20, 0.75);
-    }
-
-    /* Cyborg shop — top-right corner panel below the CYBORGS credits header. */
-    #top-cyborg-shop {
-      position: absolute;
-      top: 52px;
-      right: 12px;
-      max-width: 36vw;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px;
-      border: 1px solid #441122;
-      background: rgba(20, 0, 8, 0.75);
-    }
-
-    .shop-panel {
-      /* layout handled by #top-robot-shop / #top-cyborg-shop above */
-    }
-
-    .att-panel {
-      /* tinting handled inline on #top-cyborg-shop */
-    }
-
-    .panel-label {
-      font-size: 11px;
-      font-family: 'Courier New', monospace;
-      letter-spacing: 1px;
-      white-space: nowrap;
-      color: #6699bb;
-    }
-
-    .att-panel .panel-label { color: #aa6677; }
-
-    .shop-btn, .att-btn {
-      padding: 8px 14px;
+      gap: 2px;
+      padding: 6px 4px 5px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      white-space: nowrap;
-      transition: background 0.1s, border-color 0.1s;
-    }
-
-    .shop-btn {
       background: #0a1e33;
       border: 1px solid #1a4466;
       color: #88bbdd;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
     }
-    .shop-btn:hover { background: #102840; border-color: #2266aa; }
-    .shop-btn.selected {
+    .shop-icon-btn:hover {
+      background: #102840;
+      border-color: #2266aa;
+      box-shadow: 0 0 8px rgba(0, 120, 200, 0.4);
+    }
+    .shop-icon-btn.selected {
       background: #0e3055;
       border-color: #00aaff;
       color: #00eeff;
-      text-shadow: 0 0 6px #00aaff;
+      box-shadow: 0 0 10px rgba(0, 180, 255, 0.55);
     }
-    /* Preview pieces — single-angle Meshy renders pending full rotations.
-       Dimmer/dashed border so they're visually distinct from production. */
-    .shop-btn.preview {
+    .shop-icon-btn .icon {
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(102, 170, 255, 0.25);
+    }
+    .shop-icon-btn .icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .shop-icon-btn .icon-wall {
+      width: 32px;
+      height: 32px;
+      background: repeating-linear-gradient(
+        45deg,
+        #557799 0 4px,
+        #334455 4px 8px
+      );
+      border: 1px solid #88aacc;
+    }
+    .shop-icon-btn .label {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: inherit;
+      white-space: nowrap;
+    }
+    .shop-icon-btn .cost {
+      font-size: 10px;
+      color: #99cc66;
+    }
+    .shop-icon-btn.selected .cost { color: #ccff99; }
+
+    /* Cyborg side colours: warm-red palette to mirror the ROBOTS blue. */
+    .team-panel.att .shop-icon-btn {
+      background: #1a0008;
+      border-color: #661122;
+      color: #ddaaaa;
+    }
+    .team-panel.att .shop-icon-btn:hover {
+      background: #2a0010;
+      border-color: #aa2244;
+      box-shadow: 0 0 8px rgba(200, 60, 80, 0.4);
+    }
+    .team-panel.att .shop-icon-btn.selected {
+      background: #4a0014;
+      border-color: #ff4466;
+      color: #ffeeaa;
+      box-shadow: 0 0 10px rgba(255, 90, 110, 0.55);
+    }
+    .team-panel.att .shop-icon-btn .icon {
+      border-color: rgba(255, 102, 102, 0.25);
+    }
+
+    /* Preview pieces — single-angle pending full rotations. Dashed border
+       so they're visually distinct from production. */
+    .shop-icon-btn.preview {
       border-style: dashed;
-      opacity: 0.85;
-      color: #7799bb;
+      opacity: 0.75;
     }
 
     /* Insufficient credits — greyed out so failed placements aren't silent. */
-    .shop-btn.insufficient, .att-btn.insufficient {
+    .shop-icon-btn.insufficient {
       opacity: 0.35;
       cursor: not-allowed;
       filter: grayscale(0.5);
     }
 
-    .att-btn {
-      background: #1a0008;
-      border: 1px solid #661122;
-      color: #ddaaaa;
+    /* Disabled state during PLAN phase — shops are visible but inert. */
+    .team-panel.disabled .panel-grid {
+      pointer-events: none;
+      opacity: 0.55;
+      filter: saturate(0.6);
     }
-    .att-btn:hover { background: #2a0010; border-color: #aa2244; color: #ffbbbb; }
 
-    #battle-btn, #plan-battle-btn {
-      background: #2a0000;
+    /* ── Centre controls (phase label + READY/BATTLE button) ─────────────── */
+    #center-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 10px;
+      min-width: 180px;
+    }
+    #phase-display {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 4px;
+      color: #66ccff;
+      text-shadow: 0 0 10px #0088ff;
+    }
+    #battle-btn {
+      background: linear-gradient(180deg, #4a0008 0%, #2a0000 100%);
       border: 2px solid #aa2200;
-      color: #ff8866;
-      padding: 10px 24px;
-      font-size: 17px;
+      color: #ffaa88;
+      padding: 12px 36px;
+      font-size: 22px;
+      letter-spacing: 4px;
       cursor: pointer;
       font-family: 'Courier New', monospace;
-      letter-spacing: 2px;
       white-space: nowrap;
-      flex-shrink: 0;
-      align-self: center;
-      transition: background 0.1s, border-color 0.1s;
+      transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+      box-shadow: 0 0 14px rgba(170, 34, 0, 0.5);
+      clip-path: polygon(
+        10px 0,
+        calc(100% - 10px) 0,
+        100% 50%,
+        calc(100% - 10px) 100%,
+        10px 100%,
+        0 50%
+      );
     }
-    #battle-btn:hover, #plan-battle-btn:hover {
-      background: #440000;
+    #battle-btn:hover {
+      background: linear-gradient(180deg, #66001a 0%, #440000 100%);
       border-color: #ff4400;
-      color: #ffaa88;
+      color: #ffddbb;
+      box-shadow: 0 0 24px rgba(255, 68, 0, 0.8);
     }
 
-    /* Plan-phase bottom bar — narrower than build bar, just instructions + Battle */
+    /* ── Plan-phase instruction strip (no longer holds the battle button) ── */
     #plan-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       gap: 12px;
-      padding: 10px 16px;
+      padding: 8px 16px;
       background: rgba(0, 0, 0, 0.5);
     }
     #plan-instructions {
       display: flex;
       flex-direction: column;
+      align-items: center;
       gap: 2px;
       font-family: 'Courier New', monospace;
       color: #99bbcc;
       font-size: 12px;
       line-height: 1.4;
+      text-align: center;
     }
     #plan-instructions strong {
       color: #ffee66;
@@ -212,14 +279,15 @@
       font-size: 13px;
     }
 
-    /* Selected-piece panel — top-right corner during planning */
+    /* Selected-piece panel during planning — sits just below the top bar
+       on the right so it doesn't overlap the CYBORGS panel header. */
     #plan-selection {
       position: absolute;
-      top: 60px;
-      right: 20px;
+      top: 150px;
+      right: 16px;
       width: 240px;
       padding: 10px 14px;
-      background: rgba(0, 0, 0, 0.65);
+      background: rgba(0, 0, 0, 0.78);
       border: 1px solid #335577;
       font-family: 'Courier New', monospace;
       font-size: 12px;
@@ -352,25 +420,36 @@
       cursor: default;
     }
 
-    /* Combat history log — right-rail D&D turn log. Visible during BATTLE
-       and the win/lose overlay so the player can review what happened. Hidden
-       during BUILD (the cyborg shop occupies this corner) and PLAN (the
-       plan-selection panel does). */
+    /* Combat history log — wide bottom strip during BATTLE. The mock-up
+       command-deck look: dark frame, clipped corners, D&D-style coloured
+       rows. Hidden during BUILD/PLAN (the top bar already busy enough). */
     #combat-log {
       position: absolute;
-      top: 60px;
-      right: 12px;
-      width: 280px;
-      max-height: calc(100vh - 160px);
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.75);
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      width: min(1000px, calc(100vw - 32px));
+      max-height: 26vh;
+      padding: 10px 16px;
+      background: linear-gradient(180deg, rgba(8,12,20,0.92) 0%, rgba(0,4,10,0.88) 100%);
       border: 1px solid #224466;
+      box-shadow: 0 0 14px rgba(0, 80, 160, 0.25) inset;
       font-family: 'Courier New', monospace;
-      font-size: 11px;
-      line-height: 1.45;
+      font-size: 12px;
+      line-height: 1.5;
       color: #99bbcc;
       overflow-y: auto;
       scrollbar-width: thin;
+      clip-path: polygon(
+        10px 0,
+        calc(100% - 10px) 0,
+        100% 10px,
+        100% calc(100% - 10px),
+        calc(100% - 10px) 100%,
+        10px 100%,
+        0 calc(100% - 10px),
+        0 10px
+      );
     }
     #combat-log .log-turn {
       color: #ffcc66;

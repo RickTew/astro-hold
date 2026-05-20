@@ -48,40 +48,65 @@ export class HUD {
   }
 
   private build() {
+    const robotBtn = (id: string, label: string, cost: number, icon: string, opts: { preview?: boolean; dataType?: string } = {}) => {
+      const cls = `shop-icon-btn${opts.preview ? ' preview' : ''}`
+      const attrs = opts.dataType ? ` data-type="${opts.dataType}"` : ''
+      const idAttr = id ? ` id="${id}"` : ''
+      const iconHtml = icon === 'wall'
+        ? '<div class="icon icon-wall"></div>'
+        : `<div class="icon"><img src="${icon}" alt=""/></div>`
+      return `<button${idAttr} class="${cls}"${attrs}>${iconHtml}<div class="label">${label}</div><div class="cost">${cost}cr</div></button>`
+    }
+    const cybBtn = (label: string, cost: number, icon: string, dataType: string) =>
+      `<button class="shop-icon-btn att-btn" data-type="${dataType}"><div class="icon"><img src="${icon}" alt=""/></div><div class="label">${label}</div><div class="cost">${cost}cr</div></button>`
+
     this.container.innerHTML = `
       <div id="loading-screen">LOADING ASSETS...</div>
-      <div id="phase-display" class="hidden">BUILD PHASE</div>
-      <div id="team-label-def" class="hidden">ROBOTS</div>
-      <div id="credits-display" class="hidden">Credits: <span id="credits-val">200</span></div>
-      <div id="team-label-att" class="hidden">CYBORGS</div>
-      <div id="att-credits-display" class="hidden">Credits: <span id="att-credits-val">200</span></div>
-      <div id="top-robot-shop" class="shop-panel hidden">
-        <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
-        <button class="shop-btn" data-type="turret">Tower 30cr</button>
-        <button class="shop-btn" data-type="bomber">Bomber 70cr</button>
-        <button class="shop-btn" data-type="wall">Wall 20cr</button>
-        <button id="dog-btn" class="shop-btn">Dog 40cr</button>
-        <button class="shop-btn preview" data-type="defense">Defense 20cr</button>
-        <button class="shop-btn preview" data-type="gun">Gun 30cr</button>
-        <button class="shop-btn preview" data-type="laser">Laser 40cr</button>
-        <button class="shop-btn preview" data-type="signal">Signal 20cr</button>
+
+      <div id="top-bar" class="hidden">
+        <div id="robot-panel" class="team-panel def">
+          <div class="panel-header">
+            <span class="team-name">ROBOTS</span>
+            <span class="team-credits">Credits: <span id="credits-val">200</span></span>
+          </div>
+          <div class="panel-grid">
+            ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
+            ${robotBtn('',           'Tower',    30, '/sprites/tower/south.png',   { dataType: 'turret' })}
+            ${robotBtn('',           'Bomber',   70, '/sprites/bomber/south.png',  { dataType: 'bomber' })}
+            ${robotBtn('',           'Wall',     20, 'wall',                       { dataType: 'wall'   })}
+            ${robotBtn('dog-btn',    'Dog',      40, '/sprites/dog/south.png')}
+            ${robotBtn('',           'Defense',  20, '/sprites/defense/south.png', { dataType: 'defense', preview: true })}
+            ${robotBtn('',           'Gun',      30, '/sprites/gun/south.png',     { dataType: 'gun',     preview: true })}
+            ${robotBtn('',           'Laser',    40, '/sprites/laser/south.png',   { dataType: 'laser',   preview: true })}
+            ${robotBtn('',           'Signal',   20, '/sprites/signal/south.png',  { dataType: 'signal',  preview: true })}
+          </div>
+        </div>
+
+        <div id="center-controls">
+          <div id="phase-display">BUILD</div>
+          <button id="battle-btn">READY</button>
+        </div>
+
+        <div id="cyborg-panel" class="team-panel att">
+          <div class="panel-header">
+            <span class="team-name">CYBORGS</span>
+            <span class="team-credits">Credits: <span id="att-credits-val">200</span></span>
+          </div>
+          <div class="panel-grid">
+            ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
+            ${cybBtn('Grenadier', 50, '/sprites/grenadier/south.png', 'grenadier')}
+            ${cybBtn('Double Gun',90, '/sprites/doublegun/south.png', 'doublegun')}
+            ${cybBtn('Hulk',     100, '/sprites/hulk/south.png',      'hulk')}
+            ${cybBtn('Sniper',    90, '/sprites/sniper/south.png',    'sniper')}
+          </div>
+        </div>
       </div>
-      <div id="top-cyborg-shop" class="shop-panel att-panel hidden">
-        <button class="att-btn" data-type="cannon">Cannon 70cr</button>
-        <button class="att-btn" data-type="grenadier">Grenadier 50cr</button>
-        <button class="att-btn" data-type="doublegun">Double Gun 90cr</button>
-        <button class="att-btn" data-type="hulk">Hulk 100cr</button>
-        <button class="att-btn" data-type="sniper">Sniper 90cr</button>
-      </div>
-      <div id="bottom-bar" class="hidden">
-        <button id="battle-btn">READY</button>
-      </div>
+
       <div id="plan-bar" class="hidden">
         <div id="plan-instructions">
           <strong>PLAN PHASE</strong>
           <span>Click a piece &middot; click a cell to queue Move &middot; Shift+click an enemy to queue Fire &middot; Right-click to clear / deselect</span>
         </div>
-        <button id="plan-battle-btn">BATTLE</button>
       </div>
       <div id="plan-selection" class="hidden"></div>
       <div id="combat-log" class="hidden"><div class="log-empty">(combat events appear here as the battle plays)</div></div>
@@ -92,9 +117,9 @@ export class HUD {
     this.phaseEl          = this.container.querySelector('#phase-display')!
     this.creditsEl        = this.container.querySelector('#credits-val')!
     this.attCreditsEl     = this.container.querySelector('#att-credits-val')!
-    this.bottomBarEl      = this.container.querySelector('#bottom-bar')!
-    this.robotShopEl      = this.container.querySelector('#top-robot-shop')!
-    this.cyborgShopEl     = this.container.querySelector('#top-cyborg-shop')!
+    this.bottomBarEl      = this.container.querySelector('#top-bar')!
+    this.robotShopEl      = this.container.querySelector('#robot-panel')!
+    this.cyborgShopEl     = this.container.querySelector('#cyborg-panel')!
     this.messageEl        = this.container.querySelector('#game-message')!
     this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
@@ -108,10 +133,12 @@ export class HUD {
       this.onBuyDog?.()
     })
 
-    this.container.querySelectorAll('.shop-btn:not(#sphere-btn):not(#dog-btn)').forEach(btn => {
+    // Robot structure buttons: any shop-icon-btn with data-type inside the
+    // robot panel. Excludes the att-btn class (those go to the cyborg handler).
+    this.container.querySelectorAll('#robot-panel .shop-icon-btn[data-type]').forEach(btn => {
       btn.addEventListener('click', e => {
         const type = (e.currentTarget as HTMLElement).dataset.type as StructureType
-        this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))
+        this.container.querySelectorAll('#robot-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
         ;(e.currentTarget as HTMLElement).classList.add('selected')
         this.onSelectStructure?.(type)
       })
@@ -128,20 +155,12 @@ export class HUD {
       this.playBattleSound()
       this.onBattle?.()
     })
-
-    this.container.querySelector('#plan-battle-btn')!.addEventListener('click', () => {
-      this.playBattleSound()
-      this.onBattle?.()
-    })
   }
 
   showGame() {
     this.loadingEl.classList.add('hidden')
-    this.phaseEl.classList.remove('hidden')
-    this.container.querySelector('#credits-display')!.classList.remove('hidden')
-    this.container.querySelector('#att-credits-display')!.classList.remove('hidden')
-    this.container.querySelector('#team-label-def')!.classList.remove('hidden')
-    this.container.querySelector('#team-label-att')!.classList.remove('hidden')
+    // Team labels + credits + phase display now live inside #top-bar, which
+    // setPhase() un-hides at the start of the build phase. Nothing extra to do.
   }
 
   setCredits(amount: number) {
@@ -162,13 +181,13 @@ export class HUD {
       sphereBtn?.classList.toggle('insufficient', credits < SPHERE_COST)
       const dogBtn = this.container.querySelector('#dog-btn')
       dogBtn?.classList.toggle('insufficient', credits < Config.UNITS.dog.cost)
-      this.container.querySelectorAll('#top-robot-shop .shop-btn[data-type]').forEach(b => {
+      this.container.querySelectorAll('#robot-panel .shop-icon-btn[data-type]').forEach(b => {
         const type = (b as HTMLElement).dataset.type as StructureType
         const cost = Config.STRUCTURES[type]?.cost ?? 0
         b.classList.toggle('insufficient', credits < cost)
       })
     } else {
-      this.container.querySelectorAll('#top-cyborg-shop .att-btn[data-type]').forEach(b => {
+      this.container.querySelectorAll('#cyborg-panel .shop-icon-btn[data-type]').forEach(b => {
         const type = (b as HTMLElement).dataset.type as UnitType
         const cost = Config.UNITS[type]?.cost ?? 0
         b.classList.toggle('insufficient', credits < cost)
@@ -177,9 +196,9 @@ export class HUD {
   }
 
   setSelectedUnitType(type: UnitType | null) {
-    this.container.querySelectorAll('.att-btn').forEach(b => b.classList.remove('selected'))
+    this.container.querySelectorAll('#cyborg-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
     if (type) {
-      this.container.querySelector(`.att-btn[data-type="${type}"]`)?.classList.add('selected')
+      this.container.querySelector(`#cyborg-panel .shop-icon-btn[data-type="${type}"]`)?.classList.add('selected')
     }
   }
 
@@ -187,26 +206,35 @@ export class HUD {
   // when the player picks a sphere/cyborg so the UI mirrors that the
   // structure placement was cancelled under the hood.
   clearStructureSelection() {
-    this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))
+    this.container.querySelectorAll('#robot-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
   }
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
+    // #top-bar (label `bottomBarEl` for historical reasons) hosts the team
+    // panels + the center READY/BATTLE button. It's visible during BUILD and
+    // PLANNING, hidden during reveal so the battlefield is unobstructed.
+    const battleBtn = this.container.querySelector<HTMLButtonElement>('#battle-btn')!
     switch (phase) {
       case 'build':
-        this.phaseEl.textContent = 'BUILD PHASE'
+        this.phaseEl.textContent = 'BUILD'
+        battleBtn.textContent = 'READY'
         this.bottomBarEl.classList.remove('hidden')
-        this.robotShopEl.classList.remove('hidden')
-        this.cyborgShopEl.classList.remove('hidden')
+        // Both team panels stay mounted; the per-side gating happens at the
+        // panel level later (player-isolated views). For now, both visible.
+        this.robotShopEl.classList.remove('disabled')
+        this.cyborgShopEl.classList.remove('disabled')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'planning':
-        this.phaseEl.textContent = 'PLAN PHASE'
-        this.bottomBarEl.classList.add('hidden')
-        this.robotShopEl.classList.add('hidden')
-        this.cyborgShopEl.classList.add('hidden')
+        this.phaseEl.textContent = 'PLAN'
+        battleBtn.textContent = 'BATTLE'
+        this.bottomBarEl.classList.remove('hidden')
+        // Disable the shop grids during planning — no new pieces, only orders.
+        this.robotShopEl.classList.add('disabled')
+        this.cyborgShopEl.classList.add('disabled')
         this.planBarEl.classList.remove('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
@@ -214,19 +242,17 @@ export class HUD {
       case 'reveal':
         this.phaseEl.textContent = 'BATTLE'
         this.bottomBarEl.classList.add('hidden')
-        this.robotShopEl.classList.add('hidden')
-        this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'win':
-        this.phaseEl.textContent = 'BATTLE PHASE'
+        this.phaseEl.textContent = 'BATTLE'
         this.showEndMessage('DEFENDER WINS', 'Power Core survived', '#00ffaa')
         break
       case 'lose':
-        this.phaseEl.textContent = 'BATTLE PHASE'
+        this.phaseEl.textContent = 'BATTLE'
         this.showEndMessage('ATTACKER WINS', 'Power Core destroyed', '#ff4444')
         break
     }
