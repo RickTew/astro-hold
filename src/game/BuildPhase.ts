@@ -83,8 +83,11 @@ private buildHitPlane(): THREE.Mesh {
   }
 
   private getCell(event: MouseEvent): { col: number; row: number; wx: number; wy: number } | null {
-    this.mouse.x =  (event.clientX / window.innerWidth)  * 2 - 1
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+    // NDC y uses canvas height (window height minus reserved HUD strip).
+    // Keep in sync with Game.HUD_HEIGHT.
+    const canvasH = Math.max(1, window.innerHeight - 220)
+    this.mouse.x =  (event.clientX / window.innerWidth) * 2 - 1
+    this.mouse.y = -(event.clientY / canvasH) * 2 + 1
     this.raycaster.setFromCamera(this.mouse, this.camera)
 
     const hits = this.raycaster.intersectObject(this.hitPlane)

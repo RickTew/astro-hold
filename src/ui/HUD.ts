@@ -14,7 +14,6 @@ export class HUD {
   private attCreditsEls: HTMLElement[] = []
   private phaseEls: HTMLElement[] = []
   private topBarEl!: HTMLElement
-  private bottomBarEl!: HTMLElement
   private robotShopEl!: HTMLElement
   private cyborgShopEl!: HTMLElement
   private sidePickerEl!: HTMLElement
@@ -57,8 +56,6 @@ export class HUD {
   }
 
   private build() {
-    const corners = '<div class="corner-bracket tl"></div><div class="corner-bracket tr"></div><div class="corner-bracket bl"></div><div class="corner-bracket br"></div>'
-
     const robotBtn = (id: string, label: string, cost: number, icon: string, opts: { preview?: boolean; dataType?: string } = {}) => {
       const cls = `shop-icon-btn${opts.preview ? ' preview' : ''}`
       const attrs = opts.dataType ? ` data-type="${opts.dataType}"` : ''
@@ -95,18 +92,57 @@ export class HUD {
         </div>
       </div>
 
-      <div id="top-bar" class="hidden">
-        <div id="robot-panel" class="team-panel def">
-          ${corners}
-          <div class="panel-banner">
-            <span class="banner-side-tag">ROBOTS</span>
-            <span class="banner-phase" id="phase-banner-r">BUILD PHASE</span>
-            <span class="credits-chip">CR <span class="cr-num" id="credits-val">200</span></span>
+      <!-- Bottom HUD strip. Single silhouette built from an inline SVG; the
+           content sits over it in absolute-positioned zones. Only the
+           player's-side strip is visible (.player-defender / -attacker on
+           #hud-root toggles between them). -->
+      <div id="hud-root" class="hidden">
+
+        <!-- ROBOTS strip -->
+        <div id="robot-panel" class="hud-strip def">
+          <svg class="hud-frame" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="plate-grad-def" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"  stop-color="#2a323d"/>
+                <stop offset="55%" stop-color="#141923"/>
+                <stop offset="100%" stop-color="#080b12"/>
+              </linearGradient>
+            </defs>
+            <!-- Outer silhouette: hex-trapezoidal command-deck shape. -->
+            <path class="frame-fill" vector-effect="non-scaling-stroke"
+                  d="M 0,80 L 28,42 L 88,14 L 170,0 L 830,0 L 912,14 L 972,42 L 1000,80 L 1000,220 L 0,220 Z"
+                  fill="url(#plate-grad-def)" stroke="var(--def-frame-hi)" stroke-width="2"/>
+            <!-- Internal seam lines between zones -->
+            <line class="frame-seam" x1="280" y1="46" x2="280" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <line class="frame-seam" x1="540" y1="14" x2="540" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <line class="frame-seam" x1="780" y1="40" x2="780" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <!-- Decorative tick marks along the top edge of the chamfer -->
+            <line class="frame-tick" x1="200" y1="6" x2="208" y2="6" stroke="var(--def-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+            <line class="frame-tick" x1="792" y1="6" x2="800" y2="6" stroke="var(--def-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          </svg>
+
+          <!-- Top banner: BUILD PHASE / ROBOTS / CR / VS -->
+          <div class="hud-banner">
+            <div class="banner-side">
+              <span class="banner-side-tag">ROBOTS</span>
+            </div>
+            <div class="banner-center">
+              <span class="banner-phase" id="phase-banner-r">BUILD PHASE</span>
+            </div>
+            <div class="banner-side right">
+              <span class="credits-chip">CR <span class="cr-num" id="credits-val">200</span></span>
+              <span class="vs-chip">
+                <span class="vs-label">VS</span>
+                <span class="vs-opponent">CYBORGS</span>
+                <span class="vs-tag">AI</span>
+              </span>
+            </div>
           </div>
 
-          <div class="panel-body">
-            <div class="panel-section units-section">
-              <div class="section-label">UNITS</div>
+          <!-- Four-zone content row -->
+          <div class="hud-zones">
+            <section class="hud-zone units-zone">
+              <div class="zone-label">UNITS</div>
               <div class="panel-grid grid-3">
                 ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
                 ${robotBtn('',           'Tower',    30, '/sprites/tower/south.png',   { dataType: 'turret' })}
@@ -114,45 +150,74 @@ export class HUD {
                 ${robotBtn('',           'Wall',     20, 'wall',                       { dataType: 'wall'   })}
                 ${robotBtn('dog-btn',    'Dog',      40, '/sprites/dog/south.png')}
               </div>
-            </div>
+            </section>
 
-            <div class="panel-section log-section">
-              <div class="section-label">SYSTEM LOG</div>
+            <section class="hud-zone log-zone">
+              <div class="zone-label">SYSTEM LOG</div>
               <div class="panel-log" id="panel-log-r"></div>
-            </div>
+            </section>
 
-            <div class="panel-section specials-section">
-              <div class="section-label">SPECIALS</div>
+            <section class="hud-zone specials-zone">
+              <div class="zone-label">SPECIALS</div>
               <div class="panel-grid grid-2">
                 ${robotBtn('', 'Defense', 20, '/sprites/defense/south.png', { dataType: 'defense', preview: true })}
                 ${robotBtn('', 'Gun',     30, '/sprites/gun/south.png',     { dataType: 'gun',     preview: true })}
                 ${robotBtn('', 'Laser',   40, '/sprites/laser/south.png',   { dataType: 'laser',   preview: true })}
                 ${robotBtn('', 'Signal',  20, '/sprites/signal/south.png',  { dataType: 'signal',  preview: true })}
               </div>
-            </div>
-          </div>
+            </section>
 
-          <div class="panel-footer">
-            <div class="vs-badge">
-              <span class="vs-label">VS</span>
-              <span class="vs-opponent">CYBORGS</span>
-              <span class="vs-tag">AI</span>
-            </div>
-            <div class="intel-status">OPPONENT INTEL · REDACTED</div>
+            <section class="hud-zone deploy-zone">
+              <div class="zone-label">DEPLOY</div>
+              <button id="battle-btn-r" class="battle-btn">
+                <span class="btn-led"></span>
+                <span class="btn-text">READY</span>
+              </button>
+              <div class="intel-status">INTEL · REDACTED</div>
+            </section>
           </div>
         </div>
 
-        <div id="cyborg-panel" class="team-panel att">
-          ${corners}
-          <div class="panel-banner">
-            <span class="banner-side-tag">CYBORGS</span>
-            <span class="banner-phase" id="phase-banner-c">BUILD PHASE</span>
-            <span class="credits-chip">CR <span class="cr-num" id="att-credits-val-panel">200</span></span>
+        <!-- CYBORGS strip — same structure, red palette + Cyborgs roster. -->
+        <div id="cyborg-panel" class="hud-strip att">
+          <svg class="hud-frame" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="plate-grad-att" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"  stop-color="#3a262e"/>
+                <stop offset="55%" stop-color="#1a0d12"/>
+                <stop offset="100%" stop-color="#0a0408"/>
+              </linearGradient>
+            </defs>
+            <path class="frame-fill" vector-effect="non-scaling-stroke"
+                  d="M 0,80 L 28,42 L 88,14 L 170,0 L 830,0 L 912,14 L 972,42 L 1000,80 L 1000,220 L 0,220 Z"
+                  fill="url(#plate-grad-att)" stroke="var(--att-frame-hi)" stroke-width="2"/>
+            <line class="frame-seam" x1="280" y1="46" x2="280" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <line class="frame-seam" x1="540" y1="14" x2="540" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <line class="frame-seam" x1="780" y1="40" x2="780" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <line class="frame-tick" x1="200" y1="6" x2="208" y2="6" stroke="var(--att-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+            <line class="frame-tick" x1="792" y1="6" x2="800" y2="6" stroke="var(--att-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          </svg>
+
+          <div class="hud-banner">
+            <div class="banner-side">
+              <span class="banner-side-tag">CYBORGS</span>
+            </div>
+            <div class="banner-center">
+              <span class="banner-phase" id="phase-banner-c">BUILD PHASE</span>
+            </div>
+            <div class="banner-side right">
+              <span class="credits-chip">CR <span class="cr-num" id="att-credits-val-panel">200</span></span>
+              <span class="vs-chip">
+                <span class="vs-label">VS</span>
+                <span class="vs-opponent">ROBOTS</span>
+                <span class="vs-tag">AI</span>
+              </span>
+            </div>
           </div>
 
-          <div class="panel-body">
-            <div class="panel-section units-section">
-              <div class="section-label">UNITS</div>
+          <div class="hud-zones">
+            <section class="hud-zone units-zone">
+              <div class="zone-label">UNITS</div>
               <div class="panel-grid grid-3">
                 ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
                 ${cybBtn('Grenadier', 50, '/sprites/grenadier/south.png', 'grenadier')}
@@ -160,38 +225,32 @@ export class HUD {
                 ${cybBtn('Hulk',     100, '/sprites/hulk/south.png',      'hulk')}
                 ${cybBtn('Sniper',    90, '/sprites/sniper/south.png',    'sniper')}
               </div>
-            </div>
+            </section>
 
-            <div class="panel-section log-section">
-              <div class="section-label">SYSTEM LOG</div>
+            <section class="hud-zone log-zone">
+              <div class="zone-label">SYSTEM LOG</div>
               <div class="panel-log" id="panel-log-c"></div>
-            </div>
+            </section>
 
-            <div class="panel-section specials-section">
-              <div class="section-label">UPGRADES</div>
+            <section class="hud-zone specials-zone">
+              <div class="zone-label">UPGRADES</div>
               <div class="specials-empty">
                 <span class="empty-headline">UPGRADES</span>
                 <span class="empty-subtitle">— Coming soon —</span>
               </div>
-            </div>
-          </div>
+            </section>
 
-          <div class="panel-footer">
-            <div class="vs-badge">
-              <span class="vs-label">VS</span>
-              <span class="vs-opponent">ROBOTS</span>
-              <span class="vs-tag">AI</span>
-            </div>
-            <div class="intel-status">OPPONENT INTEL · REDACTED</div>
+            <section class="hud-zone deploy-zone">
+              <div class="zone-label">DEPLOY</div>
+              <button id="battle-btn-c" class="battle-btn">
+                <span class="btn-led"></span>
+                <span class="btn-text">READY</span>
+              </button>
+              <div class="intel-status">INTEL · REDACTED</div>
+            </section>
           </div>
         </div>
-      </div>
 
-      <div id="bottom-bar" class="hidden">
-        <button id="battle-btn">
-          <span class="btn-led"></span>
-          <span class="btn-text">READY</span>
-        </button>
       </div>
 
       <div id="plan-bar" class="hidden">
@@ -206,8 +265,7 @@ export class HUD {
     `
 
     this.loadingEl        = this.container.querySelector('#loading-screen')!
-    this.topBarEl         = this.container.querySelector('#top-bar')!
-    this.bottomBarEl      = this.container.querySelector('#bottom-bar')!
+    this.topBarEl         = this.container.querySelector('#hud-root')!
     this.robotShopEl      = this.container.querySelector('#robot-panel')!
     this.cyborgShopEl     = this.container.querySelector('#cyborg-panel')!
     this.sidePickerEl     = this.container.querySelector('#side-picker')!
@@ -263,9 +321,13 @@ export class HUD {
       })
     })
 
-    this.container.querySelector('#battle-btn')!.addEventListener('click', () => {
-      this.playBattleSound()
-      this.onBattle?.()
+    // Both panels carry their own battle button; only the player-side
+    // one is visible at any time, but we wire both so playerSide can swap.
+    this.container.querySelectorAll<HTMLButtonElement>('.battle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.playBattleSound()
+        this.onBattle?.()
+      })
     })
   }
 
@@ -343,15 +405,13 @@ export class HUD {
     // battlefield is unobstructed.
     const setPhaseText = (s: string) => { for (const el of this.phaseEls) el.textContent = s }
     const setButtonText = (s: string) => {
-      const btnText = this.container.querySelector('#battle-btn .btn-text')
-      if (btnText) btnText.textContent = s
+      this.container.querySelectorAll('.battle-btn .btn-text').forEach(el => { el.textContent = s })
     }
     switch (phase) {
       case 'build':
         setPhaseText('BUILD PHASE')
         setButtonText('READY')
         this.topBarEl.classList.remove('hidden')
-        this.bottomBarEl.classList.remove('hidden')
         this.robotShopEl.classList.remove('disabled')
         this.cyborgShopEl.classList.remove('disabled')
         this.planBarEl.classList.add('hidden')
@@ -364,7 +424,6 @@ export class HUD {
         setPhaseText('PLAN PHASE')
         setButtonText('BATTLE')
         this.topBarEl.classList.remove('hidden')
-        this.bottomBarEl.classList.remove('hidden')
         this.robotShopEl.classList.add('disabled')
         this.cyborgShopEl.classList.add('disabled')
         this.planBarEl.classList.remove('hidden')
@@ -375,7 +434,6 @@ export class HUD {
       case 'reveal':
         setPhaseText('BATTLE')
         this.topBarEl.classList.add('hidden')
-        this.bottomBarEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.remove('hidden')

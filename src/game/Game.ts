@@ -15,6 +15,16 @@ import { OpponentAI, OpponentSide } from '../ai/OpponentAI'
 
 type Phase = 'loading' | 'pick-side' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
 
+// Bottom HUD strip reserves this many CSS pixels at the bottom of the
+// window. Canvas + camera are sized to (winW, winH - HUD_HEIGHT). Keeps
+// the HUD from ever sitting on top of playable cells. CSS uses
+// `var(--hud-strip-h)` for the same value — keep them in sync.
+const HUD_HEIGHT = 220
+
+function canvasHeight(): number {
+  return Math.max(1, window.innerHeight - HUD_HEIGHT)
+}
+
 // Unified placement session — covers both cyborg and sphere placement.
 // Ghost mesh is the authoritative position; never re-raycast at click time.
 // onPlace returns true to end the session (single-shot), false to stay
@@ -107,7 +117,7 @@ export class Game {
     this.scene.background = new THREE.Color(0x201b14)  // matches terrain darkest tone
     this.placementArcPreview = new FireArcPreview(this.scene)
 
-    const halfH = 600 / (window.innerWidth / window.innerHeight)
+    const halfH = 600 / (window.innerWidth / canvasHeight())
     this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 1, 1500)
     // Top-down view — square grid cells project as on-screen squares. Sprites
     // are billboarded so they still face the camera with the same image.
@@ -116,7 +126,7 @@ export class Game {
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.setSize(window.innerWidth, canvasHeight())
 
     // Lighting rig — tuned so the dark Meshy power core reads against the
     // dark terrain from all angles.
@@ -758,8 +768,11 @@ private enterBuildPhase() {
   }
 
   private screenToWorld(clientX: number, clientY: number): THREE.Vector2 | null {
+    // NDC uses the CANVAS dimensions, not window — the HUD strip at the
+    // bottom is not part of the canvas, so vertical normalization must
+    // divide by canvas height.
     const ndcX = (clientX / window.innerWidth) * 2 - 1
-    const ndcY = -(clientY / window.innerHeight) * 2 + 1
+    const ndcY = -(clientY / canvasHeight()) * 2 + 1
     const raycaster = new THREE.Raycaster()
     raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera)
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)
@@ -774,7 +787,7 @@ private enterBuildPhase() {
     const v = new THREE.Vector3(wx, wy, 0).project(this.camera)
     return {
       x: (v.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+      y: (-v.y * 0.5 + 0.5) * canvasHeight(),
     }
   }
 
@@ -820,7 +833,8 @@ private enterBuildPhase() {
   }
 
   private onResize = () => {
-    const { innerWidth: w, innerHeight: h } = window
+    const w = window.innerWidth
+    const h = canvasHeight()
     if (w === 0 || h === 0) return
     this.renderer.setSize(w, h)
     const halfH = 600 / (w / h)
@@ -983,7 +997,7 @@ private enterBuildPhase() {
       const dy = e.clientY - this.lastPan.y
       const ww = this.camera.right - this.camera.left
       const wh = this.camera.top - this.camera.bottom
-      const panY = (dy / window.innerHeight) * wh
+      const panY = (dy / canvasHeight()) * wh
       // Camera local Y axis in world coords — has a small -Z component because
       // of the slight tilt. Read it directly from the camera's world matrix so
       // pan slides along the screen up direction instead of pitching the view.
