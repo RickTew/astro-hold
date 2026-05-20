@@ -1162,3 +1162,116 @@ asking the user to confirm direction mid-build).
 6. **Combat log filtering / persistence options** — pin recent
    kills to top, or add a "show only N turns" toggle for long
    matches.
+
+
+## Session 13 (2026-05-20) — Single-player + HUD redesign attempts
+
+### What landed
+- **Single-player mode.** Asset preload → side-picker modal (ROBOTS or
+  CYBORGS) → BUILD. The chosen side runs through the normal HUD; the
+  other is handled by a new `OpponentAI` (`src/ai/OpponentAI.ts`) that
+  spends the AI's budget on a sensible opening force at BUILD start and
+  then lets RevealPhase's existing default-action heuristics drive
+  everything in PLAN + REVEAL.
+- **Fog of war.** `Game.setAiPiecesVisible(false)` flips `mesh.visible`
+  to false on every AI-side `SpriteUnit` / `SphereDefender` /
+  `Structure` after the AI's BUILD turn. Re-enabled at the top of
+  `enterRevealPhase`. Opponent credits + opposing shop panel are
+  hidden in HUD (`.ai-side` class). Player sees an empty enemy zone
+  during BUILD/PLAN; the fog drops when BATTLE starts.
+- **Side-picker UI.** Full-screen modal with two team cards — hero
+  sprite (sphere / hulk), role tagline, roster description, CTA
+  button. Survived multiple HUD rewrites unchanged.
+- **In-game HUD (current state).** Top strip with three floating
+  panels:
+    - LEFT — 5×2 robot tile grid (Sphere/Tower/Bomber/Wall/Dog
+      over Defense/Gun/Gun/Laser/Signal — Gun duplicated because we
+      only have 9 pieces and the reference shows 10)
+    - CENTER — raised-banner panel with BUILD PHASE title (cyan glow
+      + flanking corner-bracket glyphs) + CR chip + VS · CYBORGS · AI
+      chip
+    - RIGHT — duplicate of LEFT, both clickable (same data-action /
+      data-type handlers)
+  Panels are SVG-silhouetted octagons (8px chamfers all corners), no
+  background fill on the wrapper — they float on top of the canvas
+  with `rgba(8,18,32,0.85)` fill so the map shows through faintly.
+  Cyborg variant (`#hud-top-att`) is pre-built with red palette + the
+  cyborg roster duplicated to fill 10 slots.
+
+### Hard-won lessons (also saved as memory feedback)
+- **Don't redesign the HUD without an explicit reference from the
+  user.** I shipped maybe 6–8 different HUD variants this session
+  (corner panels → wide top bar → angled wings → bottom strip with
+  SVG silhouette → centered single panel → three-section panel with
+  log → reverted → final three-panel command deck). Most rounds were
+  ME interpreting vague feedback and shipping something further from
+  what the user wanted. The session became productive only AFTER the
+  user pinned a literal reference image and I committed to building
+  THAT, with the visual mechanics they pointed at (chamfered corners,
+  duplicated panels, decorative title framing).
+- **Treat reserved-band canvas + floating-HUD as opposite design
+  axes.** I reserved 210px at the top of the canvas for the HUD;
+  when the HUD hid during REVEAL, the band stayed black and looked
+  like browser chrome. The fix was making the canvas full-window and
+  the HUD floating with transparent gaps between panels. "Part of the
+  game, not part of the window" was the user's exact wording —
+  reserved canvas bands fail that test.
+- **clip-path on borders silently aliases corners.** The first
+  panel-frame attempts used CSS `clip-path` polygons; corners came
+  out jagged because the browser doesn't anti-alias clip-paths to
+  the same precision as `border-radius`. Replaced with inline SVG
+  + `stroke-width` + `vector-effect="non-scaling-stroke"` for crisp
+  angled edges at any panel width.
+- **SVG path geometry has to leave room for tile content.** Tiles
+  in the 5×2 grid overflowed the panel outline when the SVG had
+  aggressive inward steps at the bottom corners. Switching to
+  simple octagonal silhouettes (no inward stepping) + adjusting
+  `panel-content` insets to match the chamfer kept tiles safely
+  inside.
+- **Save feedback memory the moment you receive it; otherwise you
+  forget it three messages later.** When the user said "ROBOTS do
+  not see CYBORG data until BATTLE," I should have saved that
+  immediately. I noted it in conversation, then forgot it on the
+  next iteration when I added an opponent credits readout. Wrote
+  `feedback_opponent_data_hidden.md` after the second correction.
+- **Mouse NDC must use canvas dimensions, not window.** When the
+  canvas is offset/shrunk inside the window, `clientY /
+  window.innerHeight` gives wrong NDC and cells under the cursor
+  get mis-targeted. Fix: subtract any canvas top offset and divide
+  by canvas height. Reverted out of the codebase at session end
+  (canvas is full-window again) but the rule stands for future
+  reservations.
+
+### Memory entries added this session
+- `feedback_ui_is_critical` — the HUD is the most-seen surface;
+  treat it holistically; no single-axis tweaks for visual polish.
+- `feedback_opponent_data_hidden` — no opponent credits / units
+  shown during BUILD/PLAN; `mesh.visible=false` on AI pieces until
+  REVEAL.
+- `feedback_hud_centered_top` — single-player HUD should be
+  centered horizontally; preview-piece sprites need scale ≈ 1.0
+  because their PNGs already fill edge-to-edge.
+- `feedback_three_section_panel` — reference images are literal
+  layout specs, not style references; the reference showed three
+  sections (units · log · specials) which the user wanted
+  reflected in the build.
+
+### Suggested next-session opening moves
+1. **Strip down HUD if anything feels too busy.** The three-panel
+   layout is intentionally symmetric (duplicate side panels) until
+   we have more pieces to fill them differently. When the cyborg
+   roster grows, split the duplicate side into Units / Upgrades.
+2. **Wire the system log back in.** The center panel had an event
+   log that the user removed because the black box was ugly. The
+   log itself is valuable — find a way to surface system messages
+   (build phase start, AI deployment complete, plan instructions)
+   that doesn't break the panel silhouette. Maybe a slim ticker
+   above or below the panels.
+3. **Tile click feedback during PLAN.** Tiles still respond to
+   clicks but lead nowhere (the shop is disabled during PLAN).
+   Either visually grey them out or hide the tile grid during PLAN
+   and reuse the center panel for queued-action display.
+4. **Move forward with carry-overs from session 12.**
+   Bomb planned-cell indicator, tower rotation, Hulk balance,
+   more cyborg variety (Assassin / Berserker) — listed in the
+   session 12 close-out and still relevant.

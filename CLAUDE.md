@@ -1,11 +1,18 @@
 # AstroHold — Project Rules for Claude
 
-## Status: D&D-style strategy engine LIVE (session 12)
+## Status: Single-player D&D-style strategy LIVE (session 13)
 Chess-like turn-based grid strategy with cinematic plan-then-watch reveal.
 Both sides queue all actions during PLAN; clicking BATTLE animates them one
 piece-action at a time sorted by Initiative DESC. After the first BATTLE
 click, reveals **auto-chain** until win / lose / stalemate — the player just
 watches. **NOT an RTS.** Mechanics are tuned for D&D-style strategy:
+- **Single-player mode (session 13).** Asset preload → side-picker modal
+  (ROBOTS or CYBORGS) → BUILD. The unpicked side runs on autopilot via
+  `OpponentAI` (`src/ai/OpponentAI.ts`). AI handles BUILD purchases as a
+  one-shot autobuyer; PLAN actions fall through to RevealPhase's
+  default-action heuristics. **Fog of war:** AI-side pieces have
+  `mesh.visible=false` during BUILD/PLAN; revealed at REVEAL start.
+  Opponent credits are never shown.
 - **Limited per-game ammo** on every offensive piece. Once spent, it's inert.
 - **Cardinal-only movement** (N/S/E/W) by default. Special characters opt in
   to diagonals via `Config.UNITS[type].allowDiagonalMove = true`.
@@ -23,6 +30,29 @@ watches. **NOT an RTS.** Mechanics are tuned for D&D-style strategy:
   can see what a tower will and won't cover before committing.
 - **Hulk slam special action** (2 AP, 3-cell wedge in facing dir).
 - **Cyborg Sniper** — single-shot, 400-range, 150 dmg precision strike.
+
+## HUD (session 13)
+Floating top strip with three SVG-silhouetted panels — DO NOT reserve
+canvas space for it (canvas is full window; HUD floats on top with
+`rgba(8,18,32,0.85)` panel fill so the map shows through faintly).
+- LEFT panel — 5×2 robot tile grid (Sphere/Tower/Bomber/Wall/Dog over
+  Defense/Gun/Gun/Laser/Signal; Gun is duplicated because we only have
+  9 distinct robot pieces and the layout calls for 10).
+- CENTER panel — raised-banner SVG silhouette housing the **BUILD PHASE**
+  title (flanked by corner-bracket glyphs), CR chip, and VS · OPPONENT ·
+  AI chip. No event log inside (user removed; was reading as an ugly
+  black box).
+- RIGHT panel — duplicate of LEFT, both clickable (`querySelectorAll`
+  binds events to both panel copies).
+- Cyborg variant `#hud-top-att` is pre-built with red palette and the
+  cyborg roster duplicated to fill 10 slots; `setPlayerSide` toggles
+  which side renders.
+- Panel silhouettes are inline SVG with `vector-effect="non-scaling-
+  stroke"` so chamfered corners stay crisp at any width. CSS clip-path
+  was tried and abandoned — produces aliased corners against borders.
+- Side-picker modal (`#side-picker`) is its own thing — full-screen
+  before BUILD, two team cards with hero sprite + role tagline + CTA.
+  **Do not redesign this without explicit user direction.**
 
 **One piece per cell, strict.** Large pieces (Power Core today) use a 2x2
 footprint per the size rule. Long-term plan and current balance numbers live
