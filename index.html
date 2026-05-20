@@ -265,11 +265,119 @@
       letter-spacing: 1px;
     }
 
-    /* Grid of shop tiles. */
+    /* ── Panel body — three side-by-side sections ───────────────────────
+       LEFT: units grid. CENTER: scrollable system log. RIGHT: specials /
+       upgrades. The body uses CSS grid so the log can stretch vertically
+       to match the tallest side. */
+    .team-panel .panel-body {
+      display: grid;
+      grid-template-columns: auto minmax(220px, 1fr) auto;
+      gap: 16px;
+      align-items: stretch;
+    }
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .section-label {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      color: var(--def-text-2);
+      text-align: center;
+      padding: 2px 8px;
+      border-bottom: 1px solid rgba(108, 196, 255, 0.20);
+    }
+    .team-panel.att .section-label {
+      color: var(--att-text-2);
+      border-bottom-color: rgba(255, 138, 138, 0.20);
+    }
+
+    /* Grid of shop tiles. Variants by column count: 3 or 2. */
     .team-panel .panel-grid {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
+    }
+    .team-panel .panel-grid.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .team-panel .panel-grid.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    /* ── Center section: system log ─────────────────────────────────────
+       Recessed dark slot mimicking a terminal feed. Stretches vertically
+       to match the tallest side section so the panel reads as balanced. */
+    .team-panel .log-section { min-width: 0; }
+    .team-panel .panel-log {
+      flex: 1;
+      min-height: 0;
+      padding: 8px 10px;
+      background:
+        linear-gradient(180deg, #050a14 0%, #02060c 100%);
+      border: 1px solid rgba(0, 0, 0, 0.6);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 3px 6px rgba(0, 0, 0, 0.55) inset;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #a3bdd3;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(108, 196, 255, 0.25) transparent;
+    }
+    .team-panel.att .panel-log {
+      color: #d8b8b8;
+      scrollbar-color: rgba(255, 138, 138, 0.25) transparent;
+    }
+    .team-panel .panel-log .log-row { padding: 1px 0; }
+    .team-panel .panel-log .log-tag {
+      display: inline-block;
+      min-width: 28px;
+      padding: 0 4px;
+      margin-right: 6px;
+      font-size: 9px;
+      letter-spacing: 1px;
+      border: 1px solid rgba(108, 196, 255, 0.35);
+      color: #6ac4ff;
+      text-align: center;
+      vertical-align: 1px;
+    }
+    .team-panel .panel-log .log-row.system .log-tag { color: #6ac4ff; border-color: rgba(108, 196, 255, 0.40); }
+    .team-panel .panel-log .log-row.player .log-tag { color: #c8ff5a; border-color: rgba(200, 255, 90, 0.40); }
+    .team-panel .panel-log .log-row.ai     .log-tag { color: #ff8c8c; border-color: rgba(255, 140, 140, 0.40); }
+    .team-panel .panel-log .log-text { color: inherit; }
+
+    /* ── Specials section ──────────────────────────────────────────────── */
+    .team-panel .specials-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 18px 14px;
+      background:
+        linear-gradient(180deg, #050a14 0%, #02060c 100%);
+      border: 1px dashed rgba(108, 196, 255, 0.20);
+      color: #6a7c90;
+      text-align: center;
+    }
+    .team-panel.att .specials-empty {
+      border-color: rgba(255, 138, 138, 0.20);
+    }
+    .team-panel .specials-empty .empty-headline {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 6px;
+      color: #8aa3bb;
+    }
+    .team-panel .specials-empty .empty-subtitle {
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #5a6a7c;
     }
 
     /* ── Panel footer (VS badge + intel-redacted status) ───────────────── */

@@ -103,17 +103,35 @@ export class HUD {
             <span class="banner-phase" id="phase-banner-r">BUILD PHASE</span>
             <span class="credits-chip">CR <span class="cr-num" id="credits-val">200</span></span>
           </div>
-          <div class="panel-grid">
-            ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
-            ${robotBtn('',           'Tower',    30, '/sprites/tower/south.png',   { dataType: 'turret' })}
-            ${robotBtn('',           'Bomber',   70, '/sprites/bomber/south.png',  { dataType: 'bomber' })}
-            ${robotBtn('',           'Wall',     20, 'wall',                       { dataType: 'wall'   })}
-            ${robotBtn('dog-btn',    'Dog',      40, '/sprites/dog/south.png')}
-            ${robotBtn('',           'Defense',  20, '/sprites/defense/south.png', { dataType: 'defense', preview: true })}
-            ${robotBtn('',           'Gun',      30, '/sprites/gun/south.png',     { dataType: 'gun',     preview: true })}
-            ${robotBtn('',           'Laser',    40, '/sprites/laser/south.png',   { dataType: 'laser',   preview: true })}
-            ${robotBtn('',           'Signal',   20, '/sprites/signal/south.png',  { dataType: 'signal',  preview: true })}
+
+          <div class="panel-body">
+            <div class="panel-section units-section">
+              <div class="section-label">UNITS</div>
+              <div class="panel-grid grid-3">
+                ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
+                ${robotBtn('',           'Tower',    30, '/sprites/tower/south.png',   { dataType: 'turret' })}
+                ${robotBtn('',           'Bomber',   70, '/sprites/bomber/south.png',  { dataType: 'bomber' })}
+                ${robotBtn('',           'Wall',     20, 'wall',                       { dataType: 'wall'   })}
+                ${robotBtn('dog-btn',    'Dog',      40, '/sprites/dog/south.png')}
+              </div>
+            </div>
+
+            <div class="panel-section log-section">
+              <div class="section-label">SYSTEM LOG</div>
+              <div class="panel-log" id="panel-log-r"></div>
+            </div>
+
+            <div class="panel-section specials-section">
+              <div class="section-label">SPECIALS</div>
+              <div class="panel-grid grid-2">
+                ${robotBtn('', 'Defense', 20, '/sprites/defense/south.png', { dataType: 'defense', preview: true })}
+                ${robotBtn('', 'Gun',     30, '/sprites/gun/south.png',     { dataType: 'gun',     preview: true })}
+                ${robotBtn('', 'Laser',   40, '/sprites/laser/south.png',   { dataType: 'laser',   preview: true })}
+                ${robotBtn('', 'Signal',  20, '/sprites/signal/south.png',  { dataType: 'signal',  preview: true })}
+              </div>
+            </div>
           </div>
+
           <div class="panel-footer">
             <div class="vs-badge">
               <span class="vs-label">VS</span>
@@ -131,13 +149,33 @@ export class HUD {
             <span class="banner-phase" id="phase-banner-c">BUILD PHASE</span>
             <span class="credits-chip">CR <span class="cr-num" id="att-credits-val-panel">200</span></span>
           </div>
-          <div class="panel-grid">
-            ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
-            ${cybBtn('Grenadier', 50, '/sprites/grenadier/south.png', 'grenadier')}
-            ${cybBtn('Double Gun',90, '/sprites/doublegun/south.png', 'doublegun')}
-            ${cybBtn('Hulk',     100, '/sprites/hulk/south.png',      'hulk')}
-            ${cybBtn('Sniper',    90, '/sprites/sniper/south.png',    'sniper')}
+
+          <div class="panel-body">
+            <div class="panel-section units-section">
+              <div class="section-label">UNITS</div>
+              <div class="panel-grid grid-3">
+                ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
+                ${cybBtn('Grenadier', 50, '/sprites/grenadier/south.png', 'grenadier')}
+                ${cybBtn('Double Gun',90, '/sprites/doublegun/south.png', 'doublegun')}
+                ${cybBtn('Hulk',     100, '/sprites/hulk/south.png',      'hulk')}
+                ${cybBtn('Sniper',    90, '/sprites/sniper/south.png',    'sniper')}
+              </div>
+            </div>
+
+            <div class="panel-section log-section">
+              <div class="section-label">SYSTEM LOG</div>
+              <div class="panel-log" id="panel-log-c"></div>
+            </div>
+
+            <div class="panel-section specials-section">
+              <div class="section-label">UPGRADES</div>
+              <div class="specials-empty">
+                <span class="empty-headline">UPGRADES</span>
+                <span class="empty-subtitle">— Coming soon —</span>
+              </div>
+            </div>
           </div>
+
           <div class="panel-footer">
             <div class="vs-badge">
               <span class="vs-label">VS</span>
@@ -320,6 +358,7 @@ export class HUD {
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
+        this.logSystemMessage('BUILD PHASE INITIATED. Spend credits to deploy your forces.', 'system')
         break
       case 'planning':
         setPhaseText('PLAN PHASE')
@@ -331,6 +370,7 @@ export class HUD {
         this.planBarEl.classList.remove('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
+        this.logSystemMessage('PLAN PHASE INITIATED. Click a piece, then a cell to queue a move.', 'system')
         break
       case 'reveal':
         setPhaseText('BATTLE')
@@ -350,6 +390,24 @@ export class HUD {
         this.showEndMessage('ATTACKER WINS', 'Power Core destroyed', '#ff4444')
         break
     }
+  }
+
+  // Append a single line to the in-panel SYSTEM LOG. Both panels carry
+  // their own log, but only the active player's panel is visible at any
+  // time; we write to both so switching sides mid-game would Just Work.
+  logSystemMessage(text: string, kind: 'system' | 'player' | 'ai' = 'system') {
+    const logs = this.container.querySelectorAll<HTMLElement>('.panel-log')
+    logs.forEach(log => {
+      const row = document.createElement('div')
+      row.className = `log-row ${kind}`
+      // Prefix mimics a terminal feed: "> SYSTEM · <text>"
+      const tag = kind === 'system' ? 'SYS' : kind === 'player' ? 'YOU' : 'OPP'
+      row.innerHTML = `<span class="log-tag">${tag}</span> <span class="log-text">${text}</span>`
+      log.appendChild(row)
+      // Trim history so memory stays bounded; auto-scroll to newest.
+      while (log.childElementCount > 60) log.removeChild(log.firstChild!)
+      log.scrollTop = log.scrollHeight
+    })
   }
 
   // Win/lose overlay with a Play Again button. Reload-based reset — simplest

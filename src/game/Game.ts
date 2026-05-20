@@ -376,6 +376,10 @@ private enterBuildPhase() {
     // pieces (or credits, handled in HUD) until BATTLE plays out. Re-shown
     // at the start of enterRevealPhase.
     this.setAiPiecesVisible(false)
+    // Log opponent activity (intentionally vague — no count, no pieces).
+    if (this.opponentAI) {
+      this.hud.logSystemMessage('Opponent has deployed forces. Position: REDACTED.', 'ai')
+    }
   }
 
   // Show/hide every piece on the AI's side of the field. Called with false
