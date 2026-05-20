@@ -6,17 +6,12 @@ const SPHERE_COST = 100   // mirrors Game.SPHERE_COST
 
 export class HUD {
   private container: HTMLElement
-  // Credit displays live in TWO places now: the player's full panel and the
-  // opponent's slim readout. We update both unconditionally; CSS hides
-  // whichever one isn't visible for the chosen side, so callers don't have
-  // to know which is active.
-  private creditsEls: HTMLElement[] = []
-  private attCreditsEls: HTMLElement[] = []
-  private phaseEls: HTMLElement[] = []
-  private topBarEl!: HTMLElement
+  private creditsEl!: HTMLElement
+  private attCreditsEl!: HTMLElement
+  private phaseEl!: HTMLElement
+  private bottomBarEl!: HTMLElement
   private robotShopEl!: HTMLElement
   private cyborgShopEl!: HTMLElement
-  private sidePickerEl!: HTMLElement
   private messageEl!: HTMLElement
   private loadingEl!: HTMLElement
   private planBarEl!: HTMLElement
@@ -36,8 +31,8 @@ export class HUD {
   onBuySphere: (() => void) | null = null
   onBuyDog: (() => void) | null = null
   onBattle: (() => void) | null = null
-  // Side picker — fired after the player clicks their team card. Game uses
-  // this to set playerSide and wire up the OpponentAI.
+  // Side picker — Game listens here for the chosen team. Fires once,
+  // after which the AI takes the other side for the rest of the game.
   onPickSide: ((side: 'defender' | 'attacker') => void) | null = null
   // Compass-rose callbacks. Game decides whether the purchase succeeds (cost,
   // credits, duplicate facing); HUD just forwards the click intent.
@@ -56,244 +51,69 @@ export class HUD {
   }
 
   private build() {
-    const robotBtn = (id: string, label: string, cost: number, icon: string, opts: { preview?: boolean; dataType?: string } = {}) => {
-      const cls = `shop-icon-btn${opts.preview ? ' preview' : ''}`
-      const attrs = opts.dataType ? ` data-type="${opts.dataType}"` : ''
-      const idAttr = id ? ` id="${id}"` : ''
-      const iconHtml = icon === 'wall'
-        ? '<div class="icon icon-wall"></div>'
-        : `<div class="icon"><img src="${icon}" alt=""/></div>`
-      return `<button${idAttr} class="${cls}"${attrs}>${iconHtml}<div class="label">${label}</div><div class="cost">${cost}cr</div></button>`
-    }
-    const cybBtn = (label: string, cost: number, icon: string, dataType: string) =>
-      `<button class="shop-icon-btn att-btn" data-type="${dataType}"><div class="icon"><img src="${icon}" alt=""/></div><div class="label">${label}</div><div class="cost">${cost}cr</div></button>`
-
     this.container.innerHTML = `
       <div id="loading-screen">LOADING ASSETS...</div>
-
-      <div id="side-picker" class="hidden">
-        <div class="sp-title">ASTROHOLD</div>
-        <div class="sp-headline">CHOOSE YOUR SIDE</div>
-        <div class="sp-cards">
-          <div class="sp-card def" data-side="defender" role="button" tabindex="0">
-            <div class="sp-team-name">ROBOTS</div>
-            <div class="sp-role">DEFEND THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
-            <div class="sp-tagline">Spheres, towers, walls, and dogs.<br/>Hold the line — let nothing through.</div>
-            <div class="sp-cta">PLAY ROBOTS</div>
-          </div>
-          <div class="sp-card att" data-side="attacker" role="button" tabindex="0">
-            <div class="sp-team-name">CYBORGS</div>
-            <div class="sp-role">DESTROY THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
-            <div class="sp-tagline">Cannons, snipers, grenadiers, hulks.<br/>Push west — break the defenders.</div>
-            <div class="sp-cta">PLAY CYBORGS</div>
-          </div>
-        </div>
+      <div id="phase-display" class="hidden">BUILD PHASE</div>
+      <div id="team-label-def" class="hidden">ROBOTS</div>
+      <div id="credits-display" class="hidden">Credits: <span id="credits-val">200</span></div>
+      <div id="team-label-att" class="hidden">CYBORGS</div>
+      <div id="att-credits-display" class="hidden">Credits: <span id="att-credits-val">200</span></div>
+      <div id="top-robot-shop" class="shop-panel hidden">
+        <button id="sphere-btn" class="shop-btn">Sphere 100cr</button>
+        <button class="shop-btn" data-type="turret">Tower 30cr</button>
+        <button class="shop-btn" data-type="bomber">Bomber 70cr</button>
+        <button class="shop-btn" data-type="wall">Wall 20cr</button>
+        <button id="dog-btn" class="shop-btn">Dog 40cr</button>
+        <button class="shop-btn preview" data-type="defense">Defense 20cr</button>
+        <button class="shop-btn preview" data-type="gun">Gun 30cr</button>
+        <button class="shop-btn preview" data-type="laser">Laser 40cr</button>
+        <button class="shop-btn preview" data-type="signal">Signal 20cr</button>
       </div>
-
-      <!-- Bottom HUD strip. Single silhouette built from an inline SVG; the
-           content sits over it in absolute-positioned zones. Only the
-           player's-side strip is visible (.player-defender / -attacker on
-           #hud-root toggles between them). -->
-      <div id="hud-root" class="hidden">
-
-        <!-- ROBOTS strip -->
-        <div id="robot-panel" class="hud-strip def">
-          <svg class="hud-frame" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="plate-grad-def" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"  stop-color="#2a323d"/>
-                <stop offset="55%" stop-color="#141923"/>
-                <stop offset="100%" stop-color="#080b12"/>
-              </linearGradient>
-            </defs>
-            <!-- Outer silhouette: hex-trapezoidal command-deck shape. -->
-            <path class="frame-fill" vector-effect="non-scaling-stroke"
-                  d="M 0,80 L 28,42 L 88,14 L 170,0 L 830,0 L 912,14 L 972,42 L 1000,80 L 1000,220 L 0,220 Z"
-                  fill="url(#plate-grad-def)" stroke="var(--def-frame-hi)" stroke-width="2"/>
-            <!-- Internal seam lines between zones -->
-            <line class="frame-seam" x1="280" y1="46" x2="280" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <line class="frame-seam" x1="540" y1="14" x2="540" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <line class="frame-seam" x1="780" y1="40" x2="780" y2="220" stroke="var(--def-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <!-- Decorative tick marks along the top edge of the chamfer -->
-            <line class="frame-tick" x1="200" y1="6" x2="208" y2="6" stroke="var(--def-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-            <line class="frame-tick" x1="792" y1="6" x2="800" y2="6" stroke="var(--def-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-          </svg>
-
-          <!-- Top banner: BUILD PHASE / ROBOTS / CR / VS -->
-          <div class="hud-banner">
-            <div class="banner-side">
-              <span class="banner-side-tag">ROBOTS</span>
-            </div>
-            <div class="banner-center">
-              <span class="banner-phase" id="phase-banner-r">BUILD PHASE</span>
-            </div>
-            <div class="banner-side right">
-              <span class="credits-chip">CR <span class="cr-num" id="credits-val">200</span></span>
-              <span class="vs-chip">
-                <span class="vs-label">VS</span>
-                <span class="vs-opponent">CYBORGS</span>
-                <span class="vs-tag">AI</span>
-              </span>
-            </div>
-          </div>
-
-          <!-- Four-zone content row -->
-          <div class="hud-zones">
-            <section class="hud-zone units-zone">
-              <div class="zone-label">UNITS</div>
-              <div class="panel-grid grid-3">
-                ${robotBtn('sphere-btn', 'Sphere',  100, '/sprites/sphere/south.png')}
-                ${robotBtn('',           'Tower',    30, '/sprites/tower/south.png',   { dataType: 'turret' })}
-                ${robotBtn('',           'Bomber',   70, '/sprites/bomber/south.png',  { dataType: 'bomber' })}
-                ${robotBtn('',           'Wall',     20, 'wall',                       { dataType: 'wall'   })}
-                ${robotBtn('dog-btn',    'Dog',      40, '/sprites/dog/south.png')}
-              </div>
-            </section>
-
-            <section class="hud-zone log-zone">
-              <div class="zone-label">SYSTEM LOG</div>
-              <div class="panel-log" id="panel-log-r"></div>
-            </section>
-
-            <section class="hud-zone specials-zone">
-              <div class="zone-label">SPECIALS</div>
-              <div class="panel-grid grid-2">
-                ${robotBtn('', 'Defense', 20, '/sprites/defense/south.png', { dataType: 'defense', preview: true })}
-                ${robotBtn('', 'Gun',     30, '/sprites/gun/south.png',     { dataType: 'gun',     preview: true })}
-                ${robotBtn('', 'Laser',   40, '/sprites/laser/south.png',   { dataType: 'laser',   preview: true })}
-                ${robotBtn('', 'Signal',  20, '/sprites/signal/south.png',  { dataType: 'signal',  preview: true })}
-              </div>
-            </section>
-
-            <section class="hud-zone deploy-zone">
-              <div class="zone-label">DEPLOY</div>
-              <button id="battle-btn-r" class="battle-btn">
-                <span class="btn-led"></span>
-                <span class="btn-text">READY</span>
-              </button>
-              <div class="intel-status">INTEL · REDACTED</div>
-            </section>
-          </div>
-        </div>
-
-        <!-- CYBORGS strip — same structure, red palette + Cyborgs roster. -->
-        <div id="cyborg-panel" class="hud-strip att">
-          <svg class="hud-frame" viewBox="0 0 1000 220" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="plate-grad-att" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"  stop-color="#3a262e"/>
-                <stop offset="55%" stop-color="#1a0d12"/>
-                <stop offset="100%" stop-color="#0a0408"/>
-              </linearGradient>
-            </defs>
-            <path class="frame-fill" vector-effect="non-scaling-stroke"
-                  d="M 0,80 L 28,42 L 88,14 L 170,0 L 830,0 L 912,14 L 972,42 L 1000,80 L 1000,220 L 0,220 Z"
-                  fill="url(#plate-grad-att)" stroke="var(--att-frame-hi)" stroke-width="2"/>
-            <line class="frame-seam" x1="280" y1="46" x2="280" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <line class="frame-seam" x1="540" y1="14" x2="540" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <line class="frame-seam" x1="780" y1="40" x2="780" y2="220" stroke="var(--att-frame-hi)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
-            <line class="frame-tick" x1="200" y1="6" x2="208" y2="6" stroke="var(--att-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-            <line class="frame-tick" x1="792" y1="6" x2="800" y2="6" stroke="var(--att-frame-hi)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
-          </svg>
-
-          <div class="hud-banner">
-            <div class="banner-side">
-              <span class="banner-side-tag">CYBORGS</span>
-            </div>
-            <div class="banner-center">
-              <span class="banner-phase" id="phase-banner-c">BUILD PHASE</span>
-            </div>
-            <div class="banner-side right">
-              <span class="credits-chip">CR <span class="cr-num" id="att-credits-val-panel">200</span></span>
-              <span class="vs-chip">
-                <span class="vs-label">VS</span>
-                <span class="vs-opponent">ROBOTS</span>
-                <span class="vs-tag">AI</span>
-              </span>
-            </div>
-          </div>
-
-          <div class="hud-zones">
-            <section class="hud-zone units-zone">
-              <div class="zone-label">UNITS</div>
-              <div class="panel-grid grid-3">
-                ${cybBtn('Cannon',    70, '/sprites/cannon/south.png',    'cannon')}
-                ${cybBtn('Grenadier', 50, '/sprites/grenadier/south.png', 'grenadier')}
-                ${cybBtn('Double Gun',90, '/sprites/doublegun/south.png', 'doublegun')}
-                ${cybBtn('Hulk',     100, '/sprites/hulk/south.png',      'hulk')}
-                ${cybBtn('Sniper',    90, '/sprites/sniper/south.png',    'sniper')}
-              </div>
-            </section>
-
-            <section class="hud-zone log-zone">
-              <div class="zone-label">SYSTEM LOG</div>
-              <div class="panel-log" id="panel-log-c"></div>
-            </section>
-
-            <section class="hud-zone specials-zone">
-              <div class="zone-label">UPGRADES</div>
-              <div class="specials-empty">
-                <span class="empty-headline">UPGRADES</span>
-                <span class="empty-subtitle">— Coming soon —</span>
-              </div>
-            </section>
-
-            <section class="hud-zone deploy-zone">
-              <div class="zone-label">DEPLOY</div>
-              <button id="battle-btn-c" class="battle-btn">
-                <span class="btn-led"></span>
-                <span class="btn-text">READY</span>
-              </button>
-              <div class="intel-status">INTEL · REDACTED</div>
-            </section>
-          </div>
-        </div>
-
+      <div id="top-cyborg-shop" class="shop-panel att-panel hidden">
+        <button class="att-btn" data-type="cannon">Cannon 70cr</button>
+        <button class="att-btn" data-type="grenadier">Grenadier 50cr</button>
+        <button class="att-btn" data-type="doublegun">Double Gun 90cr</button>
+        <button class="att-btn" data-type="hulk">Hulk 100cr</button>
+        <button class="att-btn" data-type="sniper">Sniper 90cr</button>
       </div>
-
+      <div id="bottom-bar" class="hidden">
+        <button id="battle-btn">READY</button>
+      </div>
       <div id="plan-bar" class="hidden">
         <div id="plan-instructions">
           <strong>PLAN PHASE</strong>
           <span>Click a piece &middot; click a cell to queue Move &middot; Shift+click an enemy to queue Fire &middot; Right-click to clear / deselect</span>
         </div>
+        <button id="plan-battle-btn">BATTLE</button>
       </div>
       <div id="plan-selection" class="hidden"></div>
       <div id="combat-log" class="hidden"><div class="log-empty">(combat events appear here as the battle plays)</div></div>
       <div id="game-message" class="hidden"></div>
+      <div id="side-picker" class="hidden">
+        <div class="sp-card-row">
+          <div class="sp-card" data-side="defender">
+            <div class="sp-team">ROBOTS</div>
+            <div class="sp-role">DEFEND THE CORE</div>
+          </div>
+          <div class="sp-card att" data-side="attacker">
+            <div class="sp-team">CYBORGS</div>
+            <div class="sp-role">DESTROY THE CORE</div>
+          </div>
+        </div>
+      </div>
     `
 
     this.loadingEl        = this.container.querySelector('#loading-screen')!
-    this.topBarEl         = this.container.querySelector('#hud-root')!
-    this.robotShopEl      = this.container.querySelector('#robot-panel')!
-    this.cyborgShopEl     = this.container.querySelector('#cyborg-panel')!
-    this.sidePickerEl     = this.container.querySelector('#side-picker')!
+    this.phaseEl          = this.container.querySelector('#phase-display')!
+    this.creditsEl        = this.container.querySelector('#credits-val')!
+    this.attCreditsEl     = this.container.querySelector('#att-credits-val')!
+    this.bottomBarEl      = this.container.querySelector('#bottom-bar')!
+    this.robotShopEl      = this.container.querySelector('#top-robot-shop')!
+    this.cyborgShopEl     = this.container.querySelector('#top-cyborg-shop')!
     this.messageEl        = this.container.querySelector('#game-message')!
     this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
     this.combatLogEl      = this.container.querySelector('#combat-log')!
-    // Each panel has its own phase banner — both stay in sync via setPhase
-    // so the inactive panel's text doesn't go stale if the player switches.
-    this.phaseEls = Array.from(this.container.querySelectorAll<HTMLElement>('.banner-phase'))
-
-    // Credits display lives in each panel header. The AI side's credits are
-    // never shown to the player — opponent intel stays hidden until BATTLE.
-    this.creditsEls = [
-      this.container.querySelector('#credits-val'),
-    ].filter(Boolean) as HTMLElement[]
-    this.attCreditsEls = [
-      this.container.querySelector('#att-credits-val-panel'),
-    ].filter(Boolean) as HTMLElement[]
-
-    // Side picker — clicking either card sets the player's side. Mouse-only
-    // per the no-keyboard rule, so we don't bind Enter/Space here.
-    this.container.querySelectorAll<HTMLElement>('#side-picker .sp-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const side = card.dataset.side as 'defender' | 'attacker'
-        this.onPickSide?.(side)
-      })
-    })
 
     this.container.querySelector('#sphere-btn')?.addEventListener('click', () => {
       this.onBuySphere?.()
@@ -303,12 +123,10 @@ export class HUD {
       this.onBuyDog?.()
     })
 
-    // Robot structure buttons: any shop-icon-btn with data-type inside the
-    // robot panel. Excludes the att-btn class (those go to the cyborg handler).
-    this.container.querySelectorAll('#robot-panel .shop-icon-btn[data-type]').forEach(btn => {
+    this.container.querySelectorAll('.shop-btn:not(#sphere-btn):not(#dog-btn)').forEach(btn => {
       btn.addEventListener('click', e => {
         const type = (e.currentTarget as HTMLElement).dataset.type as StructureType
-        this.container.querySelectorAll('#robot-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
+        this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))
         ;(e.currentTarget as HTMLElement).classList.add('selected')
         this.onSelectStructure?.(type)
       })
@@ -321,45 +139,75 @@ export class HUD {
       })
     })
 
-    // Both panels carry their own battle button; only the player-side
-    // one is visible at any time, but we wire both so playerSide can swap.
-    this.container.querySelectorAll<HTMLButtonElement>('.battle-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.playBattleSound()
-        this.onBattle?.()
+    this.container.querySelector('#battle-btn')!.addEventListener('click', () => {
+      this.playBattleSound()
+      this.onBattle?.()
+    })
+
+    this.container.querySelector('#plan-battle-btn')!.addEventListener('click', () => {
+      this.playBattleSound()
+      this.onBattle?.()
+    })
+
+    // Side-picker cards. Mouse-only per the no-keyboard rule.
+    this.container.querySelectorAll<HTMLElement>('#side-picker .sp-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const side = card.dataset.side as 'defender' | 'attacker'
+        this.onPickSide?.(side)
       })
     })
   }
 
-  showGame() {
-    this.loadingEl.classList.add('hidden')
-    // Team labels + credits + phase display live inside #top-bar, which
-    // setPhase() un-hides at the start of the build phase. Nothing extra here.
-  }
+  // ─── Side picker / single-player mode ──────────────────────────────────
 
-  // Reveal the side picker. Game listens via onPickSide for the chosen team
-  // and proceeds into BUILD once the player commits.
+  // Shown after preload — player picks Robots or Cyborgs. AI takes the
+  // other side via Game.opponentAI.
   showSidePicker() {
     this.loadingEl.classList.add('hidden')
-    this.sidePickerEl.classList.remove('hidden')
+    const picker = this.container.querySelector('#side-picker')
+    picker?.classList.remove('hidden')
   }
 
-  // Lock in the player's chosen side. Adds the gating class on #top-bar
-  // that hides the AI side's panel. The VS badge inside each panel footer
-  // already names the opposite side, so no extra wiring needed.
+  // Lock in the player's chosen side. Hides the opposing shop panel; the
+  // AI handles spawning for that side. Also hides the side-picker overlay.
   setPlayerSide(side: 'defender' | 'attacker') {
-    this.sidePickerEl.classList.add('hidden')
-    this.topBarEl.classList.remove('player-defender', 'player-attacker')
-    this.topBarEl.classList.add(side === 'defender' ? 'player-defender' : 'player-attacker')
+    const picker = this.container.querySelector('#side-picker')
+    picker?.classList.add('hidden')
+    // Hide the AI side's shop panel — the player must not click it, nor
+    // see its credits.
+    if (side === 'defender') {
+      this.container.querySelector('#top-cyborg-shop')?.classList.add('ai-side')
+      this.container.querySelector('#att-credits-display')?.classList.add('ai-side')
+      this.container.querySelector('#team-label-att')?.classList.add('ai-side')
+    } else {
+      this.container.querySelector('#top-robot-shop')?.classList.add('ai-side')
+      this.container.querySelector('#credits-display')?.classList.add('ai-side')
+      this.container.querySelector('#team-label-def')?.classList.add('ai-side')
+    }
+  }
+
+  // Stub so Game can log without checking — no UI for system log on the
+  // baseline HUD; reserved for future redesigns.
+  logSystemMessage(_text: string, _kind: 'system' | 'player' | 'ai' = 'system') {
+    // intentionally no-op
+  }
+
+  showGame() {
+    this.loadingEl.classList.add('hidden')
+    this.phaseEl.classList.remove('hidden')
+    this.container.querySelector('#credits-display')!.classList.remove('hidden')
+    this.container.querySelector('#att-credits-display')!.classList.remove('hidden')
+    this.container.querySelector('#team-label-def')!.classList.remove('hidden')
+    this.container.querySelector('#team-label-att')!.classList.remove('hidden')
   }
 
   setCredits(amount: number) {
-    for (const el of this.creditsEls) el.textContent = String(amount)
+    this.creditsEl.textContent = String(amount)
     this.refreshAffordability('robots', amount)
   }
 
   setAttCredits(amount: number) {
-    for (const el of this.attCreditsEls) el.textContent = String(amount)
+    this.attCreditsEl.textContent = String(amount)
     this.refreshAffordability('cyborgs', amount)
   }
 
@@ -371,13 +219,13 @@ export class HUD {
       sphereBtn?.classList.toggle('insufficient', credits < SPHERE_COST)
       const dogBtn = this.container.querySelector('#dog-btn')
       dogBtn?.classList.toggle('insufficient', credits < Config.UNITS.dog.cost)
-      this.container.querySelectorAll('#robot-panel .shop-icon-btn[data-type]').forEach(b => {
+      this.container.querySelectorAll('#top-robot-shop .shop-btn[data-type]').forEach(b => {
         const type = (b as HTMLElement).dataset.type as StructureType
         const cost = Config.STRUCTURES[type]?.cost ?? 0
         b.classList.toggle('insufficient', credits < cost)
       })
     } else {
-      this.container.querySelectorAll('#cyborg-panel .shop-icon-btn[data-type]').forEach(b => {
+      this.container.querySelectorAll('#top-cyborg-shop .att-btn[data-type]').forEach(b => {
         const type = (b as HTMLElement).dataset.type as UnitType
         const cost = Config.UNITS[type]?.cost ?? 0
         b.classList.toggle('insufficient', credits < cost)
@@ -386,9 +234,9 @@ export class HUD {
   }
 
   setSelectedUnitType(type: UnitType | null) {
-    this.container.querySelectorAll('#cyborg-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
+    this.container.querySelectorAll('.att-btn').forEach(b => b.classList.remove('selected'))
     if (type) {
-      this.container.querySelector(`#cyborg-panel .shop-icon-btn[data-type="${type}"]`)?.classList.add('selected')
+      this.container.querySelector(`.att-btn[data-type="${type}"]`)?.classList.add('selected')
     }
   }
 
@@ -396,76 +244,49 @@ export class HUD {
   // when the player picks a sphere/cyborg so the UI mirrors that the
   // structure placement was cancelled under the hood.
   clearStructureSelection() {
-    this.container.querySelectorAll('#robot-panel .shop-icon-btn').forEach(b => b.classList.remove('selected'))
+    this.container.querySelectorAll('.shop-btn').forEach(b => b.classList.remove('selected'))
   }
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
-    // Top bar = player's team panel + banner. Bottom bar = READY button.
-    // Both visible during BUILD + PLAN, hidden during REVEAL so the
-    // battlefield is unobstructed.
-    const setPhaseText = (s: string) => { for (const el of this.phaseEls) el.textContent = s }
-    const setButtonText = (s: string) => {
-      this.container.querySelectorAll('.battle-btn .btn-text').forEach(el => { el.textContent = s })
-    }
     switch (phase) {
       case 'build':
-        setPhaseText('BUILD PHASE')
-        setButtonText('READY')
-        this.topBarEl.classList.remove('hidden')
-        this.robotShopEl.classList.remove('disabled')
-        this.cyborgShopEl.classList.remove('disabled')
+        this.phaseEl.textContent = 'BUILD PHASE'
+        this.bottomBarEl.classList.remove('hidden')
+        this.robotShopEl.classList.remove('hidden')
+        this.cyborgShopEl.classList.remove('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
-        this.logSystemMessage('BUILD PHASE INITIATED. Spend credits to deploy your forces.', 'system')
         break
       case 'planning':
-        setPhaseText('PLAN PHASE')
-        setButtonText('BATTLE')
-        this.topBarEl.classList.remove('hidden')
-        this.robotShopEl.classList.add('disabled')
-        this.cyborgShopEl.classList.add('disabled')
+        this.phaseEl.textContent = 'PLAN PHASE'
+        this.bottomBarEl.classList.add('hidden')
+        this.robotShopEl.classList.add('hidden')
+        this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.remove('hidden')
         this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
-        this.logSystemMessage('PLAN PHASE INITIATED. Click a piece, then a cell to queue a move.', 'system')
         break
       case 'reveal':
-        setPhaseText('BATTLE')
-        this.topBarEl.classList.add('hidden')
+        this.phaseEl.textContent = 'BATTLE'
+        this.bottomBarEl.classList.add('hidden')
+        this.robotShopEl.classList.add('hidden')
+        this.cyborgShopEl.classList.add('hidden')
         this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.combatLogEl.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'win':
-        setPhaseText('BATTLE')
+        this.phaseEl.textContent = 'BATTLE PHASE'
         this.showEndMessage('DEFENDER WINS', 'Power Core survived', '#00ffaa')
         break
       case 'lose':
-        setPhaseText('BATTLE')
+        this.phaseEl.textContent = 'BATTLE PHASE'
         this.showEndMessage('ATTACKER WINS', 'Power Core destroyed', '#ff4444')
         break
     }
-  }
-
-  // Append a single line to the in-panel SYSTEM LOG. Both panels carry
-  // their own log, but only the active player's panel is visible at any
-  // time; we write to both so switching sides mid-game would Just Work.
-  logSystemMessage(text: string, kind: 'system' | 'player' | 'ai' = 'system') {
-    const logs = this.container.querySelectorAll<HTMLElement>('.panel-log')
-    logs.forEach(log => {
-      const row = document.createElement('div')
-      row.className = `log-row ${kind}`
-      // Prefix mimics a terminal feed: "> SYSTEM · <text>"
-      const tag = kind === 'system' ? 'SYS' : kind === 'player' ? 'YOU' : 'OPP'
-      row.innerHTML = `<span class="log-tag">${tag}</span> <span class="log-text">${text}</span>`
-      log.appendChild(row)
-      // Trim history so memory stays bounded; auto-scroll to newest.
-      while (log.childElementCount > 60) log.removeChild(log.firstChild!)
-      log.scrollTop = log.scrollHeight
-    })
   }
 
   // Win/lose overlay with a Play Again button. Reload-based reset — simplest

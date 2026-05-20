@@ -6,20 +6,8 @@
   <title>AstroHold</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      /* Reserved bottom strip for the HUD. Keep in sync with Game.HUD_HEIGHT
-         and BuildPhase canvas-height calc. Camera shrinks vertically by this
-         amount so the HUD never sits on top of playable cells. */
-      --hud-strip-h: 220px;
-    }
     body { background: #000; overflow: hidden; }
-    canvas {
-      display: block;
-      position: absolute;
-      top: 0; left: 0;
-      width: 100vw;
-      height: calc(100vh - var(--hud-strip-h));
-    }
+    canvas { display: block; width: 100vw; height: 100vh; }
 
     #hud {
       position: fixed;
@@ -31,834 +19,207 @@
     }
     #hud * { pointer-events: auto; }
 
-    /* ──────────────────────────────────────────────────────────────────────
-       VISUAL SYSTEM — industrial-holographic theme
-       Metallic plate base + faint hex-grid pattern + holographic team
-       accents. Each side has a hue family:
-         - plate-*:  base metallic gradient stops
-         - frame:    chunky 2px outer rim
-         - frame-hi: bright accent on hover / corners
-         - accent:   selected / LED color
-         - text-*:   foreground typography
-         - glow:     bloom around the panel + tiles
-       ────────────────────────────────────────────────────────────────────── */
-    :root {
-      /* Metallic neutral — shared base for both sides */
-      --plate-1:    #2a323d;   /* light gunmetal — top edge */
-      --plate-2:    #161a22;   /* darker — body */
-      --plate-3:    #0a0d13;   /* deepest — bottom */
-      --plate-bevel: rgba(255, 255, 255, 0.10);
-      --plate-shadow: rgba(0, 0, 0, 0.55);
-
-      /* Defender (ROBOTS) — cyan / electric blue */
-      --def-frame:    #2b4d72;
-      --def-frame-hi: #6ac4ff;
-      --def-accent:   #00e0ff;
-      --def-text:     #d8ecff;
-      --def-text-2:   #8aaecc;
-      --def-glow:     rgba(0, 160, 240, 0.45);
-      --def-led:      #2ee0ff;
-      --def-warning-1: #6ac4ff;
-      --def-warning-2: rgba(106, 196, 255, 0.10);
-
-      /* Attacker (CYBORGS) — amber / blood red */
-      --att-frame:    #7a2630;
-      --att-frame-hi: #ff8c8c;
-      --att-accent:   #ff5a55;
-      --att-text:     #ffdadc;
-      --att-text-2:   #cc9494;
-      --att-glow:     rgba(230, 70, 70, 0.45);
-      --att-led:      #ff5a55;
-      --att-warning-1: #ff8c8c;
-      --att-warning-2: rgba(255, 140, 140, 0.10);
-
-      --cost-color:  #c8ff5a;
-      --cost-shadow: rgba(140, 220, 50, 0.6);
-
-      /* Hex-grid overlay — subtle structural texture on every panel. */
-      --hex-overlay:
-        repeating-linear-gradient(
-          60deg,
-          transparent 0 18px,
-          rgba(255, 255, 255, 0.018) 18px 19px
-        ),
-        repeating-linear-gradient(
-          -60deg,
-          transparent 0 18px,
-          rgba(255, 255, 255, 0.018) 18px 19px
-        );
+    #phase-display {
+      position: absolute;
+      top: 18px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: #66ccff;
+      text-shadow: 0 0 12px #0088ff;
     }
 
-    /* ── Bottom HUD strip ──────────────────────────────────────────────────
-       The HUD lives in a reserved band along the bottom of the screen.
-       Canvas is sized so it never sits on top of playable cells. */
-    #hud-root {
+    #team-label-def {
+      position: absolute;
+      top: 8px; left: 20px;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #66aaff;
+      text-shadow: 0 0 8px #0066cc;
+    }
+
+    #team-label-att {
+      position: absolute;
+      top: 8px; right: 20px;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #ff6666;
+      text-shadow: 0 0 8px #cc0000;
+      text-align: right;
+    }
+
+    #credits-display {
+      position: absolute;
+      top: 26px; left: 20px;
+      font-size: 14px;
+      color: #aaddff;
+    }
+
+    #att-credits-display {
+      position: absolute;
+      top: 26px; right: 20px;
+      font-size: 14px;
+      color: #ffaaaa;
+      text-align: right;
+    }
+
+    /* Bottom bar — now just hosts the READY/BATTLE button. Shops moved up
+       to their own corner panels (top-left = Robots, top-right = Cyborgs)
+       so they never crash into each other. */
+    #bottom-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      height: var(--hud-strip-h);
-      pointer-events: none;
-    }
-
-    /* Player side gating — only one panel renders. */
-    #hud-root.player-defender #cyborg-panel { display: none; }
-    #hud-root.player-attacker #robot-panel  { display: none; }
-
-    /* Each .hud-strip is a layered container: SVG silhouette drawn full-
-       bleed beneath, content layers stacked above with absolute positioning. */
-    .hud-strip {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-    .hud-strip .hud-frame {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      /* Soft outer bloom so the strip reads as a discrete sci-fi panel. */
-      filter: drop-shadow(0 0 12px var(--def-glow));
-    }
-    .hud-strip.att .hud-frame { filter: drop-shadow(0 0 12px var(--att-glow)); }
-    .hud-strip .hud-frame .frame-seam { opacity: 0.55; }
-    .hud-strip .hud-frame .frame-tick { opacity: 0.85; }
-
-    /* ── HUD banner (top strip inside the silhouette) ─────────────────────
-       Sits within the chamfered top area of the SVG silhouette. Three
-       segments: side tag (left) · phase title (center) · credits + VS
-       (right). Aligned to the slanted top so it reads as part of the
-       command frame, not a layered overlay. */
-    .hud-strip .hud-banner {
-      position: absolute;
-      top: 8px;
-      left: 18%;
-      right: 18%;
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      gap: 18px;
-      padding: 4px 12px;
-      font-family: 'Courier New', monospace;
-      pointer-events: none;
-    }
-    .hud-strip .hud-banner > * { pointer-events: auto; }
-    .hud-strip .banner-side {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      letter-spacing: 4px;
-    }
-    .hud-strip .banner-side.right { justify-content: flex-end; }
-    .hud-strip .banner-side-tag {
-      font-size: 13px;
-      font-weight: bold;
-      color: var(--def-frame-hi);
-      text-shadow: 0 0 10px var(--def-glow), 0 0 2px rgba(0,0,0,0.85);
-    }
-    .hud-strip.att .banner-side-tag {
-      color: var(--att-frame-hi);
-      text-shadow: 0 0 10px var(--att-glow), 0 0 2px rgba(0,0,0,0.85);
-    }
-    .hud-strip .banner-phase {
-      font-size: 18px;
-      font-weight: bold;
-      letter-spacing: 9px;
-      color: #ecf6ff;
-      text-shadow: 0 0 14px var(--def-glow), 0 1px 0 rgba(0,0,0,0.7);
-      white-space: nowrap;
-    }
-    .hud-strip.att .banner-phase {
-      text-shadow: 0 0 14px var(--att-glow), 0 1px 0 rgba(0,0,0,0.7);
-    }
-    .hud-strip .credits-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 11px;
-      background: linear-gradient(180deg, #050a10 0%, #0b1320 100%);
-      border: 1px solid rgba(0,0,0,0.6);
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,0.06) inset,
-        0 2px 4px rgba(0,0,0,0.5) inset;
-      font-size: 11px;
-      letter-spacing: 2px;
-      color: rgba(200,230,255,0.55);
-    }
-    .hud-strip .credits-chip .cr-num {
-      color: var(--cost-color);
-      font-size: 13px;
-      font-weight: bold;
-      text-shadow: 0 0 8px var(--cost-shadow);
-    }
-    .hud-strip .vs-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 9px;
-      background: rgba(0,0,0,0.45);
-      border: 1px solid rgba(255,255,255,0.10);
-      font-size: 10px;
-      letter-spacing: 2px;
-      color: rgba(200,220,235,0.55);
-    }
-    .hud-strip .vs-chip .vs-label { opacity: 0.6; }
-    .hud-strip .vs-chip .vs-opponent {
-      font-weight: bold;
-      color: var(--att-frame-hi);
-      text-shadow: 0 0 6px var(--att-glow);
-    }
-    .hud-strip.att .vs-chip .vs-opponent {
-      color: var(--def-frame-hi);
-      text-shadow: 0 0 6px var(--def-glow);
-    }
-    .hud-strip .vs-chip .vs-tag {
-      font-size: 9px;
-      letter-spacing: 1px;
-      padding: 0 5px;
-      background: rgba(0,0,0,0.5);
-      border: 1px solid rgba(255,255,255,0.20);
-      color: #b0c4d6;
-    }
-
-    /* ── HUD zones (4-column content row) ─────────────────────────────────
-       Positioned absolutely so the silhouette's chamfered top doesn't
-       collide with content. Four sections divided by the SVG seam lines
-       at viewBox x = 280/540/780 (28/54/78 % of strip width). */
-    .hud-strip .hud-zones {
-      position: absolute;
-      top: 46px;
-      left: 0; right: 0; bottom: 8px;
-      display: grid;
-      grid-template-columns: 28% 26% 24% 22%;
-      gap: 0;
-      pointer-events: none;
-    }
-    .hud-strip .hud-zone {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 14px 4px;
-      pointer-events: auto;
-      min-width: 0;
-    }
-    .hud-strip .hud-zone .zone-label {
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      font-weight: bold;
-      letter-spacing: 4px;
-      color: var(--def-text-2);
-      padding: 2px 0 4px;
-      width: 100%;
-      text-align: center;
-      border-bottom: 1px solid rgba(108, 196, 255, 0.20);
-    }
-    .hud-strip.att .hud-zone .zone-label {
-      color: var(--att-text-2);
-      border-bottom-color: rgba(255, 138, 138, 0.20);
-    }
-
-    /* ── Tile grid variants (used inside hud-zone) ──────────────────────── */
-    .hud-strip .panel-grid {
-      display: grid;
-      gap: 6px;
-      width: 100%;
-    }
-    .hud-strip .panel-grid.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .hud-strip .panel-grid.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-    /* ── Center zone: system log ────────────────────────────────────────── */
-    .hud-strip .panel-log {
-      flex: 1;
-      width: 100%;
-      min-height: 0;
-      padding: 6px 10px;
-      background: linear-gradient(180deg, #050a14 0%, #02060c 100%);
-      border: 1px solid rgba(0, 0, 0, 0.6);
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-        0 3px 6px rgba(0, 0, 0, 0.55) inset;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      line-height: 1.5;
-      color: #a3bdd3;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(108, 196, 255, 0.25) transparent;
-    }
-    .hud-strip.att .panel-log {
-      color: #d8b8b8;
-      scrollbar-color: rgba(255, 138, 138, 0.25) transparent;
-    }
-    .hud-strip .panel-log .log-row { padding: 1px 0; }
-    .hud-strip .panel-log .log-tag {
-      display: inline-block;
-      min-width: 28px;
-      padding: 0 4px;
-      margin-right: 6px;
-      font-size: 9px;
-      letter-spacing: 1px;
-      border: 1px solid rgba(108, 196, 255, 0.35);
-      color: #6ac4ff;
-      text-align: center;
-      vertical-align: 1px;
-    }
-    .hud-strip .panel-log .log-row.system .log-tag { color: #6ac4ff; border-color: rgba(108, 196, 255, 0.40); }
-    .hud-strip .panel-log .log-row.player .log-tag { color: #c8ff5a; border-color: rgba(200, 255, 90, 0.40); }
-    .hud-strip .panel-log .log-row.ai     .log-tag { color: #ff8c8c; border-color: rgba(255, 140, 140, 0.40); }
-    .hud-strip .panel-log .log-text { color: inherit; }
-
-    /* ── Specials zone empty placeholder ────────────────────────────────── */
-    .hud-strip .specials-empty {
-      flex: 1;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 12px 8px;
-      background: linear-gradient(180deg, #050a14 0%, #02060c 100%);
-      border: 1px dashed rgba(108, 196, 255, 0.20);
-      color: #6a7c90;
-      text-align: center;
-    }
-    .hud-strip.att .specials-empty { border-color: rgba(255, 138, 138, 0.20); }
-    .hud-strip .specials-empty .empty-headline {
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 5px;
-      color: #8aa3bb;
-    }
-    .hud-strip .specials-empty .empty-subtitle {
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: #5a6a7c;
-    }
-
-    /* ── Deploy zone: READY button + intel status ───────────────────────── */
-    .hud-strip .deploy-zone {
-      justify-content: flex-start;
-      gap: 8px;
-    }
-    .hud-strip .intel-status {
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: #6a7c90;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border: 1px dashed rgba(140, 160, 180, 0.30);
-      background: rgba(0, 0, 0, 0.3);
-      animation: intelPulse 2.8s ease-in-out infinite;
-    }
-
-    /* ── Shop tile (icon + label + cost + LED) ─────────────────────────────
-       Industrial slot: dark recessed body, lit-up team-coloured LED bar
-       along the bottom, sprite icon centred, label + cost beneath in
-       stenciled monospace. */
-    .shop-icon-btn {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      padding: 6px 4px 7px;
-      cursor: pointer;
-      background: linear-gradient(180deg, #1a2230 0%, #0b1018 100%);
-      border: 1px solid #353d4a;
-      color: var(--def-text-2);
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.08) inset,
-        0 -2px 4px rgba(0, 0, 0, 0.45) inset;
-      transition: transform 0.08s ease-out, border-color 0.12s, box-shadow 0.12s, color 0.12s;
-    }
-    /* Inner highlight — a 1px line at the top edge to suggest a lit bevel. */
-    .shop-icon-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-    }
-    /* Bottom LED indicator strip — dim by default, lights up on hover/selected. */
-    .shop-icon-btn::after {
-      content: '';
-      position: absolute;
-      left: 8px; right: 8px;
-      bottom: 2px;
-      height: 2px;
-      background: var(--def-led);
-      opacity: 0.35;
-      box-shadow: 0 0 6px var(--def-led);
-      transition: opacity 0.12s, box-shadow 0.12s;
-    }
-    .hud-strip.att .shop-icon-btn::after {
-      background: var(--att-led);
-      box-shadow: 0 0 6px var(--att-led);
-    }
-    .shop-icon-btn:hover {
-      border-color: var(--def-frame-hi);
-      color: var(--def-text);
-      transform: translateY(-1px);
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.10) inset,
-        0 -2px 4px rgba(0, 0, 0, 0.50) inset,
-        0 0 14px var(--def-glow);
-    }
-    .shop-icon-btn:hover::after { opacity: 0.85; box-shadow: 0 0 10px var(--def-led); }
-    .hud-strip.att .shop-icon-btn:hover::after { box-shadow: 0 0 10px var(--att-led); }
-    .shop-icon-btn.selected {
-      border-color: var(--def-accent);
-      color: #eaf8ff;
-      box-shadow:
-        0 0 0 1px var(--def-accent) inset,
-        0 0 18px var(--def-glow);
-    }
-    .shop-icon-btn.selected::after { opacity: 1; box-shadow: 0 0 14px var(--def-led); }
-    .hud-strip.att .shop-icon-btn.selected::after { box-shadow: 0 0 14px var(--att-led); }
-
-    .shop-icon-btn .icon {
-      position: relative;
-      width: 48px;
-      height: 48px;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
-      background:
-        /* radial vignette for a "lit slot" feel */
-        radial-gradient(ellipse at 50% 45%, rgba(50, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
-        linear-gradient(180deg, #050810 0%, #020407 100%);
-      border: 1px solid #2a3140;
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-        0 3px 4px rgba(0, 0, 0, 0.55) inset;
-    }
-    .hud-strip.att .shop-icon-btn .icon {
-      background:
-        radial-gradient(ellipse at 50% 45%, rgba(100, 50, 50, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
-        linear-gradient(180deg, #100408 0%, #060203 100%);
-    }
-    /* Sprites carry transparent padding around the subject — upscaling
-       inside the tile is the only way to make small pixel-art read at
-       this thumbnail size. Per-piece scale lets us tune the few outliers
-       (Cannon, Sniper feel small at 1.6×; Hulk is fine smaller). */
-    .shop-icon-btn .icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      transform: scale(var(--icon-scale, 1.65));
-      transform-origin: center 55%;  /* shift down a hair — most sprites have headroom */
-    }
-    .shop-icon-btn[data-type="cannon"]    .icon img { --icon-scale: 1.85; }
-    .shop-icon-btn[data-type="sniper"]    .icon img { --icon-scale: 1.85; }
-    .shop-icon-btn[data-type="grenadier"] .icon img { --icon-scale: 1.75; }
-    .shop-icon-btn[data-type="doublegun"] .icon img { --icon-scale: 1.65; }
-    .shop-icon-btn[data-type="hulk"]      .icon img { --icon-scale: 1.55; }
-    .shop-icon-btn#sphere-btn             .icon img { --icon-scale: 1.45; }
-    .shop-icon-btn[data-type="turret"]    .icon img { --icon-scale: 1.55; }
-    .shop-icon-btn[data-type="bomber"]    .icon img { --icon-scale: 1.55; }
-    .shop-icon-btn#dog-btn                .icon img { --icon-scale: 1.85; }
-    /* Preview pieces (defense/gun/laser/signal) fill their PNG edge-to-edge
-       — they don't have the transparent padding the other sprites do, so
-       any scale > 1 crops them. Keep them at 1×. */
-    .shop-icon-btn.preview                .icon img { --icon-scale: 1.0; transform-origin: center center; }
-
-    /* Wall placeholder — diagonal-hatch slab styled to feel like an in-game
-       barrier rather than a missing-asset stub. */
-    .shop-icon-btn .icon-wall {
-      width: 38px;
-      height: 38px;
-      background:
-        linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.10) 100%),
-        repeating-linear-gradient(45deg, #6688aa 0 5px, #334455 5px 10px);
-      border: 1px solid #88aacc;
-      box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset, 0 -1px 0 rgba(0,0,0,0.35) inset;
-    }
-    .shop-icon-btn .label {
-      font-size: 10px;
-      letter-spacing: 1px;
-      color: inherit;
-      white-space: nowrap;
-      text-transform: uppercase;
-    }
-    .shop-icon-btn .cost {
-      font-size: 10px;
-      letter-spacing: 1px;
-      color: var(--cost-color);
-    }
-
-    /* Cyborg side — same chassis colour, red accent ring. */
-    .hud-strip.att .shop-icon-btn { color: var(--att-text-2); }
-    .hud-strip.att .shop-icon-btn:hover {
-      border-color: var(--att-frame-hi);
-      color: var(--att-text);
-      box-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.10) inset,
-        0 -2px 4px rgba(0, 0, 0, 0.50) inset,
-        0 0 14px var(--att-glow);
-    }
-    .hud-strip.att .shop-icon-btn.selected {
-      border-color: var(--att-accent);
-      color: #ffeaea;
-      box-shadow:
-        0 0 0 1px var(--att-accent) inset,
-        0 0 18px var(--att-glow);
-    }
-
-    /* Preview pieces — single-direction renders pending full rotations.
-       Dashed border + reduced opacity so the player can see they're WIP. */
-    .shop-icon-btn.preview {
-      border-style: dashed;
-      opacity: 0.75;
-    }
-
-    /* Insufficient credits. */
-    .shop-icon-btn.insufficient {
-      opacity: 0.30;
-      cursor: not-allowed;
-      filter: grayscale(0.6);
-    }
-
-    /* PLAN phase: shop visible but inert. */
-    .hud-strip.disabled .panel-grid {
-      pointer-events: none;
-      opacity: 0.55;
-      filter: saturate(0.6);
-    }
-
-    /* READY / BATTLE — industrial pushbutton. A raised "cap" sits on a
-       deeper recessed "well", with a small LED indicator on the left. */
-    .battle-btn {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
       gap: 10px;
-      padding: 14px 24px;
-      margin-top: 6px;
+      padding: 10px 16px;
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    /* Robot shop — top-left corner panel below the ROBOTS credits header. */
+    #top-robot-shop {
+      position: absolute;
+      top: 52px;
+      left: 12px;
+      max-width: 52vw;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid #1a4466;
+      background: rgba(0, 8, 20, 0.75);
+    }
+
+    /* Cyborg shop — top-right corner panel below the CYBORGS credits header. */
+    #top-cyborg-shop {
+      position: absolute;
+      top: 52px;
+      right: 12px;
+      max-width: 36vw;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid #441122;
+      background: rgba(20, 0, 8, 0.75);
+    }
+
+    .shop-panel {
+      /* layout handled by #top-robot-shop / #top-cyborg-shop above */
+    }
+
+    .att-panel {
+      /* tinting handled inline on #top-cyborg-shop */
+    }
+
+    .panel-label {
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      color: #6699bb;
+    }
+
+    .att-panel .panel-label { color: #aa6677; }
+
+    .shop-btn, .att-btn {
+      padding: 8px 14px;
       cursor: pointer;
       font-family: 'Courier New', monospace;
-      font-size: 17px;
-      font-weight: bold;
-      letter-spacing: 4px;
+      font-size: 13px;
       white-space: nowrap;
-      color: #ffe8c4;
-      /* Industrial chrome — orange-amber pushbutton */
-      background:
-        linear-gradient(180deg, #4a1810 0%, #2a0a06 60%, #0e0402 100%);
-      border: 2px solid #ff7a2a;
-      box-shadow:
-        /* outer halo */
-        0 0 24px rgba(255, 120, 40, 0.55),
-        /* inner top highlight */
-        0 1px 0 rgba(255, 200, 130, 0.35) inset,
-        /* deeper inset */
-        0 -3px 6px rgba(0, 0, 0, 0.55) inset,
-        /* sharp inner ring */
-        0 0 0 1px rgba(255, 140, 60, 0.40) inset;
-      transition: transform 0.06s ease-out, color 0.12s, box-shadow 0.12s, background 0.12s, border-color 0.12s;
-    }
-    .battle-btn .btn-led {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, #fff2c8 0%, #ffaa44 35%, #663010 100%);
-      box-shadow:
-        0 0 8px #ff8030,
-        0 0 0 1px rgba(0, 0, 0, 0.5);
-    }
-    .battle-btn .btn-text {
-      text-shadow:
-        0 0 10px rgba(255, 140, 60, 0.85),
-        0 1px 0 rgba(0, 0, 0, 0.5);
-    }
-    .battle-btn:hover {
-      transform: translateY(-1px);
-      border-color: #ffa050;
-      color: #fff4dc;
-      background:
-        linear-gradient(180deg, #6a2418 0%, #3a1008 60%, #150602 100%);
-      box-shadow:
-        0 0 36px rgba(255, 150, 50, 0.85),
-        0 1px 0 rgba(255, 220, 160, 0.45) inset,
-        0 -3px 6px rgba(0, 0, 0, 0.55) inset,
-        0 0 0 1px rgba(255, 180, 90, 0.60) inset;
-    }
-    .battle-btn:hover .btn-led {
-      box-shadow:
-        0 0 14px #ffaa30,
-        0 0 0 1px rgba(0, 0, 0, 0.5);
-    }
-    .battle-btn:active {
-      transform: translateY(0);
-      box-shadow:
-        0 0 18px rgba(255, 120, 40, 0.50),
-        0 -1px 0 rgba(255, 220, 160, 0.20) inset,
-        0 3px 5px rgba(0, 0, 0, 0.55) inset,
-        0 0 0 1px rgba(255, 140, 60, 0.45) inset;
+      transition: background 0.1s, border-color 0.1s;
     }
 
-    /* Intel-redacted pulse — shared by the panel-footer intel chip. */
-    @keyframes intelPulse {
-      0%, 100% { opacity: 0.55; }
-      50%      { opacity: 0.85; }
+    .shop-btn {
+      background: #0a1e33;
+      border: 1px solid #1a4466;
+      color: #88bbdd;
+    }
+    .shop-btn:hover { background: #102840; border-color: #2266aa; }
+    .shop-btn.selected {
+      background: #0e3055;
+      border-color: #00aaff;
+      color: #00eeff;
+      text-shadow: 0 0 6px #00aaff;
+    }
+    /* Preview pieces — single-angle Meshy renders pending full rotations.
+       Dimmer/dashed border so they're visually distinct from production. */
+    .shop-btn.preview {
+      border-style: dashed;
+      opacity: 0.85;
+      color: #7799bb;
     }
 
-    /* ── Plan-phase instruction strip ─────────────────────────────────── */
+    /* Insufficient credits — greyed out so failed placements aren't silent. */
+    .shop-btn.insufficient, .att-btn.insufficient {
+      opacity: 0.35;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    .att-btn {
+      background: #1a0008;
+      border: 1px solid #661122;
+      color: #ddaaaa;
+    }
+    .att-btn:hover { background: #2a0010; border-color: #aa2244; color: #ffbbbb; }
+
+    #battle-btn, #plan-battle-btn {
+      background: #2a0000;
+      border: 2px solid #aa2200;
+      color: #ff8866;
+      padding: 10px 24px;
+      font-size: 17px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      align-self: center;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    #battle-btn:hover, #plan-battle-btn:hover {
+      background: #440000;
+      border-color: #ff4400;
+      color: #ffaa88;
+    }
+
+    /* Plan-phase bottom bar — narrower than build bar, just instructions + Battle */
     #plan-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 12px;
       padding: 10px 16px;
-      background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.30) 100%);
+      background: rgba(0, 0, 0, 0.5);
     }
     #plan-instructions {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 3px;
+      gap: 2px;
       font-family: 'Courier New', monospace;
-      color: #aac6d8;
+      color: #99bbcc;
       font-size: 12px;
       line-height: 1.4;
-      text-align: center;
     }
     #plan-instructions strong {
-      color: #ffe88a;
-      letter-spacing: 3px;
+      color: #ffee66;
+      letter-spacing: 2px;
       font-size: 13px;
-      text-shadow: 0 0 8px rgba(255, 200, 60, 0.4);
     }
 
-    /* ── Side picker (shown after load, before BUILD) ─────────────────────
-       Full-screen modal with two industrial team cards. Same metallic-
-       plate base as the in-game panels so the side-picker feels like part
-       of the same UI system, not a separate splash screen. */
-    #side-picker {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 48px;
-      background:
-        /* faint star-field-ish noise dots */
-        radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.06) 0%, transparent 1px),
-        radial-gradient(circle at 75% 70%, rgba(255, 255, 255, 0.04) 0%, transparent 1px),
-        radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 1px),
-        /* deep space vignette */
-        radial-gradient(ellipse at center, rgba(12, 18, 32, 0.92) 0%, rgba(0, 0, 0, 0.98) 70%);
-      font-family: 'Courier New', monospace;
-      z-index: 100;
-    }
-    #side-picker .sp-title {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      font-size: 14px;
-      letter-spacing: 12px;
-      color: #6ac4ff;
-      text-shadow: 0 0 14px var(--def-glow);
-    }
-    #side-picker .sp-title::before,
-    #side-picker .sp-title::after {
-      content: '';
-      width: 70px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, #6ac4ff);
-      opacity: 0.55;
-    }
-    #side-picker .sp-title::after {
-      background: linear-gradient(90deg, #6ac4ff, transparent);
-    }
-    #side-picker .sp-headline {
-      font-size: 30px;
-      letter-spacing: 14px;
-      color: #e6f3ff;
-      text-shadow:
-        0 0 22px rgba(60, 140, 220, 0.7),
-        0 1px 0 rgba(0, 0, 0, 0.8);
-      margin-top: -36px;
-    }
-    #side-picker .sp-cards {
-      display: flex;
-      gap: 48px;
-      align-items: stretch;
-    }
-    .sp-card {
-      position: relative;
-      width: 340px;
-      padding: 26px 28px 30px;
-      background:
-        var(--hex-overlay),
-        linear-gradient(180deg, var(--plate-1) 0%, var(--plate-2) 45%, var(--plate-3) 100%);
-      border: 2px solid var(--def-frame);
-      color: var(--def-text);
-      cursor: pointer;
-      text-align: center;
-      transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
-      box-shadow:
-        0 0 24px var(--def-glow),
-        0 1px 0 var(--plate-bevel) inset,
-        0 -1px 0 var(--plate-shadow) inset,
-        0 0 32px var(--def-glow) inset;
-    }
-    .sp-card.att {
-      border-color: var(--att-frame);
-      color: var(--att-text);
-      box-shadow:
-        0 0 24px var(--att-glow),
-        0 1px 0 var(--plate-bevel) inset,
-        0 -1px 0 var(--plate-shadow) inset,
-        0 0 32px var(--att-glow) inset;
-    }
-    .sp-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--def-frame-hi);
-      box-shadow:
-        0 0 36px var(--def-glow),
-        0 1px 0 var(--plate-bevel) inset,
-        0 -1px 0 var(--plate-shadow) inset,
-        0 0 44px var(--def-glow) inset;
-    }
-    .sp-card.att:hover {
-      border-color: var(--att-frame-hi);
-      box-shadow:
-        0 0 36px var(--att-glow),
-        0 1px 0 var(--plate-bevel) inset,
-        0 -1px 0 var(--plate-shadow) inset,
-        0 0 44px var(--att-glow) inset;
-    }
-    .sp-card .sp-team-name {
-      font-size: 28px;
-      font-weight: bold;
-      letter-spacing: 8px;
-      color: var(--def-frame-hi);
-      text-shadow: 0 0 14px var(--def-glow);
-      margin-bottom: 4px;
-    }
-    .sp-card.att .sp-team-name {
-      color: var(--att-frame-hi);
-      text-shadow: 0 0 14px var(--att-glow);
-    }
-    .sp-card .sp-role {
-      font-size: 10px;
-      letter-spacing: 3px;
-      color: var(--def-text-2);
-      margin-bottom: 22px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid rgba(106, 196, 255, 0.20);
-    }
-    .sp-card.att .sp-role {
-      color: var(--att-text-2);
-      border-bottom-color: rgba(255, 140, 140, 0.20);
-    }
-    .sp-card .sp-hero {
-      position: relative;
-      width: 160px;
-      height: 160px;
-      margin: 0 auto 22px;
-      background:
-        radial-gradient(ellipse at 50% 45%, rgba(50, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
-        linear-gradient(180deg, #050810 0%, #020407 100%);
-      border: 1px solid #2a3140;
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-        0 3px 6px rgba(0, 0, 0, 0.55) inset,
-        0 0 18px var(--def-glow);
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden;
-    }
-    .sp-card.att .sp-hero {
-      background:
-        radial-gradient(ellipse at 50% 45%, rgba(100, 50, 50, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
-        linear-gradient(180deg, #100408 0%, #060203 100%);
-      box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-        0 3px 6px rgba(0, 0, 0, 0.55) inset,
-        0 0 18px var(--att-glow);
-    }
-    .sp-card .sp-hero img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      transform: scale(1.4);
-    }
-    .sp-card .sp-tagline {
-      font-size: 12px;
-      letter-spacing: 1.5px;
-      line-height: 1.6;
-      color: var(--def-text-2);
-      margin-bottom: 22px;
-      min-height: 40px;
-    }
-    .sp-card.att .sp-tagline { color: var(--att-text-2); }
-    .sp-card .sp-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 24px;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: bold;
-      letter-spacing: 5px;
-      color: var(--def-text);
-      background:
-        linear-gradient(180deg, #143a60 0%, #082040 60%, #03101e 100%);
-      border: 2px solid var(--def-frame-hi);
-      box-shadow:
-        0 0 0 1px rgba(108, 196, 255, 0.25) inset,
-        0 1px 0 rgba(255, 255, 255, 0.12) inset,
-        0 -2px 4px rgba(0, 0, 0, 0.40) inset,
-        0 0 14px var(--def-glow);
-    }
-    .sp-card.att .sp-cta {
-      color: var(--att-text);
-      background:
-        linear-gradient(180deg, #5a121c 0%, #2a0408 60%, #100204 100%);
-      border-color: var(--att-frame-hi);
-      box-shadow:
-        0 0 0 1px rgba(255, 138, 138, 0.25) inset,
-        0 1px 0 rgba(255, 255, 255, 0.12) inset,
-        0 -2px 4px rgba(0, 0, 0, 0.40) inset,
-        0 0 14px var(--att-glow);
-    }
-    .sp-card:hover .sp-cta { box-shadow:
-      0 0 0 1px rgba(108, 196, 255, 0.50) inset,
-      0 1px 0 rgba(255, 255, 255, 0.16) inset,
-      0 -2px 4px rgba(0, 0, 0, 0.40) inset,
-      0 0 22px var(--def-glow);
-    }
-    .sp-card.att:hover .sp-cta { box-shadow:
-      0 0 0 1px rgba(255, 138, 138, 0.50) inset,
-      0 1px 0 rgba(255, 255, 255, 0.16) inset,
-      0 -2px 4px rgba(0, 0, 0, 0.40) inset,
-      0 0 22px var(--att-glow);
-    }
-
-    /* Selected-piece panel during planning — sits just below the top bar
-       on the right so it doesn't overlap the CYBORGS panel header. */
+    /* Selected-piece panel — top-right corner during planning */
     #plan-selection {
       position: absolute;
-      top: 150px;
-      right: 16px;
+      top: 60px;
+      right: 20px;
       width: 240px;
       padding: 10px 14px;
-      background: rgba(0, 0, 0, 0.78);
+      background: rgba(0, 0, 0, 0.65);
       border: 1px solid #335577;
       font-family: 'Courier New', monospace;
       font-size: 12px;
@@ -991,36 +352,25 @@
       cursor: default;
     }
 
-    /* Combat history log — wide bottom strip during BATTLE. The mock-up
-       command-deck look: dark frame, clipped corners, D&D-style coloured
-       rows. Hidden during BUILD/PLAN (the top bar already busy enough). */
+    /* Combat history log — right-rail D&D turn log. Visible during BATTLE
+       and the win/lose overlay so the player can review what happened. Hidden
+       during BUILD (the cyborg shop occupies this corner) and PLAN (the
+       plan-selection panel does). */
     #combat-log {
       position: absolute;
-      left: 50%;
-      bottom: 12px;
-      transform: translateX(-50%);
-      width: min(1000px, calc(100vw - 32px));
-      max-height: 26vh;
-      padding: 10px 16px;
-      background: linear-gradient(180deg, rgba(8,12,20,0.92) 0%, rgba(0,4,10,0.88) 100%);
+      top: 60px;
+      right: 12px;
+      width: 280px;
+      max-height: calc(100vh - 160px);
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.75);
       border: 1px solid #224466;
-      box-shadow: 0 0 14px rgba(0, 80, 160, 0.25) inset;
       font-family: 'Courier New', monospace;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.45;
       color: #99bbcc;
       overflow-y: auto;
       scrollbar-width: thin;
-      clip-path: polygon(
-        10px 0,
-        calc(100% - 10px) 0,
-        100% 10px,
-        100% calc(100% - 10px),
-        calc(100% - 10px) 100%,
-        10px 100%,
-        0 calc(100% - 10px),
-        0 10px
-      );
     }
     #combat-log .log-turn {
       color: #ffcc66;
@@ -1065,6 +415,64 @@
     }
 
     .hidden { display: none !important; }
+
+    /* Single-player gating — the AI's shop panel + credits + team label all
+       carry .ai-side after setPlayerSide() runs, hiding them entirely so the
+       player can't see or interact with opponent intel. */
+    .ai-side { display: none !important; }
+
+    /* Side picker — barebones full-screen overlay shown after asset preload.
+       Player clicks one card to commit to a side. Intentionally minimal
+       until we agree on a real HUD direction. */
+    #side-picker {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 100;
+    }
+    #side-picker .sp-card-row { display: flex; gap: 32px; }
+    #side-picker .sp-card {
+      width: 260px;
+      padding: 36px 28px;
+      background: rgba(0, 8, 20, 0.85);
+      border: 2px solid #2266aa;
+      color: #cce8ff;
+      text-align: center;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    #side-picker .sp-card.att {
+      background: rgba(20, 0, 8, 0.85);
+      border-color: #aa2244;
+      color: #ffd6d6;
+    }
+    #side-picker .sp-card:hover {
+      transform: translateY(-2px);
+      border-color: #66ccff;
+      box-shadow: 0 0 18px rgba(0, 140, 220, 0.5);
+    }
+    #side-picker .sp-card.att:hover {
+      border-color: #ff6688;
+      box-shadow: 0 0 18px rgba(220, 60, 80, 0.5);
+    }
+    #side-picker .sp-team {
+      font-size: 26px;
+      letter-spacing: 6px;
+      font-weight: bold;
+      color: #66ccff;
+      margin-bottom: 6px;
+    }
+    #side-picker .sp-card.att .sp-team { color: #ff6688; }
+    #side-picker .sp-role {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: #88aabb;
+    }
+    #side-picker .sp-card.att .sp-role { color: #cc9494; }
   </style>
 </head>
 <body>
