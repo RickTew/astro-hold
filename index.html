@@ -52,6 +52,11 @@
       min-width: 0;
       height: 100%;
     }
+    /* Lock the center panel to grid column 2 so when the LEFT and RIGHT
+       shop panels are hidden during PLAN/REVEAL, the center doesn't slide
+       to column 1. Without this the auto-placer fills empty cells from the
+       start of the grid and the center jumps left. */
+    .hud-panel.hud-center { grid-column: 2; }
     .hud-panel .panel-frame {
       position: absolute;
       inset: 0;

@@ -342,8 +342,12 @@ private enterBuildPhase() {
       this.startDogPlacement()
     }
 
-    // Build's "READY" button opens the planning phase (first turn).
-    this.hud.onBattle = () => this.enterPlanningPhase()
+    // Build's "READY" button skips the separate PLAN phase and goes
+    // directly to REVEAL. The reveal engine's default-action heuristics
+    // (cyborgs march, towers fire, etc.) handle every piece without
+    // requiring the player to click again. Planning will come back as an
+    // opt-in feature when piece-action queuing is exposed elsewhere.
+    this.hud.onBattle = () => this.startBattleFromBuild()
 
     this.hud.onSpawnUnit = (type) => {
       if (this.placement?.kind === type) { this.endPlacement(); return }
@@ -485,8 +489,26 @@ private enterBuildPhase() {
     return Config.STRUCTURES[s.type].label.replace(/\s*\d+cr.*$/, '').trim()
   }
 
+  // Transition from BUILD directly to the first REVEAL, skipping the
+  // separate PLAN phase. Tears down BuildPhase (same as enterPlanningPhase
+  // does for initial=true) then jumps to the reveal loop, which uses
+  // default-action heuristics for every piece.
+  private startBattleFromBuild() {
+    if (!this.buildPhase) return
+    this.endPlacement()
+    this.closeCompassRose()
+    this.removeZoneTint('att')
+    this.removeZoneTint('def')
+    this.structures = this.buildPhase.getStructures()
+    this.buildPhase.cleanup()
+    this.buildPhase = null
+    this.enterRevealPhase()
+  }
+
   // Called once from BUILD (initial = true) and then again after every reveal
   // (initial = false) so the chess loop is BUILD → PLAN → REVEAL → PLAN ...
+  // CURRENTLY UNUSED from BUILD: the READY button transitions directly to
+  // REVEAL via startBattleFromBuild. Kept for future opt-in planning support.
   private enterPlanningPhase(initial = true) {
     if (initial) {
       if (!this.buildPhase) return
