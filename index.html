@@ -376,24 +376,22 @@
       gap: 6px;
       width: 100%;
     }
-    /* System events feed — small scrolling area in the center panel that
-       streams non-combat messages ("BUILD PHASE started", "AI deployment
-       complete", etc.) during BUILD/PLAN. Replaces the old single-line
-       message. During REVEAL the combat log takes over the panel. */
+    /* System status line — shows the latest non-combat message in the
+       center HUD panel (BUILD PHASE start, AI deployment complete, etc.).
+       Single status that updates in-place rather than a scrolling feed —
+       the center panel is too narrow to scroll a multi-line feed without
+       clipping. During REVEAL the combat log replaces this section. */
     .center-events {
       width: 100%;
-      max-height: clamp(36px, 5vh, 60px);
-      overflow-y: auto;
+      overflow: hidden;
       font-family: 'Courier New', monospace;
-      font-size: clamp(10px, 1.3vh, 12px);
+      font-size: clamp(11px, 1.4vh, 13px);
       letter-spacing: 0.4px;
       line-height: 1.45;
       color: #99bbcc;
       text-align: center;
-      padding: 2px 4px;
-      scrollbar-width: thin;
+      padding: 2px 6px;
     }
-    .center-events .center-event { padding: 1px 0; }
     .center-events .center-event-system { color: #99bbcc; }
     .center-events .center-event-player { color: #88c5e0; }
     .center-events .center-event-ai     { color: #e08888; }

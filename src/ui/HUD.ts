@@ -357,20 +357,18 @@ export class HUD {
     })
   }
 
-  // Append a one-line system event to the .center-events ticker inside the
-  // center HUD panel. Last ~8 events kept; oldest scrolls out. Writes to
-  // BOTH center variants (def + att) so the feed survives a faction switch.
+  // Show the latest system event as a single-line status inside the
+  // center HUD panel. Each call REPLACES the prior message rather than
+  // appending — the center panel is too narrow to scroll a multi-message
+  // feed cleanly without clipping. Writes to both center variants so the
+  // status survives a faction switch.
   logSystemMessage(text: string, kind: 'system' | 'player' | 'ai' = 'system') {
     this.container.querySelectorAll<HTMLElement>('.center-events').forEach(feed => {
+      feed.innerHTML = ''
       const row = document.createElement('div')
       row.className = `center-event center-event-${kind}`
       row.textContent = text
       feed.appendChild(row)
-      const MAX = 8
-      while (feed.childElementCount > MAX) {
-        feed.removeChild(feed.firstChild!)
-      }
-      feed.scrollTop = feed.scrollHeight
     })
   }
 
