@@ -117,8 +117,13 @@ export class Game {
     this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 1, 1500)
     // Top-down view — square grid cells project as on-screen squares. Sprites
     // are billboarded so they still face the camera with the same image.
-    this.camera.position.set(0, 0, 500)
-    this.camera.lookAt(0, 0, 0)
+    // Camera is OFFSET in Y so the world content sits below the floating
+    // HUD strip rather than partly behind it. Without this offset, the top
+    // ~25% of the world (top row of defender cells) would be obscured by
+    // the HUD tiles. See computeCameraYOffset for the math.
+    const camY = this.computeCameraYOffset(halfH)
+    this.camera.position.set(0, camY, 500)
+    this.camera.lookAt(0, camY, 0)
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -824,7 +829,43 @@ private enterBuildPhase() {
     const halfH = 600 / (w / h)
     this.camera.top    =  halfH
     this.camera.bottom = -halfH
+    // Re-apply the HUD-aware Y offset on resize. We preserve any user pan
+    // offset by computing the DELTA between the new and old base offsets
+    // and shifting the camera by that delta — so a panned camera stays
+    // visually anchored relative to the world.
+    const oldBase = this.cameraBaseY
+    const newBase = this.computeCameraYOffset(halfH)
+    this.camera.position.y += (newBase - oldBase)
+    this.cameraBaseY = newBase
     this.camera.updateProjectionMatrix()
+  }
+
+  // Tracks the HUD-aware base camera Y (what camera.position.y would be
+  // with zero user pan applied). Used so resize handlers can shift the
+  // camera by the delta without resetting the user's pan offset.
+  private cameraBaseY = 0
+
+  // Compute the camera Y shift needed to push the world content below the
+  // floating HUD strip. The HUD covers the top ~--hud-top-h pixels of the
+  // viewport; without this shift, the world (centered at origin) renders
+  // with its top edge BEHIND the HUD tiles, hiding the top row of defender
+  // pieces. We shift the camera to look at a point BELOW origin so the
+  // world appears UP — its top edge aligns with the HUD bottom edge.
+  //
+  // Three.js ortho projection: a world point at Y=py projects to screen
+  // y_screen = h * (halfH - py + camY) / (2*halfH).
+  //
+  // Solve for camY such that world TOP (py = WORLD.TOP = 200) lands at
+  // screen y_screen = hudPx:
+  //   hudPx / h = (halfH - 200 + camY) / (2 * halfH)
+  //   camY = 2 * halfH * hudPx / h - halfH + 200
+  private computeCameraYOffset(halfH: number): number {
+    const hudCss = getComputedStyle(document.documentElement)
+      .getPropertyValue('--hud-top-h').trim()
+    const hudPx = parseInt(hudCss) || 195
+    const offset = (2 * halfH * hudPx / window.innerHeight) - halfH + Config.WORLD.TOP
+    this.cameraBaseY = offset
+    return offset
   }
 
   private onWheel = (e: WheelEvent) => {
