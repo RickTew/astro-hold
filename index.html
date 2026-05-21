@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AstroHold</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -86,13 +89,41 @@
       gap: 4px;
     }
     .hud-center .panel-content {
-      /* Top inset is deeper than the side panels' 10px to give the
-         BUILD PHASE banner clear airspace under the protruding header
-         notch (which protrudes upward to ~y=4 in the SVG viewBox).
-         Bottom inset clears the chamfered bottom corners. */
-      inset: 30px 40px 22px 40px;
+      /* Full-bleed: content fills the SVG silhouette. The 3-section
+         layout (.cc-title / .cc-body / .cc-action) lines up with the
+         SVG's internal divider lines (y=58 and y=158 in the viewBox)
+         so each subsection occupies its own console "screen". */
+      inset: 0;
+      padding: 8px 24px;
+      justify-content: stretch;
+      gap: 0;
+    }
+    .center-build-info {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+      width: 100%;
+      height: 100%;
+      gap: 0;
+    }
+    .cc-title {
+      display: flex;
+      align-items: center;
       justify-content: center;
-      gap: 14px;
+      padding: 4px 8px;
+    }
+    .cc-body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 1.2vh, 12px);
+      padding: 6px 4px;
+    }
+    .cc-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
     }
 
     /* ── Tile grid ───────────────────────────────────────────────────── */
@@ -263,11 +294,11 @@
       position: relative;
       display: inline-flex;
       align-items: center;
-      gap: 18px;
-      font-family: 'Courier New', monospace;
-      font-size: clamp(20px, 3vh, 28px);
-      font-weight: bold;
-      letter-spacing: clamp(6px, 1.4vh, 10px);
+      gap: clamp(12px, 1.6vh, 18px);
+      font-family: 'Orbitron', 'Courier New', monospace;
+      font-size: clamp(18px, 2.6vh, 24px);
+      font-weight: 900;
+      letter-spacing: clamp(4px, 0.9vh, 7px);
       color: #f4faff;
       white-space: nowrap;
       padding: 2px 6px;
@@ -276,13 +307,13 @@
         0 0 8px rgba(80, 200, 255, 0.7),
         0 0 2px rgba(0, 0, 0, 0.9);
     }
-    /* Bracket accents on either side of BUILD PHASE — read as command-
-       deck punctuation. */
+    /* Bracket accents on either side of the phase title — read as
+       command-deck punctuation, sized to the title height. */
     .hud-center .center-phase::before,
     .hud-center .center-phase::after {
       content: '';
-      width: 20px;
-      height: 20px;
+      width: clamp(12px, 1.8vh, 16px);
+      height: clamp(12px, 1.8vh, 16px);
       border: 2.5px solid #6ac4ff;
       filter: drop-shadow(0 0 5px rgba(90, 200, 255, 0.75));
     }
@@ -302,18 +333,19 @@
     .hud-center .center-credits {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 3px 12px;
+      gap: 8px;
+      padding: clamp(4px, 0.8vh, 6px) clamp(14px, 2vw, 22px);
       background: linear-gradient(180deg, #030710 0%, #0b1320 100%);
-      border: 1px solid rgba(90, 167, 212, 0.45);
+      border: 1.5px solid rgba(90, 167, 212, 0.55);
       box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
         0 2px 4px rgba(0, 0, 0, 0.5) inset,
-        0 0 8px rgba(90, 167, 212, 0.25);
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      letter-spacing: 3px;
-      color: rgba(200, 230, 255, 0.6);
+        0 0 10px rgba(90, 167, 212, 0.30);
+      font-family: 'Orbitron', 'Courier New', monospace;
+      font-size: clamp(11px, 1.4vh, 13px);
+      font-weight: 500;
+      letter-spacing: clamp(2px, 0.4vh, 4px);
+      color: rgba(200, 230, 255, 0.75);
     }
     .hud-panel[data-side="att"] .center-credits {
       border-color: rgba(212, 90, 122, 0.45);
@@ -323,11 +355,11 @@
         0 0 8px rgba(212, 90, 122, 0.25);
     }
     .hud-center .center-credits .cr-num {
-      color: #c8ff7a;
-      font-weight: bold;
-      font-size: 14px;
-      margin-left: 4px;
-      text-shadow: 0 0 6px rgba(160, 220, 60, 0.7);
+      color: #d4ff7a;
+      font-weight: 900;
+      font-size: clamp(14px, 1.9vh, 17px);
+      margin-left: 6px;
+      text-shadow: 0 0 10px rgba(180, 240, 70, 0.85), 0 0 4px rgba(140, 220, 50, 0.7);
     }
     /* Matchup line — PLAYER VS OPPONENT, faction names colored by role
        (defender blue, attacker red). Sits below the centered credits chip. */
@@ -335,11 +367,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
       padding: 2px 10px;
-      font-family: 'Courier New', monospace;
-      font-size: clamp(12px, 1.5vh, 14px);
-      letter-spacing: 3px;
+      font-family: 'Orbitron', 'Courier New', monospace;
+      font-size: clamp(13px, 1.7vh, 16px);
+      font-weight: 700;
+      letter-spacing: clamp(2px, 0.4vh, 3px);
       color: #8aabc4;
     }
     .hud-center .center-matchup .vs-label { opacity: 0.55; font-size: 0.85em; }
@@ -375,13 +408,8 @@
        Replaces the old #bottom-bar (READY) and #plan-bar (BATTLE + instructions).
        Lives inside each .hud-center .panel-content so the action button is part
        of the command-deck silhouette, not floating at the viewport edge. */
-    .center-build-info {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: clamp(10px, 1.6vh, 16px);
-      width: 100%;
-    }
+    /* Legacy .center-build-info flex rules replaced by the grid rules
+       above (which line up with the SVG divider sections). */
     /* System status line — shows the latest non-combat message in the
        center HUD panel (BUILD PHASE start, AI deployment complete, etc.).
        Single status that updates in-place rather than a scrolling feed —
@@ -409,12 +437,12 @@
        Color follows the player's role (.role-defender = blue,
        .role-attacker = red); applied by HUD.setPlayerSide. */
     .center-action-btn {
-      margin-top: 2px;
-      padding: clamp(10px, 1.6vh, 14px) clamp(30px, 4.5vw, 46px);
+      margin: 0;
+      padding: clamp(8px, 1.3vh, 12px) clamp(36px, 5vw, 56px);
       font-size: clamp(15px, 2vh, 19px);
-      font-weight: bold;
+      font-weight: 900;
       letter-spacing: clamp(4px, 0.9vh, 7px);
-      font-family: 'Courier New', monospace;
+      font-family: 'Orbitron', 'Courier New', monospace;
       cursor: pointer;
       white-space: nowrap;
       position: relative;

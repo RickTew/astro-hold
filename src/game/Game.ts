@@ -386,7 +386,7 @@ private enterBuildPhase() {
     this.setAiPiecesVisible(false)
     // Log opponent activity (intentionally vague — no count, no pieces).
     if (this.opponentAI) {
-      this.hud.logSystemMessage('AI deployment complete. Forces hidden until BATTLE.', 'ai')
+      this.hud.logSystemMessage('AI forces deployed. Hidden until BATTLE.', 'ai')
     }
   }
 

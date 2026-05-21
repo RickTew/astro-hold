@@ -117,25 +117,33 @@ export class HUD {
     // corners on all sides, internal divider line under the banner area.
     const centerPanelSvg = (side: 'def' | 'att') => `
       <svg class="panel-frame" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M 12,30 L 28,14 L 100,14 L 112,4 L 208,4 L 220,14 L 292,14 L 308,30 L 308,198 L 296,210 L 24,210 L 12,198 Z"
-              fill="rgba(8, 18, 32, 0.55)"
+        <!-- Clean chamfered rectangle. Internal divider lines split the
+             panel into three horizontal sections so each piece of content
+             gets its own "screen" inside the console:
+               y=4..58    title bar (BUILD PHASE)
+               y=58..158  content area (CR, matchup, status)
+               y=158..206 action bar (READY button) -->
+        <path d="M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z"
+              fill="rgba(8, 18, 32, 0.58)"
               stroke="${side === 'def' ? '#5aa7d4' : '#d45a7a'}"
               stroke-width="2.8" stroke-linejoin="miter"
               vector-effect="non-scaling-stroke"/>
-        <!-- Internal banner divider — separates BUILD PHASE area from below. -->
-        <line x1="40" y1="62" x2="280" y2="62"
+        <!-- Divider under the title bar -->
+        <line x1="14" y1="58" x2="306" y2="58"
               stroke="${side === 'def' ? '#5aa7d4' : '#d45a7a'}"
-              stroke-width="0.6" stroke-opacity="0.55"
+              stroke-width="1.2" stroke-opacity="0.40"
               vector-effect="non-scaling-stroke"/>
-        <!-- Decorative tick marks flanking the BUILD PHASE area. -->
-        <line x1="32" y1="38" x2="48" y2="38"
-              stroke="${side === 'def' ? '#8fd0f2' : '#f28fa6'}"
-              stroke-width="1.4" stroke-opacity="0.85"
+        <!-- Divider above the action bar -->
+        <line x1="14" y1="158" x2="306" y2="158"
+              stroke="${side === 'def' ? '#5aa7d4' : '#d45a7a'}"
+              stroke-width="1.2" stroke-opacity="0.40"
               vector-effect="non-scaling-stroke"/>
-        <line x1="272" y1="38" x2="288" y2="38"
-              stroke="${side === 'def' ? '#8fd0f2' : '#f28fa6'}"
-              stroke-width="1.4" stroke-opacity="0.85"
-              vector-effect="non-scaling-stroke"/>
+        <!-- Decorative corner tick marks — read as "screw heads" anchoring
+             the console panel. Subtle, just enough texture to feel mechanical. -->
+        <circle cx="14" cy="14" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
+        <circle cx="306" cy="14" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
+        <circle cx="14" cy="196" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
+        <circle cx="306" cy="196" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
       </svg>`
 
     this.container.innerHTML = `
@@ -154,20 +162,22 @@ export class HUD {
         <div class="hud-panel hud-center" data-side="def">
           ${centerPanelSvg('def')}
           <div class="panel-content">
-            <!-- BUILD / PLAN content: phase title, credits, VS chip, status
-                 message, primary action button. Hidden during REVEAL. -->
+            <!-- BUILD / PLAN content. Three console sections that match the
+                 SVG divider lines: title / content / action. -->
             <div class="center-build-info">
-              <div class="center-banner-row">
-                <div class="center-phase">BUILD PHASE</div>
+              <div class="cc-title"><div class="center-phase">BUILD PHASE</div></div>
+              <div class="cc-body">
+                <div class="center-credits">CR<span class="cr-num" id="credits-val">1000</span></div>
+                <div class="center-matchup">
+                  <span class="vs-player">ROBOTS</span>
+                  <span class="vs-label">VS</span>
+                  <span class="vs-team">CYBORGS</span>
+                </div>
+                <div class="center-events"></div>
               </div>
-              <div class="center-credits">CR<span class="cr-num" id="credits-val">1000</span></div>
-              <div class="center-matchup">
-                <span class="vs-player">ROBOTS</span>
-                <span class="vs-label">VS</span>
-                <span class="vs-team">CYBORGS</span>
+              <div class="cc-action">
+                <button class="center-action-btn" data-action="primary">READY</button>
               </div>
-              <div class="center-events"></div>
-              <button class="center-action-btn" data-action="primary">READY</button>
             </div>
             <!-- REVEAL content: combat log fills the panel. -->
             <div class="center-log hidden"><div class="log-empty">(combat events appear here)</div></div>
@@ -200,17 +210,19 @@ export class HUD {
           ${centerPanelSvg('att')}
           <div class="panel-content">
             <div class="center-build-info">
-              <div class="center-banner-row">
-                <div class="center-phase">BUILD PHASE</div>
+              <div class="cc-title"><div class="center-phase">BUILD PHASE</div></div>
+              <div class="cc-body">
+                <div class="center-credits">CR<span class="cr-num" id="att-credits-val">1000</span></div>
+                <div class="center-matchup">
+                  <span class="vs-player">CYBORGS</span>
+                  <span class="vs-label">VS</span>
+                  <span class="vs-team">ROBOTS</span>
+                </div>
+                <div class="center-events"></div>
               </div>
-              <div class="center-credits">CR<span class="cr-num" id="att-credits-val">1000</span></div>
-              <div class="center-matchup">
-                <span class="vs-player">CYBORGS</span>
-                <span class="vs-label">VS</span>
-                <span class="vs-team">ROBOTS</span>
+              <div class="cc-action">
+                <button class="center-action-btn" data-action="primary">READY</button>
               </div>
-              <div class="center-events"></div>
-              <button class="center-action-btn" data-action="primary">READY</button>
             </div>
             <div class="center-log hidden"><div class="log-empty">(combat events appear here)</div></div>
           </div>
@@ -467,7 +479,7 @@ export class HUD {
         this.cyborgShopEl.classList.remove('hidden')
         this.planSelectionEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
-        this.logSystemMessage('BUILD PHASE. Place your forces.', 'system')
+        this.logSystemMessage('Place your forces. Click READY when set.', 'system')
         break
       case 'planning':
         setCenter('PLAN PHASE', 'BATTLE')
