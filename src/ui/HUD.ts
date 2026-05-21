@@ -8,15 +8,11 @@ export class HUD {
   private container: HTMLElement
   private creditsEl!: HTMLElement
   private attCreditsEl!: HTMLElement
-  private phaseEl!: HTMLElement
-  private bottomBarEl!: HTMLElement
   private robotShopEl!: HTMLElement
   private cyborgShopEl!: HTMLElement
   private messageEl!: HTMLElement
   private loadingEl!: HTMLElement
-  private planBarEl!: HTMLElement
   private planSelectionEl!: HTMLElement
-  private combatLogEl!: HTMLElement
   // Sticky empty-state marker so we know whether to wipe the "(combat will
   // appear here…)" placeholder on first append.
   private combatLogEmpty = true
@@ -158,15 +154,25 @@ export class HUD {
         <div class="hud-panel hud-center" data-side="def">
           ${centerPanelSvg('def')}
           <div class="panel-content">
-            <div class="center-banner-row">
-              <div class="center-phase" id="phase-display">BUILD PHASE</div>
-              <div class="center-credits">CR<span class="cr-num" id="credits-val">1000</span></div>
+            <!-- BUILD / PLAN content: phase title, credits, VS chip, status
+                 message, primary action button. Hidden during REVEAL. -->
+            <div class="center-build-info">
+              <div class="center-banner-row">
+                <div class="center-phase">BUILD PHASE</div>
+              </div>
+              <div class="center-stats-row">
+                <div class="center-credits">CR<span class="cr-num" id="credits-val">1000</span></div>
+                <div class="center-vs">
+                  <span class="vs-label">VS</span>
+                  <span class="vs-team">CYBORGS</span>
+                  <span class="vs-ai">AI</span>
+                </div>
+              </div>
+              <div class="center-message">Place defenses, then READY.</div>
+              <button class="center-action-btn" data-action="primary">READY</button>
             </div>
-            <div class="center-vs">
-              <span class="vs-label">VS</span>
-              <span class="vs-team">CYBORGS</span>
-              <span class="vs-ai">AI</span>
-            </div>
+            <!-- REVEAL content: combat log fills the panel. -->
+            <div class="center-log hidden"><div class="log-empty">(combat events appear here)</div></div>
           </div>
         </div>
 
@@ -195,15 +201,22 @@ export class HUD {
         <div class="hud-panel hud-center" data-side="att">
           ${centerPanelSvg('att')}
           <div class="panel-content">
-            <div class="center-banner-row">
-              <div class="center-phase">BUILD PHASE</div>
-              <div class="center-credits">CR<span class="cr-num" id="att-credits-val">1000</span></div>
+            <div class="center-build-info">
+              <div class="center-banner-row">
+                <div class="center-phase">BUILD PHASE</div>
+              </div>
+              <div class="center-stats-row">
+                <div class="center-credits">CR<span class="cr-num" id="att-credits-val">1000</span></div>
+                <div class="center-vs">
+                  <span class="vs-label">VS</span>
+                  <span class="vs-team">ROBOTS</span>
+                  <span class="vs-ai">AI</span>
+                </div>
+              </div>
+              <div class="center-message">Spawn forces, then READY.</div>
+              <button class="center-action-btn" data-action="primary">READY</button>
             </div>
-            <div class="center-vs">
-              <span class="vs-label">VS</span>
-              <span class="vs-team">ROBOTS</span>
-              <span class="vs-ai">AI</span>
-            </div>
+            <div class="center-log hidden"><div class="log-empty">(combat events appear here)</div></div>
           </div>
         </div>
 
@@ -218,66 +231,61 @@ export class HUD {
 
       </div>
 
-      <div id="bottom-bar" class="hidden">
-        <button id="battle-btn">READY</button>
-      </div>
-      <div id="plan-bar" class="hidden">
-        <div id="plan-instructions">
-          <strong>PLAN PHASE</strong>
-          <span>Click a piece &middot; click a cell to queue Move &middot; Shift+click an enemy to queue Fire &middot; Right-click to clear / deselect</span>
-        </div>
-        <button id="plan-battle-btn">BATTLE</button>
-      </div>
+      <!-- bottom-bar (READY) and plan-bar (BATTLE) moved INTO each center
+           panel as .center-action-btn. Combat log lives in .center-log
+           inside the visible center panel. -->
       <div id="plan-selection" class="hidden"></div>
-      <div id="combat-log" class="hidden"><div class="log-empty">(combat events appear here as the battle plays)</div></div>
       <div id="game-message" class="hidden"></div>
       <div id="side-picker" class="hidden">
-        <div class="sp-title">ASTROHOLD</div>
-        <div class="sp-headline">CHOOSE YOUR SIDE</div>
-        <div class="sp-cards">
-          <div class="sp-card def robot" data-faction="robot" data-role="defender">
-            <div class="sp-team-name">ROBOTS</div>
-            <div class="sp-role">DEFEND THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
-            <div class="sp-tagline">Spheres, towers, walls.<br/>Hold the line.</div>
-            <div class="sp-cta">PLAY</div>
+        <div class="sp-inner">
+          <div class="sp-title">ASTROHOLD</div>
+          <div class="sp-headline">CHOOSE YOUR SIDE</div>
+          <div class="sp-cards">
+            <div class="sp-card robot" data-faction="robot" data-role="defender">
+              <div class="sp-team-name">ROBOTS</div>
+              <div class="sp-role">DEFEND THE POWER CORE</div>
+              <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
+              <div class="sp-tagline">Spheres, towers, walls.<br/>Hold the line.</div>
+              <div class="sp-cta">PLAY</div>
+            </div>
+            <div class="sp-card cyborg" data-faction="cyborg" data-role="defender">
+              <div class="sp-team-name">CYBORGS</div>
+              <div class="sp-role">DEFEND THE POWER CORE</div>
+              <div class="sp-hero"><img src="/sprites/sniper/south.png" alt=""/></div>
+              <div class="sp-tagline">Snipers and towers.<br/>Hold the line.</div>
+              <div class="sp-cta">PLAY</div>
+            </div>
+            <div class="sp-card robot" data-faction="robot" data-role="attacker">
+              <div class="sp-team-name">ROBOTS</div>
+              <div class="sp-role">DESTROY THE POWER CORE</div>
+              <div class="sp-hero"><img src="/sprites/dog/south.png" alt=""/></div>
+              <div class="sp-tagline">Dogs and assault drones.<br/>Break the line.</div>
+              <div class="sp-cta">PLAY</div>
+            </div>
+            <div class="sp-card cyborg" data-faction="cyborg" data-role="attacker">
+              <div class="sp-team-name">CYBORGS</div>
+              <div class="sp-role">DESTROY THE POWER CORE</div>
+              <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
+              <div class="sp-tagline">Hulks and grenadiers.<br/>Break the line.</div>
+              <div class="sp-cta">PLAY</div>
+            </div>
           </div>
-          <div class="sp-card def cyborg" data-faction="cyborg" data-role="defender">
-            <div class="sp-team-name">CYBORGS</div>
-            <div class="sp-role">DEFEND THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
-            <div class="sp-tagline">Spheres, towers, walls.<br/>Hold the line.</div>
-            <div class="sp-cta">PLAY</div>
-          </div>
-          <div class="sp-card att robot" data-faction="robot" data-role="attacker">
-            <div class="sp-team-name">ROBOTS</div>
-            <div class="sp-role">DESTROY THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/dog/south.png" alt=""/></div>
-            <div class="sp-tagline">Cannons, snipers, hulks.<br/>Break the line.</div>
-            <div class="sp-cta">PLAY</div>
-          </div>
-          <div class="sp-card att cyborg" data-faction="cyborg" data-role="attacker">
-            <div class="sp-team-name">CYBORGS</div>
-            <div class="sp-role">DESTROY THE POWER CORE</div>
-            <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
-            <div class="sp-tagline">Cannons, snipers, hulks.<br/>Break the line.</div>
-            <div class="sp-cta">PLAY</div>
+          <div class="sp-legend">
+            <span class="sp-legend-row"><span class="sp-swatch sp-swatch-you"></span>YOU</span>
+            <span class="sp-legend-sep">·</span>
+            <span class="sp-legend-row"><span class="sp-swatch sp-swatch-ai"></span>AI</span>
           </div>
         </div>
       </div>
     `
 
     this.loadingEl        = this.container.querySelector('#loading-screen')!
-    this.phaseEl          = this.container.querySelector('#phase-display')!
     this.creditsEl        = this.container.querySelector('#credits-val')!
     this.attCreditsEl     = this.container.querySelector('#att-credits-val')!
-    this.bottomBarEl      = this.container.querySelector('#bottom-bar')!
     this.robotShopEl      = this.container.querySelector('#hud-top')!
     this.cyborgShopEl     = this.container.querySelector('#hud-top-att')!
     this.messageEl        = this.container.querySelector('#game-message')!
-    this.planBarEl        = this.container.querySelector('#plan-bar')!
     this.planSelectionEl  = this.container.querySelector('#plan-selection')!
-    this.combatLogEl      = this.container.querySelector('#combat-log')!
 
     // Tile clicks. Both LEFT and RIGHT panels carry the same tiles, so we
     // bind by class selector. data-action covers sphere/dog (unit-based
@@ -307,14 +315,14 @@ export class HUD {
       })
     })
 
-    this.container.querySelector('#battle-btn')!.addEventListener('click', () => {
-      this.playBattleSound()
-      this.onBattle?.()
-    })
-
-    this.container.querySelector('#plan-battle-btn')!.addEventListener('click', () => {
-      this.playBattleSound()
-      this.onBattle?.()
+    // Primary action button lives inside each center HUD panel. Same handler
+    // for BUILD's "READY" and PLAN's "BATTLE" — Game decides what happens
+    // based on current phase. Both panels (def + att variants) carry one.
+    this.container.querySelectorAll<HTMLButtonElement>('.center-action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.playBattleSound()
+        this.onBattle?.()
+      })
     })
 
     // Side-picker cards. Mouse-only per the no-keyboard rule. Each card
@@ -418,42 +426,67 @@ export class HUD {
   }
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
+    const setCenter = (title: string, message: string, buttonLabel: string | null) => {
+      // Apply to ALL center panels (def + att variants). Only the visible
+      // one is on-screen, but updating both keeps them in sync so switching
+      // sides mid-session doesn't show stale state.
+      this.container.querySelectorAll<HTMLElement>('.hud-panel.hud-center .center-phase')
+        .forEach(el => { el.textContent = title })
+      this.container.querySelectorAll<HTMLElement>('.hud-panel.hud-center .center-message')
+        .forEach(el => { el.textContent = message })
+      this.container.querySelectorAll<HTMLButtonElement>('.center-action-btn').forEach(btn => {
+        if (buttonLabel === null) {
+          btn.classList.add('hidden')
+        } else {
+          btn.classList.remove('hidden')
+          btn.textContent = buttonLabel
+        }
+      })
+    }
+    const showBuildInfo = (visible: boolean) => {
+      this.container.querySelectorAll<HTMLElement>('.center-build-info').forEach(el => {
+        el.classList.toggle('hidden', !visible)
+      })
+    }
+    const showCenterLog = (visible: boolean) => {
+      this.container.querySelectorAll<HTMLElement>('.center-log').forEach(el => {
+        el.classList.toggle('hidden', !visible)
+      })
+    }
+
     switch (phase) {
       case 'build':
-        this.phaseEl.textContent = 'BUILD PHASE'
-        this.bottomBarEl.classList.remove('hidden')
+        setCenter('BUILD PHASE', 'Place your forces, then READY.', 'READY')
+        showBuildInfo(true)
+        showCenterLog(false)
         this.robotShopEl.classList.remove('hidden')
         this.cyborgShopEl.classList.remove('hidden')
-        this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
-        this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'planning':
-        this.phaseEl.textContent = 'PLAN PHASE'
-        this.bottomBarEl.classList.add('hidden')
+        setCenter('PLAN PHASE', 'Click a piece, then a cell to queue actions.', 'BATTLE')
+        showBuildInfo(true)
+        showCenterLog(false)
         this.robotShopEl.classList.add('hidden')
         this.cyborgShopEl.classList.add('hidden')
-        this.planBarEl.classList.remove('hidden')
-        this.combatLogEl.classList.add('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'reveal':
-        this.phaseEl.textContent = 'BATTLE'
-        this.bottomBarEl.classList.add('hidden')
+        setCenter('BATTLE', '', null)
+        showBuildInfo(false)
+        showCenterLog(true)
         this.robotShopEl.classList.add('hidden')
         this.cyborgShopEl.classList.add('hidden')
-        this.planBarEl.classList.add('hidden')
         this.planSelectionEl.classList.add('hidden')
-        this.combatLogEl.classList.remove('hidden')
         this.messageEl.classList.add('hidden')
         break
       case 'win':
-        this.phaseEl.textContent = 'BATTLE PHASE'
+        setCenter('BATTLE', '', null)
         this.showEndMessage('DEFENDER WINS', 'Power Core survived', '#00ffaa')
         break
       case 'lose':
-        this.phaseEl.textContent = 'BATTLE PHASE'
+        setCenter('BATTLE', '', null)
         this.showEndMessage('ATTACKER WINS', 'Power Core destroyed', '#ff4444')
         break
     }
@@ -632,29 +665,33 @@ export class HUD {
   }
 
   // Append one reveal's worth of combat-log entries under a "── Turn N ──"
-  // header. Auto-scrolls to the bottom so the latest action is in view; trims
-  // the DOM to the last ~200 entries so long battles don't bloat memory.
+  // header. Writes to BOTH center-panel variants (def + att) so the log is
+  // populated regardless of which side the player picked. Auto-scrolls and
+  // trims to the last ~200 rows so long battles don't bloat memory.
   appendCombatLog(turn: number, entries: ReadonlyArray<CombatLogEntry>) {
     if (entries.length === 0) return
-    if (this.combatLogEmpty) {
-      this.combatLogEl.innerHTML = ''
-      this.combatLogEmpty = false
-    }
-    const header = document.createElement('div')
-    header.className = 'log-turn'
-    header.textContent = `── Turn ${turn} ──`
-    this.combatLogEl.appendChild(header)
-    for (const e of entries) {
-      const row = document.createElement('div')
-      row.className = `log-entry ${e.side}`
-      row.textContent = e.text
-      this.combatLogEl.appendChild(row)
-    }
-    const MAX_ROWS = 220
-    while (this.combatLogEl.childElementCount > MAX_ROWS) {
-      this.combatLogEl.removeChild(this.combatLogEl.firstChild!)
-    }
-    this.combatLogEl.scrollTop = this.combatLogEl.scrollHeight
+    const logs = this.container.querySelectorAll<HTMLElement>('.center-log')
+    logs.forEach(log => {
+      if (this.combatLogEmpty) {
+        log.innerHTML = ''
+      }
+      const header = document.createElement('div')
+      header.className = 'log-turn'
+      header.textContent = `── Turn ${turn} ──`
+      log.appendChild(header)
+      for (const e of entries) {
+        const row = document.createElement('div')
+        row.className = `log-entry ${e.side}`
+        row.textContent = e.text
+        log.appendChild(row)
+      }
+      const MAX_ROWS = 220
+      while (log.childElementCount > MAX_ROWS) {
+        log.removeChild(log.firstChild!)
+      }
+      log.scrollTop = log.scrollHeight
+    })
+    this.combatLogEmpty = false
   }
 
   setPlanningSelection(info: PlanningSelectionInfo | null) {

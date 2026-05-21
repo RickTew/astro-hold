@@ -352,90 +352,87 @@
     /* Hide AI side's HUD entirely. */
     .ai-side { display: none !important; }
 
-    /* Bottom bar — READY button */
-    #bottom-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
+    /* ── Center panel: status message + primary action (READY/BATTLE) ───
+       Replaces the old #bottom-bar (READY) and #plan-bar (BATTLE + instructions).
+       Lives inside each .hud-center .panel-content so the action button is part
+       of the command-deck silhouette, not floating at the viewport edge. */
+    .center-build-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+    .center-stats-row {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      padding: 8px 16px;
-      pointer-events: none;
+      gap: 14px;
+      flex-wrap: wrap;
     }
-    #bottom-bar > * { pointer-events: auto; }
-
-    #battle-btn, #plan-battle-btn {
+    .center-message {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: #8aaecc;
+      text-align: center;
+      max-width: 100%;
+      line-height: 1.4;
+      min-height: 14px;
+    }
+    .hud-panel[data-side="att"] .center-message { color: #cc9494; }
+    .center-action-btn {
+      margin-top: 4px;
+      padding: 7px 22px;
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      font-family: 'Courier New', monospace;
+      cursor: pointer;
+      white-space: nowrap;
       background: linear-gradient(180deg, #4a0814 0%, #2a040a 60%, #0e0204 100%);
       border: 2px solid #c4441c;
       color: #ffe0b8;
-      padding: 10px 30px;
-      font-size: 17px;
-      font-weight: bold;
-      cursor: pointer;
-      font-family: 'Courier New', monospace;
-      letter-spacing: 4px;
-      white-space: nowrap;
-      flex-shrink: 0;
-      align-self: center;
       box-shadow:
-        0 0 18px rgba(255, 120, 40, 0.55),
-        0 1px 0 rgba(255, 200, 130, 0.30) inset;
-      transition: background 0.1s, border-color 0.1s, box-shadow 0.1s;
+        0 0 12px rgba(255, 120, 40, 0.45),
+        0 1px 0 rgba(255, 200, 130, 0.25) inset;
+      transition: border-color 0.1s, box-shadow 0.1s;
     }
-    #battle-btn:hover, #plan-battle-btn:hover {
+    .center-action-btn:hover {
       border-color: #ff7a3a;
       color: #fff1d8;
       box-shadow:
-        0 0 26px rgba(255, 150, 50, 0.85),
+        0 0 20px rgba(255, 150, 50, 0.80),
         0 1px 0 rgba(255, 220, 160, 0.40) inset;
     }
 
-    #battle-btn, #plan-battle-btn {
-      background: #2a0000;
-      border: 2px solid #aa2200;
-      color: #ff8866;
-      padding: 10px 24px;
-      font-size: 17px;
-      cursor: pointer;
+    /* Combat log inside the center panel — replaces banner/stats/message
+       during REVEAL. Scrollable; trimmed to ~200 rows by appendCombatLog. */
+    .center-log {
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      overflow-y: auto;
       font-family: 'Courier New', monospace;
-      letter-spacing: 2px;
-      white-space: nowrap;
-      flex-shrink: 0;
-      align-self: center;
-      transition: background 0.1s, border-color 0.1s;
-    }
-    #battle-btn:hover, #plan-battle-btn:hover {
-      background: #440000;
-      border-color: #ff4400;
-      color: #ffaa88;
-    }
-
-    /* Plan-phase bottom bar — narrower than build bar, just instructions + Battle */
-    #plan-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 16px;
-      background: rgba(0, 0, 0, 0.5);
-    }
-    #plan-instructions {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      font-family: 'Courier New', monospace;
-      color: #99bbcc;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.4;
+      color: #99bbcc;
+      padding-right: 4px;
+      scrollbar-width: thin;
     }
-    #plan-instructions strong {
-      color: #ffee66;
-      letter-spacing: 2px;
-      font-size: 13px;
+    .center-log .log-turn {
+      color: #ffcc66;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin: 6px 0 3px;
+      border-bottom: 1px dashed #443322;
+      padding-bottom: 2px;
     }
+    .center-log .log-turn:first-child { margin-top: 0; }
+    .center-log .log-entry { padding: 1px 0; }
+    .center-log .log-entry.defender { color: #88bbdd; }
+    .center-log .log-entry.attacker { color: #dd8888; }
+    .center-log .log-entry.neutral  { color: #ffaa44; font-weight: bold; }
+    .center-log .log-empty { color: #556677; font-style: italic; }
 
     /* Selected-piece panel — top-right corner during planning */
     #plan-selection {
@@ -577,40 +574,8 @@
       cursor: default;
     }
 
-    /* Combat history log — right-rail D&D turn log. Visible during BATTLE
-       and the win/lose overlay so the player can review what happened. Hidden
-       during BUILD (the cyborg shop occupies this corner) and PLAN (the
-       plan-selection panel does). */
-    #combat-log {
-      position: absolute;
-      top: 60px;
-      right: 12px;
-      width: 280px;
-      max-height: calc(100vh - 160px);
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.75);
-      border: 1px solid #224466;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      line-height: 1.45;
-      color: #99bbcc;
-      overflow-y: auto;
-      scrollbar-width: thin;
-    }
-    #combat-log .log-turn {
-      color: #ffcc66;
-      font-weight: bold;
-      letter-spacing: 1px;
-      margin: 6px 0 4px;
-      border-bottom: 1px dashed #443322;
-      padding-bottom: 2px;
-    }
-    #combat-log .log-turn:first-child { margin-top: 0; }
-    #combat-log .log-entry { padding: 1px 0; }
-    #combat-log .log-entry.defender { color: #88bbdd; }
-    #combat-log .log-entry.attacker { color: #dd8888; }
-    #combat-log .log-entry.neutral  { color: #ffaa44; font-weight: bold; }
-    #combat-log .log-empty { color: #556677; font-style: italic; }
+    /* Combat log moved to .center-log inside each hud-center panel —
+       see "Center panel: status message + primary action" section. */
 
     #game-message {
       position: absolute;
@@ -647,16 +612,15 @@
     .ai-side { display: none !important; }
 
     /* ── Side picker (full-screen modal shown after asset preload) ───────
-       Two team cards with hero sprite + role tagline + CTA button. */
+       Four faction × role cards. Container scrolls when content is taller
+       than viewport; inner wrapper centers content when it DOES fit. The
+       centering-when-fits + scroll-when-overflows trick uses an outer
+       container with overflow:auto and an inner block with min-height:100%
+       and flex centering — avoids the classic justify-content:center +
+       overflow:auto clipping bug. */
     #side-picker {
       position: absolute;
       inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
-      padding: 24px;
       overflow: auto;
       background:
         radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.06) 0%, transparent 1px),
@@ -665,6 +629,16 @@
         radial-gradient(ellipse at center, rgba(12, 18, 32, 0.92) 0%, rgba(0, 0, 0, 0.98) 70%);
       font-family: 'Courier New', monospace;
       z-index: 100;
+    }
+    #side-picker .sp-inner {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      padding: 24px;
+      box-sizing: border-box;
     }
     #side-picker .sp-title {
       display: inline-flex;
@@ -734,7 +708,7 @@
         0 -1px 0 rgba(0, 0, 0, 0.55) inset,
         0 0 32px rgba(0, 160, 240, 0.45) inset;
     }
-    .sp-card.att {
+    .sp-card.cyborg {
       background:
         repeating-linear-gradient(60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
         repeating-linear-gradient(-60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
@@ -756,7 +730,7 @@
         0 -1px 0 rgba(0, 0, 0, 0.55) inset,
         0 0 44px rgba(0, 160, 240, 0.45) inset;
     }
-    .sp-card.att:hover {
+    .sp-card.cyborg:hover {
       border-color: #ff8c8c;
       box-shadow:
         0 0 36px rgba(230, 70, 70, 0.45),
@@ -772,7 +746,7 @@
       text-shadow: 0 0 14px rgba(0, 160, 240, 0.45);
       margin-bottom: 2px;
     }
-    .sp-card.att .sp-team-name {
+    .sp-card.cyborg .sp-team-name {
       color: #ff8c8c;
       text-shadow: 0 0 14px rgba(230, 70, 70, 0.45);
     }
@@ -784,7 +758,7 @@
       padding-bottom: 8px;
       border-bottom: 1px solid rgba(106, 196, 255, 0.20);
     }
-    .sp-card.att .sp-role {
+    .sp-card.cyborg .sp-role {
       color: #cc9494;
       border-bottom-color: rgba(255, 140, 140, 0.20);
     }
@@ -804,7 +778,7 @@
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
     }
-    .sp-card.att .sp-hero {
+    .sp-card.cyborg .sp-hero {
       background:
         radial-gradient(ellipse at 50% 45%, rgba(100, 50, 50, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
         linear-gradient(180deg, #100408 0%, #060203 100%);
@@ -829,7 +803,7 @@
       margin-bottom: 14px;
       min-height: 50px;
     }
-    .sp-card.att .sp-tagline { color: #cc9494; }
+    .sp-card.cyborg .sp-tagline { color: #cc9494; }
     .sp-card .sp-cta {
       margin-top: auto;
       display: inline-flex;
@@ -849,7 +823,7 @@
         0 -2px 4px rgba(0, 0, 0, 0.40) inset,
         0 0 14px rgba(0, 160, 240, 0.45);
     }
-    .sp-card.att .sp-cta {
+    .sp-card.cyborg .sp-cta {
       color: #ffdadc;
       background: linear-gradient(180deg, #5a121c 0%, #2a0408 60%, #100204 100%);
       border-color: #ff8c8c;
@@ -865,12 +839,35 @@
       0 -2px 4px rgba(0, 0, 0, 0.40) inset,
       0 0 22px rgba(0, 160, 240, 0.45);
     }
-    .sp-card.att:hover .sp-cta { box-shadow:
+    .sp-card.cyborg:hover .sp-cta { box-shadow:
       0 0 0 1px rgba(255, 138, 138, 0.50) inset,
       0 1px 0 rgba(255, 255, 255, 0.16) inset,
       0 -2px 4px rgba(0, 0, 0, 0.40) inset,
       0 0 22px rgba(230, 70, 70, 0.45);
     }
+    /* Legend — explicit "YOU = blue, AI = red" so players don't have to
+       infer the color convention. Sits below the cards. */
+    #side-picker .sp-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #8aaecc;
+      padding: 6px 14px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(106, 196, 255, 0.18);
+    }
+    #side-picker .sp-legend-row { display: inline-flex; align-items: center; gap: 8px; }
+    #side-picker .sp-legend-sep { opacity: 0.45; }
+    #side-picker .sp-swatch {
+      width: 14px;
+      height: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.6) inset;
+    }
+    #side-picker .sp-swatch-you { background: #b8d4ff; box-shadow: 0 0 8px rgba(110, 180, 255, 0.55); }
+    #side-picker .sp-swatch-ai  { background: #ffb8b8; box-shadow: 0 0 8px rgba(255, 120, 120, 0.55); }
   </style>
 </head>
 <body>
