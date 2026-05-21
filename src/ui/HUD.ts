@@ -31,9 +31,10 @@ export class HUD {
   onBuySphere: (() => void) | null = null
   onBuyDog: (() => void) | null = null
   onBattle: (() => void) | null = null
-  // Side picker — Game listens here for the chosen team. Fires once,
-  // after which the AI takes the other side for the rest of the game.
-  onPickSide: ((side: 'defender' | 'attacker') => void) | null = null
+  // Side picker — Game listens here for the chosen team. Fires once with the
+  // player's faction (visual identity) + role (defender or attacker). The AI
+  // gets the opposite role with a randomly-chosen faction.
+  onPickSide: ((faction: 'robot' | 'cyborg', role: 'defender' | 'attacker') => void) | null = null
   // Compass-rose callbacks. Game decides whether the purchase succeeds (cost,
   // credits, duplicate facing); HUD just forwards the click intent.
   onAddFacing: ((angle: number) => void) | null = null
@@ -231,19 +232,33 @@ export class HUD {
         <div class="sp-title">ASTROHOLD</div>
         <div class="sp-headline">CHOOSE YOUR SIDE</div>
         <div class="sp-cards">
-          <div class="sp-card def" data-side="defender">
+          <div class="sp-card def robot" data-faction="robot" data-role="defender">
             <div class="sp-team-name">ROBOTS</div>
             <div class="sp-role">DEFEND THE POWER CORE</div>
             <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
             <div class="sp-tagline">Spheres, towers, walls.<br/>Hold the line.</div>
-            <div class="sp-cta">PLAY ROBOTS</div>
+            <div class="sp-cta">PLAY</div>
           </div>
-          <div class="sp-card att" data-side="attacker">
+          <div class="sp-card def cyborg" data-faction="cyborg" data-role="defender">
+            <div class="sp-team-name">CYBORGS</div>
+            <div class="sp-role">DEFEND THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
+            <div class="sp-tagline">Spheres, towers, walls.<br/>Hold the line.</div>
+            <div class="sp-cta">PLAY</div>
+          </div>
+          <div class="sp-card att robot" data-faction="robot" data-role="attacker">
+            <div class="sp-team-name">ROBOTS</div>
+            <div class="sp-role">DESTROY THE POWER CORE</div>
+            <div class="sp-hero"><img src="/sprites/dog/south.png" alt=""/></div>
+            <div class="sp-tagline">Cannons, snipers, hulks.<br/>Break the line.</div>
+            <div class="sp-cta">PLAY</div>
+          </div>
+          <div class="sp-card att cyborg" data-faction="cyborg" data-role="attacker">
             <div class="sp-team-name">CYBORGS</div>
             <div class="sp-role">DESTROY THE POWER CORE</div>
             <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
             <div class="sp-tagline">Cannons, snipers, hulks.<br/>Break the line.</div>
-            <div class="sp-cta">PLAY CYBORGS</div>
+            <div class="sp-cta">PLAY</div>
           </div>
         </div>
       </div>
@@ -299,11 +314,14 @@ export class HUD {
       this.onBattle?.()
     })
 
-    // Side-picker cards. Mouse-only per the no-keyboard rule.
+    // Side-picker cards. Mouse-only per the no-keyboard rule. Each card
+    // carries data-faction + data-role; both feed Game so it can place the
+    // player's pieces with the right tint and let the AI pick its own faction.
     this.container.querySelectorAll<HTMLElement>('#side-picker .sp-card').forEach(card => {
       card.addEventListener('click', () => {
-        const side = card.dataset.side as 'defender' | 'attacker'
-        this.onPickSide?.(side)
+        const faction = card.dataset.faction as 'robot' | 'cyborg'
+        const role = card.dataset.role as 'defender' | 'attacker'
+        this.onPickSide?.(faction, role)
       })
     })
   }
@@ -319,17 +337,17 @@ export class HUD {
   }
 
   // Lock in the player's chosen side. The two HUD-top variants (#hud-top
-  // for robots, #hud-top-att for cyborgs) are pre-built; we just toggle
-  // visibility. Phase visibility (BUILD/PLAN vs REVEAL) is layered on top
-  // by setPhase().
+  // for defender roster, #hud-top-att for attacker roster) are pre-built;
+  // we toggle visibility based on the ROLE. Faction only affects piece tint
+  // (handled by Game) and the side-picker visuals, not the HUD shop layout.
   private playerSide: 'defender' | 'attacker' = 'defender'
-  setPlayerSide(side: 'defender' | 'attacker') {
+  setPlayerSide(role: 'defender' | 'attacker') {
     const picker = this.container.querySelector('#side-picker')
     picker?.classList.add('hidden')
-    this.playerSide = side
+    this.playerSide = role
     // Mark the inactive HUD with .ai-side; setPhase will show the active
     // one when appropriate.
-    if (side === 'defender') {
+    if (role === 'defender') {
       this.container.querySelector('#hud-top-att')?.classList.add('ai-side')
     } else {
       this.container.querySelector('#hud-top')?.classList.add('ai-side')

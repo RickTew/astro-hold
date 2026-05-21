@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, StructureType } from '../game/GameConfig'
+import { Config, StructureType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
 
@@ -125,8 +125,13 @@ export class Structure {
   private dyingFrame = 0
   private removed = false
 
-  constructor(scene: THREE.Scene, type: StructureType, col: number, row: number) {
+  // Team identity (player / ai) controls the multiplicative blue/red tint
+  // applied to the sprite material. Defaults to 'player' for non-AI spawns.
+  private team: 'player' | 'ai' = 'player'
+
+  constructor(scene: THREE.Scene, type: StructureType, col: number, row: number, team: 'player' | 'ai' = 'player') {
     this.type = type
+    this.team = team
     this.id = nextActorId('struct')
     this.col = col
     this.row = row
@@ -151,9 +156,12 @@ export class Structure {
       case 'signal': {
         // Pixel sprite — same SpriteMaterial flags as cyborgs/spheres.
         // depthTest off so we sit cleanly above the ground without z-fighting.
+        // Team tint is multiplicative so structures shared between factions
+        // (towers / bombers / etc) still read which side owns them.
         const tex = structureTextures.get(this.type) ?? null
         const mat = new THREE.SpriteMaterial({
           map: tex,
+          color: TEAM_TINT[this.team],
           transparent: true,
           depthTest: false,
           depthWrite: false,
@@ -171,11 +179,14 @@ export class Structure {
       case 'wall': {
         // Wall body acts as its own HP indicator — scaled in takeDamage().
         // Fills most of the cell (40×40) so its shrink reads cleanly.
+        // Base brown × team tint so wall ownership is visible at a glance.
         const H = 40
         this.wallBodyHeight = H
+        const wallColor = new THREE.Color(0x996633)
+          .multiply(new THREE.Color(TEAM_TINT[this.team]))
         this.wallBody = new THREE.Mesh(
           new THREE.BoxGeometry(40, H, 12),
-          new THREE.MeshBasicMaterial({ color: 0x996633 })
+          new THREE.MeshBasicMaterial({ color: wallColor })
         )
         this.mesh.add(this.wallBody)
         break
@@ -234,10 +245,13 @@ export class Structure {
       const s = Math.max(0.05, ratio)
       this.wallBody.scale.y = s
       this.wallBody.position.y = -(1 - s) * (this.wallBodyHeight / 2)
-      // Tint darker as the wall takes a beating.
+      // Tint darker as the wall takes a beating, but multiply with the
+      // team color so ownership stays visible all the way through.
       const mat = this.wallBody.material as THREE.MeshBasicMaterial
-      const tint = 0.5 + 0.5 * ratio
-      mat.color.setRGB(0.6 * tint, 0.4 * tint, 0.2 * tint)
+      const dim = 0.5 + 0.5 * ratio
+      const base = new THREE.Color(0.6 * dim, 0.4 * dim, 0.2 * dim)
+        .multiply(new THREE.Color(TEAM_TINT[this.team]))
+      mat.color.copy(base)
     } else {
       this.hpBar.scale.x = ratio
       this.hpBar.position.x = -(1 - ratio) * 14   // half of new bar width 28

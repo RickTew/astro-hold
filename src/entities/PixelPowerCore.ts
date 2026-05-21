@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config } from '../game/GameConfig'
+import { Config, TEAM_TINT } from '../game/GameConfig'
 import { playExplosion } from '../audio/sfx'
 
 // 2D-sprite alternative to the GLB PowerCore. Billboarded, so it cannot be
@@ -59,7 +59,7 @@ export class PixelPowerCore {
   private dyingTime = 0
   private dyingFrame = 0
 
-  constructor(scene: THREE.Scene, x: number, y: number, size = 130) {
+  constructor(scene: THREE.Scene, x: number, y: number, size = 130, team: 'player' | 'ai' = 'player') {
     this.size = size
     this.hp = this.maxHp = Config.POWER_CORE.HP
     this.mesh = new THREE.Group()
@@ -68,6 +68,7 @@ export class PixelPowerCore {
     const firstTex = loaded ? rotTextures[DEFAULT_DIRECTION_INDEX] : null
     const mat = new THREE.SpriteMaterial({
       map: firstTex,
+      color: TEAM_TINT[team],
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -108,6 +109,12 @@ export class PixelPowerCore {
 
   faceCamera(camera: THREE.Camera) {
     this.hpBarGroup.quaternion.copy(camera.quaternion)
+  }
+
+  // Switch the core's team tint after construction. Called by Game once the
+  // side picker resolves — until then the default 'player' tint applies.
+  setTeam(team: 'player' | 'ai') {
+    (this.sprite.material as THREE.SpriteMaterial).color.setHex(TEAM_TINT[team])
   }
 
   takeDamage(amount: number) {

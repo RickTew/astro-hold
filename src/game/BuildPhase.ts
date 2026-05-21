@@ -130,7 +130,9 @@ private buildHitPlane(): THREE.Mesh {
 
     this.credits -= cost
     this.hud.setCredits(this.credits)
-    this.structures.push(new Structure(this.scene, this.selectedType, cell.col, cell.row))
+    // BuildPhase serves the player's purchases — AI uses aiSpawnStructure()
+    // directly on Game. So 'player' is the right team tint here.
+    this.structures.push(new Structure(this.scene, this.selectedType, cell.col, cell.row, 'player'))
   }
 
   private showGhost(wx: number, wy: number) {

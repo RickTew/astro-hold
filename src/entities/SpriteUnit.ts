@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, UnitType } from '../game/GameConfig'
+import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
@@ -278,6 +278,7 @@ export class SpriteUnit {
     spawnX: number,
     spawnY?: number,
     side: 'attacker' | 'defender' = 'attacker',
+    team: 'player' | 'ai' = 'player',
   ) {
     this.type = type
     this._side = side
@@ -305,13 +306,16 @@ export class SpriteUnit {
     this.mesh.position.set(spawnX, y, 0)
 
     const set = animSets.get(type)
+    // Per-type colour tint × team tint. Per-type gives the role a green wash
+    // (grenadier) or warm orange (doublegun); team tint stacks on top so
+    // player pieces feel cool-blue and AI pieces feel warm-red. The two
+    // multiply, so a player grenadier reads green-leaning-teal and an AI
+    // grenadier reads green-leaning-olive — visually distinct in any matchup.
+    const tintColor = new THREE.Color(SPRITE_TINT[type] ?? 0xffffff)
+      .multiply(new THREE.Color(TEAM_TINT[team]))
     const mat = new THREE.SpriteMaterial({
       map: set?.staticTextures.get('west') ?? null,
-      // Per-type colour tint so unit roles read clearly even at a glance.
-      // Multiplied against the sprite, so grenadier gets a green wash and
-      // doublegun gets a warm orange wash without changing the source art.
-      // Cannon / dog / etc. stay neutral (white = identity).
-      color: SPRITE_TINT[type] ?? 0xffffff,
+      color: tintColor,
       transparent: true,
       depthTest: false,
       depthWrite: false,

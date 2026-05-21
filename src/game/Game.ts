@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, StructureType, UnitType } from './GameConfig'
+import { Config, StructureType, UnitType, Faction, Role } from './GameConfig'
 import { Background } from '../scene/Background'
 import { PixelPowerCore, preloadPixelPowerCore } from '../entities/PixelPowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
@@ -83,7 +83,13 @@ export class Game {
 
   // Single-player mode: the player picks one side at load; the other side
   // runs on autopilot via OpponentAI. Set after the side picker resolves.
+  // playerSide stores the chosen ROLE ('defender' | 'attacker'); faction is
+  // a separate axis controlling visual identity (currently cosmetic — both
+  // factions share towers + power core; movable characters reuse existing
+  // sprites until faction-specific sets are generated).
   private playerSide: OpponentSide | null = null
+  private playerFaction: Faction | null = null
+  private aiFaction: Faction | null = null
   private opponentAI: OpponentAI | null = null
 
   // Single source of truth for any active placement.
@@ -164,17 +170,33 @@ export class Game {
   // is committed so the AI can take its first BUILD turn alongside the player.
   private enterPickSide() {
     this.phase = 'pick-side'
-    this.hud.onPickSide = (side) => this.onSidePicked(side)
+    this.hud.onPickSide = (faction, role) => this.onSidePicked(faction, role)
     this.hud.showSidePicker()
   }
 
-  private onSidePicked(side: OpponentSide) {
+  private onSidePicked(faction: Faction, role: Role) {
     if (this.playerSide) return  // re-entry guard
-    this.playerSide = side
-    const aiSide: OpponentSide = side === 'defender' ? 'attacker' : 'defender'
+    this.playerSide = role
+    this.playerFaction = faction
+    // AI gets the opposite role + a random faction so same-faction matchups
+    // (Robots vs Robots) happen organically. The roster + tint hooks key off
+    // role/team — faction is currently visual identity only.
+    this.aiFaction = Math.random() < 0.5 ? 'robot' : 'cyborg'
+    const aiSide: OpponentSide = role === 'defender' ? 'attacker' : 'defender'
     this.opponentAI = new OpponentAI(aiSide, this.aiApi(aiSide))
-    this.hud.setPlayerSide(side)
+    this.hud.setPlayerSide(role)
+    // Apply player team tint to the Power Core if the player is defending,
+    // or AI tint if the player is attacking (the core always sits on the
+    // defender side, so it belongs to whoever picked defender).
+    this.applyPowerCoreTeamTint(role === 'defender' ? 'player' : 'ai')
     this.enterBuildPhase()
+  }
+
+  // Re-tint the existing Power Core sprite after the player picks a role.
+  // The PowerCore is constructed during init() (before side is known) with
+  // the default 'player' tint; we update it here once ownership resolves.
+  private applyPowerCoreTeamTint(team: 'player' | 'ai') {
+    this.powerCore?.setTeam(team)
   }
 
   // Build the AI's spend-and-spawn API. `side` is the AI's side (the OPPOSITE
@@ -205,12 +227,13 @@ export class Game {
 
   // AI spawn primitives — mouse-free counterparts to the placement system.
   // All include a final occupancy check so the AI can never double-place a
-  // cell even if its scoring function got something wrong.
+  // cell even if its scoring function got something wrong. Pieces spawned
+  // here are AI-owned, so they get the AI team tint (red wash).
   private aiSpawnSphere(x: number, y: number): boolean {
     if (!this.buildPhase) return false
     if (this.isCellOccupied(x, y)) return false
     if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
-    this.spheres.push(new SphereDefender(this.scene, x, y))
+    this.spheres.push(new SphereDefender(this.scene, x, y, 'ai'))
     return true
   }
   private aiSpawnDefenderUnit(type: UnitType, x: number, y: number): boolean {
@@ -218,7 +241,7 @@ export class Game {
     if (this.isCellOccupied(x, y)) return false
     const cost = Config.UNITS[type]?.cost ?? 0
     if (!this.buildPhase.spendCredits(cost)) return false
-    this.defenderUnits.push(new SpriteUnit(this.scene, type, x, y, 'defender'))
+    this.defenderUnits.push(new SpriteUnit(this.scene, type, x, y, 'defender', 'ai'))
     return true
   }
   private aiSpawnAttackerUnit(type: UnitType, x: number, y: number): boolean {
@@ -227,7 +250,7 @@ export class Game {
     if (this.attCredits < cost) return false
     this.attCredits -= cost
     this.hud.setAttCredits(this.attCredits)
-    this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y))
+    this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'ai'))
     return true
   }
   private aiSpawnStructure(type: StructureType, col: number, row: number): boolean {
@@ -238,7 +261,7 @@ export class Game {
     if (this.isCellOccupied(x, y)) return false
     const cost = Config.STRUCTURES[type]?.cost ?? 0
     if (!this.buildPhase.spendCredits(cost)) return false
-    this.buildPhase.getStructures().push(new Structure(this.scene, type, col, row))
+    this.buildPhase.getStructures().push(new Structure(this.scene, type, col, row, 'ai'))
     return true
   }
 
@@ -572,7 +595,7 @@ private enterBuildPhase() {
         if (!this.buildPhase) return false
         if (this.isCellOccupied(x, y)) return false   // one piece per cell
         if (!this.buildPhase.spendCredits(SPHERE_COST)) return false
-        this.spheres.push(new SphereDefender(this.scene, x, y))
+        this.spheres.push(new SphereDefender(this.scene, x, y, 'player'))
         return false  // multi-place — keep selecting until user cancels or credits run out
       },
     }
@@ -594,7 +617,7 @@ private enterBuildPhase() {
         if (this.isCellOccupied(x, y)) return false
         const cost = Config.UNITS.dog.cost
         if (!this.buildPhase || !this.buildPhase.spendCredits(cost)) return false
-        this.defenderUnits.push(new SpriteUnit(this.scene, 'dog', x, y, 'defender'))
+        this.defenderUnits.push(new SpriteUnit(this.scene, 'dog', x, y, 'defender', 'player'))
         return false
       },
     }
@@ -620,7 +643,7 @@ private enterBuildPhase() {
         if (this.attCredits < cost) return false
         this.attCredits -= cost
         this.hud.setAttCredits(this.attCredits)
-        this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y))
+        this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'player'))
         return false
       },
       onEnd: () => this.hud.setSelectedUnitType(null),

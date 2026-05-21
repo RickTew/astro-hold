@@ -1,3 +1,21 @@
+// Player + AI team tints applied as a multiplicative wash on top of any
+// per-piece tint. Subtle so role tints (grenadier green, doublegun orange)
+// still read, but bold enough to distinguish ownership in same-faction
+// matchups (Robots vs Robots). Imported by SpriteUnit, SphereDefender,
+// Structure, and PixelPowerCore at construction time.
+export type Team = 'player' | 'ai'
+export const TEAM_TINT: Record<Team, number> = {
+  player: 0xb8d4ff,
+  ai:     0xffb8b8,
+}
+
+// Player faction + role choice from the side picker. Faction is currently
+// visual-only — the playable roster is determined by role, since both
+// factions share towers/power core and the movable cyborg/robot mobile
+// units don't have cross-faction sprite sets yet.
+export type Faction = 'robot' | 'cyborg'
+export type Role = 'defender' | 'attacker'
+
 export const Config = {
   WORLD: { LEFT: -600, RIGHT: 600, TOP: 200, BOTTOM: -200 },
   DEFENDER_MAX_X: -200,

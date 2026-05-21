@@ -644,14 +644,16 @@
       margin-top: -36px;
     }
     #side-picker .sp-cards {
-      display: flex;
-      gap: 48px;
+      display: grid;
+      grid-template-columns: repeat(2, 300px);
+      gap: 28px 32px;
       align-items: stretch;
+      justify-content: center;
     }
     .sp-card {
       position: relative;
-      width: 340px;
-      padding: 26px 28px 30px;
+      width: 300px;
+      padding: 22px 24px 26px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -726,9 +728,9 @@
     }
     .sp-card .sp-hero {
       position: relative;
-      width: 160px;
-      height: 160px;
-      margin: 0 auto 22px;
+      width: 130px;
+      height: 130px;
+      margin: 0 auto 18px;
       background:
         radial-gradient(ellipse at 50% 45%, rgba(50, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
         linear-gradient(180deg, #050810 0%, #020407 100%);

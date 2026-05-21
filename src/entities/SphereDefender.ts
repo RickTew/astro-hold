@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config } from '../game/GameConfig'
+import { Config, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
 
@@ -73,7 +73,7 @@ export class SphereDefender {
   private dyingTime = 0
   private dyingFrame = 0
 
-  constructor(scene: THREE.Scene, x: number, y: number) {
+  constructor(scene: THREE.Scene, x: number, y: number, team: 'player' | 'ai' = 'player') {
     this.id = nextActorId('sphere')
     this.worldX = x
     this.worldY = y
@@ -89,6 +89,7 @@ export class SphereDefender {
     // pixel-art edges. renderOrder bumps it after background elements.
     const mat = new THREE.SpriteMaterial({
       map: firstTex,
+      color: TEAM_TINT[team],
       transparent: true,
       depthTest: false,
       depthWrite: false,
