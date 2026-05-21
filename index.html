@@ -644,8 +644,8 @@
       display: inline-flex;
       align-items: center;
       gap: 14px;
-      font-size: clamp(10px, 1.6vh, 14px);
-      letter-spacing: clamp(6px, 1.2vh, 12px);
+      font-size: clamp(13px, 1.8vh, 17px);
+      letter-spacing: clamp(7px, 1.4vh, 13px);
       color: #6ac4ff;
       text-shadow: 0 0 14px rgba(0, 160, 240, 0.45);
     }
@@ -659,8 +659,8 @@
     }
     #side-picker .sp-title::after { background: linear-gradient(90deg, #6ac4ff, transparent); }
     #side-picker .sp-headline {
-      font-size: clamp(16px, 3vh, 24px);
-      letter-spacing: clamp(4px, 1.2vh, 10px);
+      font-size: clamp(22px, 3.6vh, 32px);
+      letter-spacing: clamp(6px, 1.4vh, 12px);
       color: #e6f3ff;
       text-shadow: 0 0 22px rgba(60, 140, 220, 0.7), 0 1px 0 rgba(0, 0, 0, 0.8);
       margin-top: -8px;
@@ -675,7 +675,7 @@
     .sp-card {
       position: relative;
       width: 100%;
-      padding: clamp(12px, 2vh, 20px);
+      padding: clamp(14px, 2.4vh, 24px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -683,7 +683,7 @@
         repeating-linear-gradient(60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
         repeating-linear-gradient(-60deg, transparent 0 18px, rgba(255, 255, 255, 0.018) 18px 19px),
         linear-gradient(180deg, #2a323d 0%, #161a22 45%, #0a0d13 100%);
-      border: 1.5px solid #3a5570;
+      border: 2px solid #3a5570;
       color: #d8ecff;
       cursor: pointer;
       text-align: center;
@@ -694,36 +694,57 @@
         0 1px 0 rgba(255, 255, 255, 0.08) inset,
         0 -1px 0 rgba(0, 0, 0, 0.55) inset;
     }
-    .sp-card:hover {
+    /* DEFENDER = blue (matches the existing blue defender HUD theme). */
+    .sp-card.defender { border-color: #3a5570; box-shadow: 0 0 18px rgba(60, 130, 200, 0.28), 0 1px 0 rgba(255,255,255,0.08) inset, 0 -1px 0 rgba(0,0,0,0.55) inset; }
+    .sp-card.defender:hover {
       transform: translateY(-2px);
       border-color: #6ac4ff;
-      box-shadow:
-        0 0 24px rgba(0, 160, 240, 0.45),
-        0 1px 0 rgba(255, 255, 255, 0.12) inset,
-        0 -1px 0 rgba(0, 0, 0, 0.55) inset;
+      box-shadow: 0 0 28px rgba(0, 160, 240, 0.55), 0 1px 0 rgba(255,255,255,0.12) inset, 0 -1px 0 rgba(0,0,0,0.55) inset;
+    }
+    .sp-card.defender .sp-role-label { color: #cfeaff; text-shadow: 0 0 14px rgba(120, 200, 255, 0.55); }
+    .sp-card.defender .sp-cta {
+      color: #d8ecff;
+      background: linear-gradient(180deg, #143a60 0%, #082040 60%, #03101e 100%);
+      border-color: #6ac4ff;
+    }
+
+    /* ATTACKER = red (matches the existing red attacker HUD theme). */
+    .sp-card.attacker { border-color: #7a2630; box-shadow: 0 0 18px rgba(200, 60, 80, 0.28), 0 1px 0 rgba(255,255,255,0.08) inset, 0 -1px 0 rgba(0,0,0,0.55) inset; }
+    .sp-card.attacker:hover {
+      transform: translateY(-2px);
+      border-color: #ff8c8c;
+      box-shadow: 0 0 28px rgba(230, 70, 70, 0.55), 0 1px 0 rgba(255,255,255,0.12) inset, 0 -1px 0 rgba(0,0,0,0.55) inset;
+    }
+    .sp-card.attacker .sp-role-label { color: #ffd8d8; text-shadow: 0 0 14px rgba(255, 130, 130, 0.55); }
+    .sp-card.attacker .sp-team-name { color: #cc9494; border-bottom-color: rgba(255, 140, 140, 0.22); }
+    .sp-card.attacker .sp-tagline { color: #cc9494; }
+    .sp-card.attacker .sp-cta {
+      color: #ffdadc;
+      background: linear-gradient(180deg, #5a121c 0%, #2a0408 60%, #100204 100%);
+      border-color: #ff8c8c;
     }
     .sp-card .sp-role-label {
-      font-size: clamp(18px, 2.8vh, 26px);
+      font-size: clamp(24px, 3.4vh, 32px);
       font-weight: bold;
-      letter-spacing: clamp(4px, 0.9vh, 8px);
+      letter-spacing: clamp(5px, 1.1vh, 9px);
       color: #e6f3ff;
       text-shadow: 0 0 12px rgba(140, 200, 255, 0.40);
-      margin-bottom: 2px;
+      margin-bottom: 4px;
     }
     .sp-card .sp-team-name {
-      font-size: clamp(11px, 1.4vh, 14px);
+      font-size: clamp(14px, 1.8vh, 17px);
       letter-spacing: clamp(2px, 0.4vh, 4px);
       color: #8aaecc;
-      margin-bottom: clamp(8px, 1.4vh, 14px);
-      padding-bottom: clamp(6px, 1vh, 10px);
+      margin-bottom: clamp(10px, 1.6vh, 16px);
+      padding-bottom: clamp(8px, 1.2vh, 12px);
       border-bottom: 1px solid rgba(106, 196, 255, 0.20);
       width: 80%;
     }
     .sp-card .sp-hero {
       position: relative;
-      width: clamp(70px, 11vh, 96px);
-      height: clamp(70px, 11vh, 96px);
-      margin: 0 auto clamp(8px, 1.2vh, 14px);
+      width: clamp(90px, 13vh, 120px);
+      height: clamp(90px, 13vh, 120px);
+      margin: 0 auto clamp(10px, 1.5vh, 16px);
       background:
         radial-gradient(ellipse at 50% 45%, rgba(50, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%),
         linear-gradient(180deg, #050810 0%, #020407 100%);
@@ -743,22 +764,22 @@
       transform: scale(1.4);
     }
     .sp-card .sp-tagline {
-      font-size: clamp(10px, 1.3vh, 12px);
-      letter-spacing: 1px;
-      line-height: 1.45;
-      color: #8aaecc;
-      margin-bottom: clamp(10px, 1.6vh, 16px);
+      font-size: clamp(13px, 1.7vh, 15px);
+      letter-spacing: 0.8px;
+      line-height: 1.5;
+      color: #b0c8dc;
+      margin-bottom: clamp(12px, 1.8vh, 18px);
     }
     .sp-card .sp-cta {
       margin-top: auto;
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      padding: clamp(8px, 1.2vh, 11px) clamp(20px, 3vw, 28px);
+      padding: clamp(10px, 1.4vh, 13px) clamp(24px, 3.5vw, 34px);
       font-family: inherit;
-      font-size: clamp(12px, 1.5vh, 14px);
+      font-size: clamp(15px, 1.9vh, 18px);
       font-weight: bold;
-      letter-spacing: clamp(3px, 0.6vh, 5px);
+      letter-spacing: clamp(4px, 0.7vh, 6px);
       color: #d8ecff;
       background: linear-gradient(180deg, #143a60 0%, #082040 60%, #03101e 100%);
       border: 2px solid #6ac4ff;
@@ -767,44 +788,52 @@
         0 1px 0 rgba(255, 255, 255, 0.12) inset,
         0 -2px 4px rgba(0, 0, 0, 0.40) inset;
     }
-    .sp-card:hover .sp-cta {
+    .sp-card.defender:hover .sp-cta {
       box-shadow:
         0 0 0 1px rgba(108, 196, 255, 0.50) inset,
         0 1px 0 rgba(255, 255, 255, 0.16) inset,
         0 -2px 4px rgba(0, 0, 0, 0.40) inset,
-        0 0 18px rgba(0, 160, 240, 0.45);
+        0 0 18px rgba(0, 160, 240, 0.55);
+    }
+    .sp-card.attacker:hover .sp-cta {
+      box-shadow:
+        0 0 0 1px rgba(255, 138, 138, 0.50) inset,
+        0 1px 0 rgba(255, 255, 255, 0.16) inset,
+        0 -2px 4px rgba(0, 0, 0, 0.40) inset,
+        0 0 18px rgba(230, 70, 70, 0.55);
     }
     /* How-to-play collapsible — closed by default; opens to a short
        three-section reference. Width-locked to the cards grid above. */
     #side-picker .sp-howto {
       width: min(720px, 100%);
-      font-size: clamp(11px, 1.4vh, 13px);
-      color: #99b8d0;
+      font-size: clamp(14px, 1.8vh, 17px);
+      color: #b0c8dc;
       background: rgba(0, 0, 0, 0.50);
       border: 1px solid rgba(106, 196, 255, 0.18);
-      padding: 0 clamp(12px, 2.4vw, 18px);
+      padding: 0 clamp(14px, 2.6vw, 22px);
     }
-    #side-picker .sp-howto[open] { padding-bottom: clamp(12px, 1.8vh, 16px); }
+    #side-picker .sp-howto[open] { padding-bottom: clamp(14px, 2vh, 20px); }
     #side-picker .sp-howto summary {
       cursor: pointer;
-      padding: clamp(10px, 1.6vh, 14px) 0;
+      padding: clamp(12px, 1.8vh, 16px) 0;
       font-weight: bold;
+      font-size: clamp(15px, 1.9vh, 18px);
       letter-spacing: 2px;
-      color: #c8ddf2;
+      color: #d8ecff;
       list-style: none;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
     #side-picker .sp-howto summary::before {
       content: '▶';
-      font-size: 9px;
+      font-size: 11px;
       transition: transform 0.2s;
     }
     #side-picker .sp-howto[open] summary::before { transform: rotate(90deg); }
     #side-picker .sp-howto summary::-webkit-details-marker { display: none; }
-    #side-picker .sp-howto-body { line-height: 1.55; }
-    #side-picker .sp-howto-body p { margin: clamp(4px, 0.8vh, 8px) 0; }
+    #side-picker .sp-howto-body { line-height: 1.6; }
+    #side-picker .sp-howto-body p { margin: clamp(6px, 1vh, 10px) 0; }
     #side-picker .sp-howto-body strong { color: #ffd089; letter-spacing: 1px; }
   </style>
 </head>

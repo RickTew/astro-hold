@@ -870,6 +870,11 @@ private enterBuildPhase() {
   }
 
   private onWheel = (e: WheelEvent) => {
+    // Don't capture wheel events fired inside HUD overlays — they need to
+    // scroll naturally (side picker, how-to-play expander, combat log,
+    // future settings panels, etc.). Without this guard, preventDefault()
+    // here blocks the browser's native scroll on every HUD overlay.
+    if ((e.target as HTMLElement | null)?.closest?.('#hud')) return
     e.preventDefault()
     this.zoomVelocity += Math.max(-0.015, Math.min(0.015, e.deltaY * 0.00015))
   }

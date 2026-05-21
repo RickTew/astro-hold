@@ -241,18 +241,18 @@ export class HUD {
           <div class="sp-title">ASTROHOLD</div>
           <div class="sp-headline">CHOOSE YOUR SIDE</div>
           <div class="sp-cards">
-            <button class="sp-card" data-faction="robot" data-role="defender">
+            <button class="sp-card defender" data-faction="robot" data-role="defender">
               <div class="sp-role-label">DEFENDER</div>
               <div class="sp-team-name">Robots</div>
               <div class="sp-hero"><img src="/sprites/sphere/south.png" alt=""/></div>
-              <div class="sp-tagline">Hold the line. Stop the assault.</div>
+              <div class="sp-tagline">Hold the line. Protect the Power Core.</div>
               <div class="sp-cta">PLAY</div>
             </button>
-            <button class="sp-card" data-faction="cyborg" data-role="attacker">
+            <button class="sp-card attacker" data-faction="cyborg" data-role="attacker">
               <div class="sp-role-label">ATTACKER</div>
               <div class="sp-team-name">Cyborgs</div>
               <div class="sp-hero"><img src="/sprites/hulk/south.png" alt=""/></div>
-              <div class="sp-tagline">Push west. Break the defense.</div>
+              <div class="sp-tagline">Break through. Reach the Power Core.</div>
               <div class="sp-cta">PLAY</div>
             </button>
           </div>
