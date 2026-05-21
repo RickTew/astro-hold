@@ -1,12 +1,15 @@
-// Player + AI team tints applied as a multiplicative wash on top of any
-// per-piece tint. Subtle so role tints (grenadier green, doublegun orange)
-// still read, but bold enough to distinguish ownership in same-faction
-// matchups (Robots vs Robots). Imported by SpriteUnit, SphereDefender,
-// Structure, and PixelPowerCore at construction time.
+// Team tints (player blue / AI red) were added for same-faction matchups
+// where both teams would render the same sprites; the tint disambiguated
+// ownership. We simplified to 2 cards which removed same-faction matchups,
+// so the team tint now just MUDDIES the per-piece tints (grenadier green ×
+// AI red = olive, etc.). Identity is communicated by zone position: player
+// is on the side they picked, AI is on the opposite side.
+// Both tints set to identity (white) so the multiplication is a no-op.
+// Restore non-white values here if same-faction matchups return.
 export type Team = 'player' | 'ai'
 export const TEAM_TINT: Record<Team, number> = {
-  player: 0xb8d4ff,
-  ai:     0xffb8b8,
+  player: 0xffffff,
+  ai:     0xffffff,
 }
 
 // Player faction + role choice from the side picker. Faction is currently
