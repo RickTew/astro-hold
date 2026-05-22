@@ -635,34 +635,26 @@
     }
 
     /* ── Tight tile layout — proposed production sizing ─────────────
-       Shorter tiles (less empty space under the cost), narrower tiles
-       (horizontal padding around the grid so tiles don't touch the
-       panel border), bigger gap between rows for breathing room.
-         - Auto-height rows + align-content: center → tile rows hug
-           their content height and sit vertically centered in the
-           panel instead of stretching to fill it.
-         - padding: 0 6px on .tile-grid → tiles are inset from the
-           panel border on the sides.
-         - Smaller .tile-icon (46×46 vs 56×56) → narrower tiles. */
+       Shrink the tile BOXES (the dark blue containers around each
+       icon), NOT the unit icons themselves. The icons stay 56×56.
+         - grid-template-columns / -rows: repeat(N, auto) → each tile
+           sizes to its content instead of stretching to fill its
+           grid cell. No more empty band under the cost text; tiles
+           are no wider than they need to be.
+         - justify-content / align-content: center → the cluster of
+           content-sized tiles sits centered in the panel, with even
+           breathing room between the tile block and the cyan border
+           on all four sides.
+         - gap: 10px → a little more space between tiles too. */
     .tight-tiles .tile-grid {
+      grid-template-columns: repeat(4, auto);
       grid-template-rows: repeat(2, auto);
+      justify-content: center;
       align-content: center;
-      gap: 8px;
-      padding: 0 6px;
+      gap: 10px;
     }
     .tight-tiles .hud-tile {
-      padding: 3px 1px;
-    }
-    .tight-tiles .hud-tile .tile-icon {
-      width: 46px;
-      height: 46px;
-    }
-    .tight-tiles .hud-tile .tile-label {
-      font-size: 10px;
-      margin-top: 1px;
-    }
-    .tight-tiles .hud-tile .tile-cost {
-      font-size: 10px;
+      padding: 4px 6px;
     }
 
     /* ─── Controls panel (fixed right) ─────────────────────────────── */
