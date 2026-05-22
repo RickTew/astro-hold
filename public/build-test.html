@@ -634,6 +634,37 @@
         drop-shadow(0 0 18px rgba(0, 140, 220, 0.7));
     }
 
+    /* ── Tight tile layout — proposed production sizing ─────────────
+       Shorter tiles (less empty space under the cost), narrower tiles
+       (horizontal padding around the grid so tiles don't touch the
+       panel border), bigger gap between rows for breathing room.
+         - Auto-height rows + align-content: center → tile rows hug
+           their content height and sit vertically centered in the
+           panel instead of stretching to fill it.
+         - padding: 0 6px on .tile-grid → tiles are inset from the
+           panel border on the sides.
+         - Smaller .tile-icon (46×46 vs 56×56) → narrower tiles. */
+    .tight-tiles .tile-grid {
+      grid-template-rows: repeat(2, auto);
+      align-content: center;
+      gap: 8px;
+      padding: 0 6px;
+    }
+    .tight-tiles .hud-tile {
+      padding: 3px 1px;
+    }
+    .tight-tiles .hud-tile .tile-icon {
+      width: 46px;
+      height: 46px;
+    }
+    .tight-tiles .hud-tile .tile-label {
+      font-size: 10px;
+      margin-top: 1px;
+    }
+    .tight-tiles .hud-tile .tile-cost {
+      font-size: 10px;
+    }
+
     /* ─── Controls panel (fixed right) ─────────────────────────────── */
     .exp-controls {
       position: fixed;
@@ -758,6 +789,19 @@
     <h2>SWEET SPOT <span class="tag">RECOMMENDED COMBO</span></h2>
     <div class="preview-frame">
       <div id="hud-sweetspot" class="hud-top exp-hud fx-canvas-text fx-edge-trace fx-add-ring fx-led fx-cr-bloom fx-tile-pop"></div>
+    </div>
+  </div>
+
+  <!-- Fourth row: TIGHTER TILES — proposed production sizing.
+       Smaller icons, auto-height rows centered vertically, horizontal
+       padding around the grid for breathing room. WALL slot replaced
+       with a duplicate TOWER until wall art exists. Has the shipped
+       production effects (icon glow, hover-pop, CR bloom, edge-trace)
+       so the row previews the final look at the new size. -->
+  <div class="preview-section">
+    <h2>TIGHTER TILES <span class="tag">PROPOSED PRODUCTION SIZE</span></h2>
+    <div class="preview-frame">
+      <div id="hud-tight" class="hud-top tight-tiles exp-hud fx-icon-glow fx-tile-pop fx-cr-bloom fx-edge-trace"></div>
     </div>
   </div>
 
@@ -894,12 +938,13 @@
       </svg>`
     }
 
-    function renderHud(target) {
+    function renderHud(target, tiles) {
+      const tileList = tiles || robotTiles
       target.innerHTML = `
         <div class="hud-panel hud-left">
           ${panelSvg('def', false)}
           <div class="panel-content">
-            <div class="tile-grid">${robotTiles.map(tileHtml).join('')}</div>
+            <div class="tile-grid">${tileList.map(tileHtml).join('')}</div>
           </div>
         </div>
         <div class="hud-panel hud-center">
@@ -925,15 +970,22 @@
         <div class="hud-panel hud-right">
           ${panelSvg('def', true)}
           <div class="panel-content">
-            <div class="tile-grid">${robotTiles.map(tileHtml).join('')}</div>
+            <div class="tile-grid">${tileList.map(tileHtml).join('')}</div>
           </div>
         </div>
       `
     }
 
+    // Tight-tile preview uses a tile list where the WALL slot (index 3)
+    // is replaced with a duplicate TOWER, per the request to drop the
+    // placeholder until wall art exists.
+    const tightTiles = robotTiles.slice()
+    tightTiles[3] = { label: 'TOWER', cost: 30, icon: '/sprites/tower/south.png', preview: false }
+
     renderHud(document.getElementById('hud-baseline'))
     renderHud(document.getElementById('hud-experimental'))
     renderHud(document.getElementById('hud-sweetspot'))
+    renderHud(document.getElementById('hud-tight'), tightTiles)
 
     const expHud      = document.getElementById('hud-experimental')
     const sweetHud    = document.getElementById('hud-sweetspot')
