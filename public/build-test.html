@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroHold — BUILD PHASE Design Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    /* ─────────────────────────────────────────────────────────────────
+       AstroHold BUILD PHASE design sandbox.
+
+       Renders the production HUD twice — once baseline, once with
+       toggleable experimental effects — so we can A/B visual ideas
+       without touching the live game. Effects below are CSS/SVG
+       adaptations of the Three.js suggestions (TextGeometry → CSS
+       glow, UnrealBloomPass → drop-shadow filter, etc.).
+       ───────────────────────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #050810;
+      color: #cce8ff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 24px 24px 80px;
+    }
+
+    .page-head {
+      max-width: 1200px;
+      margin: 0 auto 24px;
+    }
+    .page-head h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: #d8ecff;
+      text-shadow: 0 0 14px rgba(60, 140, 220, 0.55);
+      margin-bottom: 6px;
+    }
+    .page-head p {
+      font-size: 13px;
+      color: #99bbcc;
+      line-height: 1.6;
+      max-width: 820px;
+    }
+
+    .preview-section {
+      max-width: 1600px;
+      margin: 0 auto 32px;
+    }
+    .preview-section h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #6ac4ff;
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+    .preview-section h2 .tag {
+      display: inline-block;
+      margin-left: 10px;
+      padding: 2px 8px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #99bbcc;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(106, 196, 255, 0.25);
+    }
+
+    /* Faux game-canvas backdrop so the HUD's transparency reads correctly.
+       Earthy palette + radial light spots roughly match the real game terrain. */
+    .preview-frame {
+      position: relative;
+      width: 100%;
+      height: 270px;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(8,16,12,0.78), rgba(8,16,12,0.78)),
+        radial-gradient(ellipse at 25% 65%, rgba(120, 90, 60, 0.38), transparent 55%),
+        radial-gradient(ellipse at 75% 40%, rgba(60, 80, 110, 0.32), transparent 60%),
+        radial-gradient(circle at 12% 18%, rgba(255,255,255,0.08) 0, transparent 1px),
+        radial-gradient(circle at 88% 82%, rgba(255,255,255,0.06) 0, transparent 1px),
+        radial-gradient(circle at 55% 12%, rgba(255,255,255,0.05) 0, transparent 1px),
+        #1a1810;
+      border: 1px solid rgba(106, 196, 255, 0.15);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       HUD CSS — copied from index.html with the position scoping changed
+       so the HUD renders inside .preview-frame instead of position:fixed
+       to the viewport. Functional CSS is identical to production.
+       ───────────────────────────────────────────────────────────── */
+    .hud-top {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 250px;
+      display: grid;
+      grid-template-columns: 1fr minmax(460px, 38%) 1fr;
+      gap: 10px;
+      padding: 6px 16px 8px;
+    }
+    .hud-panel {
+      position: relative;
+      min-width: 0;
+      height: 100%;
+    }
+    .hud-panel.hud-center { grid-column: 2; }
+    .panel-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      filter: drop-shadow(0 0 10px rgba(90, 167, 212, 0.18));
+    }
+    .panel-content {
+      position: absolute;
+      inset: 10px 12px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .hud-center .panel-content {
+      inset: 0;
+      padding: 8px 24px;
+      justify-content: stretch;
+      gap: 0;
+    }
+    .center-build-info {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+      width: 100%;
+      height: 100%;
+      gap: 0;
+    }
+    .cc-title { display: flex; align-items: center; justify-content: center; padding: 4px 8px; }
+    .cc-body  { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(8px, 1.2vh, 12px); padding: 6px 4px; }
+    .cc-action { display: flex; align-items: center; justify-content: center; padding: 4px 8px; }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, 1fr);
+      gap: 6px;
+      width: 100%;
+      height: 100%;
+    }
+    .hud-tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 1px;
+      padding: 4px 2px 4px;
+      cursor: pointer;
+      background: linear-gradient(180deg, #0d1c2e 0%, #061320 100%);
+      border: 1px solid #2a5577;
+      color: #88c5e0;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      transition: border-color 0.1s, box-shadow 0.1s, transform 0.06s;
+      min-width: 0;
+    }
+    .hud-tile:hover {
+      border-color: #6ac4ff;
+      box-shadow: 0 0 6px rgba(106, 196, 255, 0.55);
+      transform: translateY(-1px);
+    }
+    .hud-tile .tile-icon {
+      width: 56px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 45%, rgba(40, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%);
+      border: 1px solid rgba(106, 196, 255, 0.30);
+    }
+    .hud-tile .tile-icon img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      transform: scale(1.55);
+      transform-origin: center 55%;
+    }
+    .hud-tile.preview .tile-icon img {
+      transform: scale(0.78);
+      transform-origin: center;
+    }
+    .hud-tile .icon-wall {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px; font-weight: 700;
+      color: rgba(160, 200, 230, 0.55);
+      text-shadow: 0 0 6px rgba(106, 196, 255, 0.35);
+    }
+    .hud-tile .icon-wall::before { content: "?"; }
+    .hud-tile .tile-label {
+      font-size: 11px;
+      letter-spacing: 1px;
+      margin-top: 2px;
+      color: inherit;
+    }
+    .hud-tile .tile-cost {
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: #c8ff7a;
+      font-weight: bold;
+    }
+
+    .center-phase {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      font-family: 'Orbitron', 'Courier New', monospace;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #f4faff;
+      white-space: nowrap;
+      padding: 2px 6px;
+      text-shadow:
+        0 0 24px rgba(110, 215, 255, 0.95),
+        0 0 8px rgba(80, 200, 255, 0.7),
+        0 0 2px rgba(0, 0, 0, 0.9);
+    }
+    .center-phase::before, .center-phase::after {
+      content: '';
+      width: 14px; height: 14px;
+      border: 2.5px solid #6ac4ff;
+      filter: drop-shadow(0 0 5px rgba(90, 200, 255, 0.75));
+    }
+    .center-phase::before { border-right: none; border-bottom: none; }
+    .center-phase::after  { border-left: none; border-top: none; }
+
+    .center-credits {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 18px;
+      background: linear-gradient(180deg, #030710 0%, #0b1320 100%);
+      border: 1.5px solid rgba(90, 167, 212, 0.55);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 2px 4px rgba(0, 0, 0, 0.5) inset,
+        0 0 10px rgba(90, 167, 212, 0.30);
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: rgba(200, 230, 255, 0.75);
+    }
+    .center-credits .cr-num {
+      color: #d4ff7a;
+      font-weight: 900;
+      font-size: 16px;
+      margin-left: 6px;
+      text-shadow: 0 0 10px rgba(180, 240, 70, 0.85), 0 0 4px rgba(140, 220, 50, 0.7);
+    }
+    .center-matchup {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 2px 10px;
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      color: #8aabc4;
+    }
+    .center-matchup .vs-label { opacity: 0.55; font-size: 0.85em; }
+    .center-matchup .vs-player { color: #6ac4ff; text-shadow: 0 0 6px rgba(60, 170, 230, 0.65); }
+    .center-matchup .vs-team   { color: #ff7a9a; text-shadow: 0 0 6px rgba(230, 80, 120, 0.65); }
+    .center-events {
+      width: 100%;
+      font-size: 12px;
+      color: #99bbcc;
+      text-align: center;
+      padding: 2px 6px;
+    }
+    .center-action-btn {
+      margin: 0;
+      padding: 10px 44px;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      font-family: 'Orbitron', monospace;
+      cursor: pointer;
+      white-space: nowrap;
+      position: relative;
+      background: linear-gradient(180deg, #1c4a78 0%, #0a2848 50%, #03101e 100%);
+      border: 3px solid #6ac4ff;
+      color: #eaf6ff;
+      text-shadow: 0 0 8px rgba(140, 220, 255, 0.55), 0 1px 0 rgba(0, 0, 0, 0.7);
+      box-shadow:
+        0 0 0 1px rgba(180, 220, 255, 0.35) inset,
+        0 2px 0 rgba(220, 240, 255, 0.30) inset,
+        0 -6px 10px rgba(0, 0, 0, 0.55) inset,
+        0 3px 0 rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(0, 170, 255, 0.55);
+      transition: transform 0.07s, box-shadow 0.1s;
+    }
+    .center-action-btn:active { transform: translateY(2px); }
+
+    /* ═════════════════════════════════════════════════════════════════
+       EXPERIMENTAL EFFECTS
+
+       Each effect is scoped to .exp-hud.fx-<name> so toggling a
+       checkbox flips a single class on the experimental HUD container.
+       Baseline HUD never picks these up.
+       ═════════════════════════════════════════════════════════════ */
+
+    /* fx-glow — boosted neon glow on the phase title.
+       CSS equivalent of "emissive material on TextGeometry". */
+    .exp-hud.fx-glow .center-phase {
+      color: #ffffff;
+      text-shadow:
+        0 0 4px #ffffff,
+        0 0 10px #6ac4ff,
+        0 0 22px #2090e0,
+        0 0 38px #0066c8,
+        0 0 60px rgba(0, 80, 180, 0.7);
+      animation: phase-pulse 2.4s ease-in-out infinite;
+    }
+    .exp-hud.fx-glow .center-phase::before,
+    .exp-hud.fx-glow .center-phase::after {
+      border-color: #b8e8ff;
+      filter: drop-shadow(0 0 10px #6ac4ff) drop-shadow(0 0 18px rgba(0, 140, 220, 0.7));
+    }
+    @keyframes phase-pulse {
+      0%, 100% { filter: brightness(1); }
+      50%      { filter: brightness(1.25); }
+    }
+
+    /* fx-sweep — slow light bar pans across the title.
+       CSS equivalent of "SpotLight slowly panning across banner". */
+    .exp-hud.fx-sweep .center-phase {
+      overflow: hidden;
+    }
+    .exp-hud.fx-sweep .center-phase {
+      background: linear-gradient(
+        90deg,
+        #f4faff 0%,
+        #f4faff 35%,
+        #b8e8ff 48%,
+        #ffffff 50%,
+        #b8e8ff 52%,
+        #f4faff 65%,
+        #f4faff 100%
+      );
+      background-size: 250% 100%;
+      background-position: 100% 0;
+      -webkit-background-clip: text;
+              background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: title-sweep 4s linear infinite;
+    }
+    @keyframes title-sweep {
+      0%   { background-position: 130% 0; }
+      100% { background-position: -30% 0; }
+    }
+
+    /* fx-starfield — slow parallax stars behind the center panel.
+       CSS equivalent of "PlaneGeometry with scrolling UV starfield". */
+    .exp-hud.fx-starfield .hud-center .panel-content::before {
+      content: '';
+      position: absolute;
+      inset: 4px 4px 4px 4px;
+      pointer-events: none;
+      z-index: -1;
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.85), transparent 70%),
+        radial-gradient(1px 1px at 80% 20%, rgba(180,220,255,0.7), transparent 70%),
+        radial-gradient(1px 1px at 45% 70%, rgba(255,255,255,0.6), transparent 70%),
+        radial-gradient(1px 1px at 65% 85%, rgba(200,230,255,0.7), transparent 70%),
+        radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.5), transparent 70%),
+        radial-gradient(1px 1px at 90% 55%, rgba(190,225,255,0.6), transparent 70%),
+        radial-gradient(1px 1px at 30% 95%, rgba(255,255,255,0.4), transparent 70%);
+      background-size: 220px 180px;
+      animation: stars-drift 22s linear infinite;
+      opacity: 0.85;
+    }
+    @keyframes stars-drift {
+      0%   { background-position: 0 0; }
+      100% { background-position: -220px 180px; }
+    }
+
+    /* fx-scanlines — subtle CRT lines over the whole HUD.
+       Cheap "tactical console" texture without GLSL. */
+    .exp-hud.fx-scanlines::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0 2px,
+        rgba(255, 255, 255, 0.035) 2px 3px
+      );
+      mix-blend-mode: overlay;
+      z-index: 5;
+    }
+
+    /* fx-noise — SVG turbulence overlay = real procedural noise (GLSL
+       was the suggestion; SVG feTurbulence is the DOM equivalent).
+       Filter defined inline below in <svg> at page top. */
+    .exp-hud.fx-noise::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.6  0 0 0 0 0.78  0 0 0 0 0.95  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      opacity: 0.10;
+      mix-blend-mode: screen;
+      animation: noise-shift 0.18s steps(2) infinite;
+      z-index: 4;
+    }
+    @keyframes noise-shift {
+      0%   { transform: translate(0, 0); }
+      50%  { transform: translate(-3px, 1px); }
+      100% { transform: translate(2px, -2px); }
+    }
+
+    /* fx-tile-pop — stronger hover on tiles (scale + colored glow).
+       CSS equivalent of "raycaster hover scales mesh + emissive flash". */
+    .exp-hud.fx-tile-pop .hud-tile {
+      transition: transform 0.18s cubic-bezier(0.34, 1.6, 0.64, 1),
+                  box-shadow 0.18s,
+                  border-color 0.12s;
+    }
+    .exp-hud.fx-tile-pop .hud-tile:hover {
+      transform: translateY(-3px) scale(1.06);
+      border-color: #b8e8ff;
+      box-shadow:
+        0 0 16px rgba(106, 196, 255, 0.85),
+        0 0 0 1px #6ac4ff inset;
+    }
+    .exp-hud.fx-tile-pop .hud-tile:hover .tile-icon {
+      border-color: rgba(180, 220, 255, 0.7);
+      box-shadow: 0 0 10px rgba(106, 196, 255, 0.4) inset;
+    }
+
+    /* fx-cr-bloom — pulsing bloom on the credits number.
+       CSS equivalent of "UnrealBloomPass on the CR counter". */
+    .exp-hud.fx-cr-bloom .cr-num {
+      animation: cr-bloom 1.8s ease-in-out infinite;
+    }
+    @keyframes cr-bloom {
+      0%, 100% {
+        text-shadow:
+          0 0 6px rgba(180, 240, 70, 0.7),
+          0 0 14px rgba(140, 220, 50, 0.5);
+      }
+      50% {
+        text-shadow:
+          0 0 4px #f0ff90,
+          0 0 14px #d4ff7a,
+          0 0 28px rgba(180, 240, 70, 0.95),
+          0 0 44px rgba(120, 200, 40, 0.7);
+      }
+    }
+
+    /* fx-entry — tiles slide-in from above with stagger.
+       CSS equivalent of "Group.position.lerp slide-in on phase transition". */
+    .exp-hud.fx-entry .hud-tile {
+      animation: tile-slide 0.55s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+    }
+    .exp-hud.fx-entry .hud-tile:nth-child(1) { animation-delay: 0.05s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(2) { animation-delay: 0.10s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(3) { animation-delay: 0.15s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(4) { animation-delay: 0.20s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(5) { animation-delay: 0.25s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(6) { animation-delay: 0.30s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(7) { animation-delay: 0.35s; }
+    .exp-hud.fx-entry .hud-tile:nth-child(8) { animation-delay: 0.40s; }
+    @keyframes tile-slide {
+      from { transform: translateY(-24px); opacity: 0; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+
+    /* fx-wireframe — outline-only tile icons + dashed panel borders.
+       CSS approximation of "material.wireframe = true" (not literal,
+       since DOM doesn't have wireframe — uses outlines + ghost icons). */
+    .exp-hud.fx-wireframe .panel-frame path {
+      fill: rgba(0, 8, 20, 0.6);
+      stroke-dasharray: 6 4;
+      animation: dash-march 12s linear infinite;
+    }
+    .exp-hud.fx-wireframe .hud-tile {
+      background: transparent;
+      border-style: dashed;
+    }
+    .exp-hud.fx-wireframe .tile-icon img {
+      opacity: 0.65;
+      filter: brightness(1.4) drop-shadow(0 0 4px #6ac4ff);
+    }
+    @keyframes dash-march {
+      0%   { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -200; }
+    }
+
+    /* ─── Controls panel (fixed right) ─────────────────────────────── */
+    .exp-controls {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 200;
+      width: 240px;
+      background: rgba(0, 8, 20, 0.94);
+      border: 1px solid #2266aa;
+      box-shadow: 0 0 22px rgba(0, 80, 160, 0.35);
+      padding: 14px 14px 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #cce8ff;
+    }
+    .exp-controls h3 {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: #6ac4ff;
+      margin-bottom: 10px;
+      text-shadow: 0 0 6px rgba(60, 140, 220, 0.5);
+    }
+    .exp-controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .exp-controls label:hover { color: #b8e8ff; }
+    .exp-controls input { accent-color: #6ac4ff; cursor: pointer; }
+    .exp-controls .fx-desc {
+      display: block;
+      font-size: 10px;
+      color: #6699aa;
+      padding-left: 22px;
+      margin-top: -2px;
+      margin-bottom: 4px;
+    }
+    .exp-controls .btn-row {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(106, 196, 255, 0.18);
+      display: flex;
+      gap: 6px;
+    }
+    .exp-controls button {
+      flex: 1;
+      padding: 6px 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      background: #0a1e33;
+      border: 1px solid #2266aa;
+      color: #88bbdd;
+      cursor: pointer;
+    }
+    .exp-controls button:hover { background: #102840; color: #cce8ff; }
+
+    /* Discarded-suggestions footer */
+    .discarded {
+      max-width: 1200px;
+      margin: 32px auto 0;
+      padding: 16px 20px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(212, 90, 122, 0.25);
+      font-size: 12px;
+      color: #aabbcc;
+      line-height: 1.6;
+    }
+    .discarded h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: #d45a7a;
+      margin-bottom: 10px;
+    }
+    .discarded ul { list-style: none; padding: 0; }
+    .discarded li { padding: 3px 0 3px 18px; position: relative; }
+    .discarded li::before { content: '✕'; position: absolute; left: 0; color: #d45a7a; font-weight: bold; }
+    .discarded li strong { color: #ddccaa; }
+  </style>
+</head>
+<body>
+
+  <div class="page-head">
+    <h1>BUILD PHASE — Design Sandbox</h1>
+    <p>
+      Production HUD (top) vs experimental HUD (bottom). Toggle effects on the right.
+      Suggestions that targeted 3D-scene rendering (TextGeometry, Three.js lights, UnrealBloomPass,
+      mesh wireframes) have been adapted to their CSS/SVG equivalents — the HUD is DOM-based, so
+      raw Three.js APIs don't apply, but the visual intent translates cleanly.
+    </p>
+  </div>
+
+  <div class="preview-section">
+    <h2>BASELINE <span class="tag">PRODUCTION</span></h2>
+    <div class="preview-frame">
+      <div id="hud-baseline" class="hud-top"></div>
+    </div>
+  </div>
+
+  <div class="preview-section">
+    <h2>EXPERIMENTAL <span class="tag">EFFECTS ON</span></h2>
+    <div class="preview-frame">
+      <div id="hud-experimental" class="hud-top exp-hud"></div>
+    </div>
+  </div>
+
+  <aside class="exp-controls">
+    <h3>EFFECTS</h3>
+    <label><input type="checkbox" data-fx="glow"> Title neon boost</label>
+    <span class="fx-desc">Stronger text-shadow + pulse</span>
+
+    <label><input type="checkbox" data-fx="sweep"> Title light-sweep</label>
+    <span class="fx-desc">Gradient panning across "BUILD PHASE"</span>
+
+    <label><input type="checkbox" data-fx="starfield"> Animated starfield</label>
+    <span class="fx-desc">Slow parallax dots behind center panel</span>
+
+    <label><input type="checkbox" data-fx="scanlines"> CRT scanlines</label>
+    <span class="fx-desc">Subtle horizontal lines over the HUD</span>
+
+    <label><input type="checkbox" data-fx="noise"> Procedural noise</label>
+    <span class="fx-desc">SVG feTurbulence — flickering data grain</span>
+
+    <label><input type="checkbox" data-fx="tile-pop"> Tile hover-pop</label>
+    <span class="fx-desc">Stronger scale + glow on hover</span>
+
+    <label><input type="checkbox" data-fx="cr-bloom"> CR bloom pulse</label>
+    <span class="fx-desc">Credits number pulses neon green</span>
+
+    <label><input type="checkbox" data-fx="entry"> Tile slide-in</label>
+    <span class="fx-desc">Staggered slide-from-top on load</span>
+
+    <label><input type="checkbox" data-fx="wireframe"> Wireframe panels</label>
+    <span class="fx-desc">Dashed borders + ghost icons (holo vibe)</span>
+
+    <div class="btn-row">
+      <button id="all-on">ALL ON</button>
+      <button id="all-off">ALL OFF</button>
+      <button id="replay">REPLAY</button>
+    </div>
+  </aside>
+
+  <section class="discarded">
+    <h2>DISCARDED SUGGESTIONS (don't apply to a DOM HUD)</h2>
+    <ul>
+      <li><strong>TextGeometry / FontLoader</strong> — 3D text only. Our title is HTML text; CSS text-shadow + animated gradient gives the same visual without the rebuild.</li>
+      <li><strong>BoxGeometry / PlaneGeometry buttons</strong> — would require rebuilding the HUD inside the WebGL scene. Our tiles already render as DOM elements with hover states.</li>
+      <li><strong>SpotLight / RectAreaLight banner sweep</strong> — Three.js lights don't illuminate DOM. The "light sweep" effect is the CSS-equivalent above.</li>
+      <li><strong>UnrealBloomPass</strong> — postprocessing only affects the WebGL canvas, not DOM elements floating over it. CSS <code>filter: drop-shadow</code> is the practical equivalent.</li>
+      <li><strong>material.wireframe = true</strong> — only valid on 3D mesh materials. "Wireframe" toggle above uses dashed CSS borders + ghosted icons as a holographic stand-in.</li>
+      <li><strong>Group.position.lerp() for menu slide-in</strong> — CSS keyframes handle DOM slide-in natively, no need for a Three.js animation system.</li>
+      <li><strong>Procedural GLSL noise shader</strong> — replaced with SVG <code>feTurbulence</code>, which is the W3C-standard procedural noise filter for DOM content. Same visual outcome, no shader pipeline.</li>
+    </ul>
+  </section>
+
+  <script>
+    // Tile data matches HUD.ts robotTiles. Render twice into baseline + experimental.
+    const robotTiles = [
+      { label: 'SPHERE',  cost: 100, icon: '/sprites/sphere/south.png',  preview: false },
+      { label: 'TOWER',   cost:  30, icon: '/sprites/tower/south.png',   preview: false },
+      { label: 'BOMBER',  cost:  70, icon: '/sprites/bomber/south.png',  preview: false },
+      { label: 'WALL',    cost:  20, icon: 'wall',                       preview: false },
+      { label: 'DOG',     cost:  40, icon: '/sprites/dog/south.png',     preview: false },
+      { label: 'DEFENSE', cost:  20, icon: '/sprites/defense/south.png', preview: true  },
+      { label: 'LASER',   cost:  40, icon: '/sprites/laser/south.png',   preview: true  },
+      { label: 'SIGNAL',  cost:  20, icon: '/sprites/signal/south.png',  preview: true  },
+    ]
+
+    function tileHtml(t) {
+      const classes = ['hud-tile']
+      if (t.preview) classes.push('preview')
+      const iconEl = t.icon === 'wall'
+        ? '<div class="tile-icon"><div class="icon-wall"></div></div>'
+        : `<div class="tile-icon"><img src="${t.icon}" alt=""/></div>`
+      return `<div class="${classes.join(' ')}">${iconEl}<div class="tile-label">${t.label}</div><div class="tile-cost">${t.cost}cr</div></div>`
+    }
+
+    function panelSvg(side, flip) {
+      const path = 'M 12,4 L 188,4 L 196,12 L 196,198 L 188,206 L 12,206 L 4,198 L 4,12 Z'
+      const stroke = '#5aa7d4'
+      const xform = flip ? ' style="transform:scaleX(-1)"' : ''
+      return `<svg class="panel-frame" viewBox="0 0 200 210" preserveAspectRatio="none" aria-hidden="true"${xform}>
+        <path d="${path}" fill="rgba(8, 18, 32, 0.55)" stroke="${stroke}" stroke-width="2.8" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/>
+      </svg>`
+    }
+
+    function centerSvg() {
+      const stroke = '#5aa7d4'
+      const dot = '#8fd0f2'
+      return `<svg class="panel-frame" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z"
+              fill="rgba(8, 18, 32, 0.58)" stroke="${stroke}" stroke-width="2.8"
+              stroke-linejoin="miter" vector-effect="non-scaling-stroke"/>
+        <line x1="14" y1="58" x2="306" y2="58" stroke="${stroke}" stroke-width="1.2" stroke-opacity="0.40" vector-effect="non-scaling-stroke"/>
+        <line x1="14" y1="158" x2="306" y2="158" stroke="${stroke}" stroke-width="1.2" stroke-opacity="0.40" vector-effect="non-scaling-stroke"/>
+        <circle cx="14" cy="14" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="306" cy="14" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="14" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="306" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+      </svg>`
+    }
+
+    function renderHud(target) {
+      target.innerHTML = `
+        <div class="hud-panel hud-left">
+          ${panelSvg('def', false)}
+          <div class="panel-content">
+            <div class="tile-grid">${robotTiles.map(tileHtml).join('')}</div>
+          </div>
+        </div>
+        <div class="hud-panel hud-center">
+          ${centerSvg()}
+          <div class="panel-content">
+            <div class="center-build-info">
+              <div class="cc-title"><div class="center-phase">BUILD PHASE</div></div>
+              <div class="cc-body">
+                <div class="center-credits">CR<span class="cr-num">1000</span></div>
+                <div class="center-matchup">
+                  <span class="vs-player">ROBOTS</span>
+                  <span class="vs-label">VS</span>
+                  <span class="vs-team">CYBORGS</span>
+                </div>
+                <div class="center-events">AI forces deployed. Hidden until BATTLE.</div>
+              </div>
+              <div class="cc-action">
+                <button class="center-action-btn">READY</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hud-panel hud-right">
+          ${panelSvg('def', true)}
+          <div class="panel-content">
+            <div class="tile-grid">${robotTiles.map(tileHtml).join('')}</div>
+          </div>
+        </div>
+      `
+    }
+
+    renderHud(document.getElementById('hud-baseline'))
+    renderHud(document.getElementById('hud-experimental'))
+
+    const expHud = document.getElementById('hud-experimental')
+    const checkboxes = document.querySelectorAll('.exp-controls input[type="checkbox"]')
+
+    function applyFx(fx, on) {
+      expHud.classList.toggle(`fx-${fx}`, on)
+    }
+
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', e => {
+        applyFx(e.target.dataset.fx, e.target.checked)
+      })
+    })
+
+    document.getElementById('all-on').addEventListener('click', () => {
+      checkboxes.forEach(cb => { cb.checked = true; applyFx(cb.dataset.fx, true) })
+    })
+    document.getElementById('all-off').addEventListener('click', () => {
+      checkboxes.forEach(cb => { cb.checked = false; applyFx(cb.dataset.fx, false) })
+    })
+    // Re-render to replay any animation effects (entry slide-in, etc.).
+    document.getElementById('replay').addEventListener('click', () => {
+      renderHud(expHud)
+      // Class state survives because expHud reference is preserved.
+    })
+  </script>
+
+</body>
+</html>
