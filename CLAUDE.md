@@ -1,6 +1,6 @@
 # AstroHold — Project Rules for Claude
 
-## Status: Single-player D&D-style strategy LIVE (session 14)
+## Status: Single-player D&D-style strategy LIVE (session 15)
 Chess-like turn-based grid strategy. **BUILD → REVEAL** is the live flow
 (PLAN phase code exists but is currently skipped — see Phase flow section).
 After the first BATTLE click, reveals **auto-chain** until win / lose /
@@ -37,15 +37,34 @@ D&D-style strategy:
   `allowDiagonalMove: true`. Fragile (HP 50). See `MedicPad.ts`,
   `Tether.ts`, and `RevealPhase.medicDefaultAction()`.
 
-## HUD (session 14)
+## HUD (session 15)
 Floating top strip with three SVG-silhouetted panels — DO NOT reserve
 canvas space for it (canvas is full window; HUD floats on top with
 `rgba(8,18,32,0.58)` panel fill so the map shows through). To stop the
 world top row from rendering BEHIND the HUD, `Game.computeCameraYOffset()`
 reads `--hud-top-h` and shifts `camera.position.y` so world top aligns
 with HUD bottom. Resize re-applies via the delta to preserve user pan.
-- LEFT panel — 4×2 robot tile grid (8 unique pieces): Sphere/Tower/Bomber/Wall
-  over Dog/Defense/Laser/Signal. Defense/Laser/Signal are "preview"
+
+Tile grid sizing (session 15): `.tile-grid` uses
+`grid-template-columns/-rows: repeat(N, auto)` + `justify-content: center`
++ `align-content: center` so each `.hud-tile` is content-sized (icon +
+label + cost) and the cluster sits centered with breathing room on all
+four sides of the cyan panel border. Unit icons remain at
+`clamp(46px, 7vh, 64px)`. Don't go back to `1fr` — it stretched tiles
+into the panel border and left empty space under the cost text.
+
+Six effects shipped in session 15 from the `/build-test.html` sandbox:
+tile hover-pop (snappy scale + glow), CR bloom pulse (50% intensity),
+letter-by-letter phase title reveal (`HUD.setPhase` wraps chars in
+`.boot-char` spans inside `.phase-chars`), additive-blend selection
+pulse ring (on `.hud-tile.selected`), edge-trace orbit (SVG
+`<animateMotion>` dot on center panel — auto-hidden during REVEAL
+via `.phase-reveal` class), unit icon glow. All theme-matched
+(cyan defender / pink attacker).
+
+- LEFT panel — 4×2 robot tile grid (8 pieces): Sphere/Tower/Bomber/TOWER
+  (the WALL slot is a duplicate TOWER until wall art exists) over
+  Dog/Defense/Laser/Signal. Defense/Laser/Signal are "preview"
   pieces with placeholder behavior (no unique mechanics yet).
 - CENTER panel — clean chamfered rectangle SVG with two internal dividers
   splitting it into three console "screens":
@@ -58,9 +77,10 @@ with HUD bottom. Resize re-applies via the delta to preserve user pan.
     Color follows role (.role-defender = blue, .role-attacker = red);
     `:active` translates 2px to feel mechanical.
 - RIGHT panel — duplicate of LEFT, both clickable.
-- Cyborg variant `#hud-top-att` has 4×2 attacker grid (5 unique
-  cyborgs + 3 duplicates until new art exists). `setPlayerSide` toggles
-  which strip variant renders; `.ai-side` hides the inactive one.
+- Cyborg variant `#hud-top-att` has 4×2 attacker grid (6 unique
+  cyborgs + 2 duplicates after S15 added Medic to the roster).
+  `setPlayerSide` toggles which strip variant renders; `.ai-side`
+  hides the inactive one.
 - Panel silhouettes are inline SVG with `vector-effect="non-scaling-
   stroke"` so chamfered corners stay crisp at any width. CSS clip-path
   was tried and abandoned — produces aliased corners against borders.
@@ -138,7 +158,10 @@ cost was unwarranted.
 - Power Core at (-550, 0) — **2x2 footprint** (size rule), sprite size
   `GRID_CELL * 3` = 150 world units. Centroid sits on a grid intersection,
   4 underlying cells reserved.
-- Start credits: 1000 (testing budget)
+- Start credits: 1000 (testing budget). **AI side gets +50%** via
+  `Config.AI_CREDIT_BONUS = 0.5` (= 1500cr) to compensate for the lack
+  of human positional judgement — applied per-side in `enterBuildPhase`
+  based on which side the player picked. Tune knob for balance.
 - **All piece costs in multiples of 10** so leftover credits remain
   spendable by the cheapest piece (Wall 20cr / Grenadier 50cr).
 - `STATIONARY_INITIATIVE = 100` (from `TurnTypes.ts`). Defender structures

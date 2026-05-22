@@ -1404,3 +1404,171 @@ asking the user to confirm direction mid-build).
   this to look nice ;)" was the polite signal). Areas for future
   polish: typography on body text, divider line treatment, the corner
   rivet decoration, microinteractions on credit/phase changes.
+
+---
+
+## Session 15 (2026-05-22) — HUD polish sandbox + Cyborg Medic (3 heal modes) + AI buff
+
+### What landed
+- **Build-test sandbox at `/build-test.html`.** Standalone page that
+  renders the production HUD three times for A/B comparison:
+  `BASELINE` (current production), `EXPERIMENTAL` (production + 15
+  toggleable effects on a right-side checklist), `NO TILE BOXES`
+  (production minus the dark-blue tile background + icon frame so
+  units float directly on the panel). Effects mostly map round-1 +
+  round-2 Three.js suggestions to DOM/CSS/SVG equivalents — see the
+  "WHAT TRANSLATED, WHAT DIDN'T" footer on the page. Survives as the
+  go-to surface for future HUD iteration so we don't risk the live
+  game.
+- **Six HUD effects shipped to production** after sandbox A/B:
+  - **Tile hover-pop** — `transform: translateY(-3px) scale(1.06)`
+    spring + brighter rim glow.
+  - **CR bloom pulse (50% intensity)** — `text-shadow` keyframes on
+    `.cr-num`. Toned down from the sandbox default per user.
+  - **Letter-by-letter title reveal** — `HUD.setPhase` wraps the
+    phase title in `.boot-char` spans with staggered
+    `animation-delay`; the new `.phase-chars` wrapper keeps the
+    `.center-phase` inline-flex `gap` from exploding letter spacing.
+  - **Selection pulse ring** — additive (`mix-blend-mode: screen`)
+    ring radiates outward from `.hud-tile.selected`. Theme-matched
+    (cyan defender / pink attacker).
+  - **Edge-trace orbit** — glowing dot circles the center panel via
+    SVG `<animateMotion>` on the same chamfered path the panel-frame
+    uses. **Hidden during REVEAL** (later in session) because it
+    competes with the combat log.
+  - **Unit icon glow** — soft theme-matched halo on every `.tile-icon`
+    + brightness/drop-shadow boost on the sprite. Intensifies on
+    hover.
+- **Tighter tile sizing in the shop.** `.tile-grid` columns + rows
+  switched from `1fr` to `auto`, plus `justify-content: center` +
+  `align-content: center`. Each `.hud-tile` box now hugs its content
+  (icon + label + cost) instead of stretching to fill its grid cell —
+  no more empty band under the "cost" text — and the centered cluster
+  has breathing room on all four sides of the cyan panel border. Gap
+  bumped to 10px (8px / 6px at 1100/860 breakpoints). Unit icons
+  unchanged.
+- **WALL → duplicate TOWER.** Wall sprite art doesn't exist yet and
+  the "?" placeholder didn't match the rest of the row. `robotTiles`
+  slot 3 now renders a tower (same `data-type="turret"` so clicking
+  it places a regular tower). Drop the duplicate once wall art lands.
+- **Cyborg Medic — full implementation** with three heal modes
+  sharing a 5-charge ammo pool, plus diagonal movement (first mobile
+  unit with `allowDiagonalMove: true`). Sprites extracted from
+  Cyborg_MEDIC.zip: 8 rotations, 4-frame idle (Breathing_Idle),
+  6-frame walking, 9-frame die (stops_and_drops_dead — landed in
+  the follow-up zip update mid-session).
+  - **Med-pack throw** (1 charge, 3-cell range) — green med-pack
+    `Projectile` arcs to a damaged ally; on-land calls
+    `target.heal(30)` + flashes the sprite material green for
+    280ms. Med-pack sprite generated procedurally via
+    `CanvasTexture` (white pad + green cross) — no PNG asset
+    shipped. Reuses the Bomber's lobbed-projectile pipeline.
+  - **Medic-pad** (2 charges) — new `MedicPad` entity dropped on
+    an empty cell. Procedural `CanvasTexture` sprite (white pad +
+    green cross + halo gradient). Heals every damaged cyborg
+    within ~1.5 cells for 15 HP per tick. 4 ticks of charges, 60
+    HP, destructible. Ticks at start of each reveal so cyborgs
+    are topped up before they take their actions.
+  - **Tether** (1 charge / turn) — new `Tether` entity with a
+    `PlaneGeometry` strip rendered per-frame as a glowing green
+    beam between medic + target. Two-layer (additive halo + bright
+    core) so it reads as light, not a bar. Both endpoints pinned —
+    `SpriteUnit.tether` field flips the default-action to `hold`
+    while active. Target heals 20 HP per turn; auto-ends when
+    medic ammo runs out, target hits full HP, or either dies.
+  - **AI priority** (`RevealPhase.medicDefaultAction`) — tether a
+    high-value damaged ally (Hulk / Sniper / Cannon / Doublegun)
+    first → throw at most-damaged ally in 3-cell range → drop pad
+    on cluster of 2+ damaged cyborgs → walk toward most-damaged.
+    Falls through to march-on-core when nothing needs healing so
+    the medic follows the front line.
+  - **HUD integration.** Replaces the second CANNON duplicate in
+    `cyborgTiles`. `OpponentAI` weighted pool gets a weight-1
+    medic entry. UnitType union picks up 'medic' automatically
+    from Config inference. Placement / preload / HUD click
+    handler all type-driven, no special-cases needed.
+- **AI credit buff** — `Config.AI_CREDIT_BONUS = 0.5` (+50%). AI side
+  starts with 1500 credits, player keeps 1000. Cyborgs were getting
+  shredded by entrenched defender Sphere + Laser arrays; the AI
+  needs bodies to compensate for not having human positional
+  judgement. Applied per-side in `enterBuildPhase` based on which
+  side the player picked. **Tune knob** for future balance work.
+- **REVEAL HUD tweaks.** `HUD.setPhase` stamps `.phase-reveal` on
+  the top-strip container during REVEAL; CSS hides `.edge-trace`
+  under that class so the orbiting dot doesn't compete with the
+  scrolling combat log. Combat log text centered
+  (`text-align: center` on `.center-log`) instead of left-aligned.
+
+### Hard-won lessons
+- **"Shrink the boxes" ≠ "shrink the units."** First pass at the
+  tighter-tile change scaled `.tile-icon` from 56→46. User
+  immediately corrected: they wanted the **dark blue tile container**
+  smaller, the unit sprites unchanged. Lesson: parse the user's
+  noun precisely. "Boxes" = `.hud-tile` containers, "units" /
+  "icons" = the sprite art. Auto-sized grid cells solved it without
+  touching icon dimensions.
+- **The HUD is DOM. Most "Three.js" suggestions don't apply.** Two
+  rounds of AI-generated HUD effect suggestions assumed the HUD
+  lived inside the WebGL scene (TextGeometry, BoxGeometry buttons,
+  SpotLight, UnrealBloomPass, `material.wireframe`, `Group.lerp`).
+  Our HUD is HTML/CSS overlaid on the canvas — moving it into the
+  scene would be a rewrite, not an effect to A/B. The build-test
+  sandbox uses CSS/SVG/2D-canvas equivalents that achieve the same
+  visual outcome.
+- **Procedural `CanvasTexture` is gold for placeholder sprites.**
+  Med-pack + medic-pad both render from 32-64px canvases drawn
+  with `ctx.fillRect` calls — no PNG asset shipped, no asset
+  pipeline. Pattern: build the canvas in a `make…Texture()`
+  function, cache the result, use as `THREE.CanvasTexture`. Great
+  for icons that don't need PixelLab-quality art.
+- **AI credit bonus is a clean balance lever.** When a side
+  consistently loses, a credit multiplier is a less destructive
+  fix than re-tuning unit costs/HP across the roster. Lives in
+  `Config.AI_CREDIT_BONUS`, applies once at `enterBuildPhase`.
+- **Sandbox-then-promote works.** Building the build-test page
+  before touching production HUD let the user toggle effects on/
+  off until they knew exactly what to ship. Six effects went from
+  experimental to production in one clean commit because they'd
+  already been previewed in context.
+
+### Memory entries added/updated this session
+- New: `project_session_15_medic.md` — Medic spec, heal-mode
+  mechanics, ammo budgeting, AI priority, Tether/MedicPad entities.
+- New: `feedback_shrink_boxes_not_units.md` — parse user nouns
+  precisely; "boxes" = containers, "units" / "icons" = the art
+  inside.
+- New: `reference_build_test_sandbox.md` — `/build-test.html` is
+  the HUD A/B surface; all preview rows rebased on current
+  production so variants compare against what actually ships.
+- Update: `project_chess_turn_system.md` — note Medic + diagonal
+  movement, AI credit bonus pattern.
+
+### Suggested next-session opening moves
+1. **Playtest pass with Medic + AI buff.** With the AI at +50% and
+   the Medic in the cyborg pool, the balance should be different
+   enough to need a tuning pass. Track win rates as
+   defender vs attacker.
+2. **Wall sprite art.** Replace the duplicate TOWER in slot 3 of
+   `robotTiles` with a proper wall when art lands. The placeholder
+   is functional but visually redundant.
+3. **Re-enable PLAN phase for Medic targeting.** All three heal
+   modes pick their target via AI heuristic right now. A real
+   strategy-mode would let the player choose which damaged ally
+   to tether/throw at — PLAN is the natural place to surface that.
+4. **Define the 3 preview defender pieces** (DEFENSE / LASER /
+   SIGNAL) with distinct mechanics. Still carrying over from S14.
+5. **More cyborg art.** With Medic landed, cyborg roster is 6
+   unique + 2 duplicates. Generate one more (Assassin or
+   Berserker) to fill out the 8-tile grid.
+
+### Open friction points
+- Defender Sphere + Laser arrays are still strong — AI buff might
+  need to go to 0.75x or 1.0x. Watch playtest.
+- Medic doesn't have a throw / shoot animation — snaps to the
+  static rotation pose during the heal moment. Works but reads
+  as static.
+- Medic-pad has no direct-fire vulnerability today — only AoE can
+  damage it (and pads aren't even in `applyAoeForSide`'s defender
+  loop, so currently nothing damages them). They self-destruct
+  on charge expiry. Add direct-fire targeting + AoE inclusion if
+  balance shifts.
