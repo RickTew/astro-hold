@@ -504,6 +504,115 @@
       100% { stroke-dashoffset: -200; }
     }
 
+    /* fx-canvas-text — replace HTML title with a <canvas> drawing the
+       text procedurally each frame. CSS equivalent of "CanvasTexture":
+       per-frame flicker/glow control that CSS keyframes can't quite do. */
+    .phase-canvas {
+      display: block;
+      max-width: 100%;
+      pointer-events: none;
+    }
+    .exp-hud.fx-canvas-text .center-phase {
+      /* When canvas is active, the parent acts as a sized container; bracket
+         pseudo-elements still flank it via flex. */
+      gap: 12px;
+    }
+
+    /* fx-boot-reveal — letter-by-letter reveal of "BUILD PHASE".
+       Spans are injected by JS when the effect activates. */
+    .exp-hud.fx-boot-reveal .center-phase .boot-char {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(-6px);
+      animation: boot-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    }
+    @keyframes boot-char-in {
+      from { opacity: 0; transform: translateY(-8px); filter: blur(2px); }
+      to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+    }
+
+    /* fx-led — small status LED beside the title. Cyan dot, pulses
+       in/out to suggest the console is "online". */
+    .exp-hud.fx-led .cc-title {
+      position: relative;
+    }
+    .exp-hud.fx-led .cc-title::before {
+      content: '';
+      position: absolute;
+      left: clamp(20px, 5%, 32px);
+      top: 50%;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #6ac4ff;
+      box-shadow:
+        0 0 0 1px rgba(180, 220, 255, 0.6) inset,
+        0 0 8px #6ac4ff,
+        0 0 16px rgba(60, 170, 230, 0.7);
+      transform: translateY(-50%);
+      animation: led-blink 1.6s ease-in-out infinite;
+    }
+    @keyframes led-blink {
+      0%, 100% { opacity: 0.55; box-shadow: 0 0 0 1px rgba(180,220,255,0.4) inset, 0 0 6px #6ac4ff, 0 0 10px rgba(60,170,230,0.5); }
+      50%      { opacity: 1;    box-shadow: 0 0 0 1px rgba(180,220,255,0.8) inset, 0 0 12px #6ac4ff, 0 0 24px rgba(60,170,230,0.9); }
+    }
+
+    /* fx-add-ring — additive-blend pulse ring behind one tile, demoing
+       a "selected" state. Mix-blend-mode: screen is the DOM equivalent
+       of Three.js additive blending. */
+    .exp-hud.fx-add-ring .hud-tile:nth-child(2) {
+      overflow: visible;
+    }
+    .exp-hud.fx-add-ring .hud-tile:nth-child(2)::before {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border: 2px solid #6ac4ff;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      animation: add-ring-pulse 1.5s ease-out infinite;
+    }
+    @keyframes add-ring-pulse {
+      0%   { opacity: 0.95; transform: scale(0.94); box-shadow: 0 0 0 0 rgba(106, 196, 255, 0.85); }
+      80%  { opacity: 0.10; transform: scale(1.18); box-shadow: 0 0 22px 6px rgba(106, 196, 255, 0); }
+      100% { opacity: 0;    transform: scale(1.20); box-shadow: 0 0 0 0 rgba(106, 196, 255, 0); }
+    }
+    .exp-hud.fx-add-ring .hud-tile:nth-child(2)::after {
+      content: 'SELECTED';
+      position: absolute;
+      top: -8px;
+      right: -4px;
+      font-family: 'Orbitron', monospace;
+      font-size: 7px;
+      letter-spacing: 1px;
+      padding: 1px 4px;
+      background: #003a5a;
+      color: #b8e8ff;
+      border: 1px solid #6ac4ff;
+      pointer-events: none;
+    }
+
+    /* fx-edge-trace — glowing dot orbits the center panel's perimeter.
+       Pure SVG with <animateMotion> along the panel's chamfered path. */
+    .edge-trace {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+      overflow: visible;
+    }
+    .exp-hud.fx-edge-trace .edge-trace {
+      display: block;
+    }
+    .edge-trace circle {
+      filter:
+        drop-shadow(0 0 4px #6ac4ff)
+        drop-shadow(0 0 10px #6ac4ff)
+        drop-shadow(0 0 18px rgba(0, 140, 220, 0.7));
+    }
+
     /* ─── Controls panel (fixed right) ─────────────────────────────── */
     .exp-controls {
       position: fixed;
@@ -594,10 +703,16 @@
   <div class="page-head">
     <h1>BUILD PHASE — Design Sandbox</h1>
     <p>
-      Production HUD (top) vs experimental HUD (bottom). Toggle effects on the right.
-      Suggestions that targeted 3D-scene rendering (TextGeometry, Three.js lights, UnrealBloomPass,
-      mesh wireframes) have been adapted to their CSS/SVG equivalents — the HUD is DOM-based, so
-      raw Three.js APIs don't apply, but the visual intent translates cleanly.
+      Three rows: <strong>BASELINE</strong> (current production), <strong>EXPERIMENTAL</strong>
+      (toggle effects on the right), <strong>SWEET SPOT</strong> (preset combo of the user's
+      recommended stack).
+    </p>
+    <p style="margin-top: 8px;">
+      Both rounds of suggestions assumed the HUD lives inside the Three.js scene
+      (TextGeometry, CanvasTexture, SpriteMaterial, Three.Group, fragment shaders, additive
+      blend sprites). Our HUD is HTML/CSS overlaid on the canvas — moving it into the WebGL
+      scene would be a rewrite, not an effect to A/B. Each effect below uses the closest
+      DOM/SVG/2D-canvas equivalent that achieves the same visual outcome.
     </p>
   </div>
 
@@ -612,6 +727,16 @@
     <h2>EXPERIMENTAL <span class="tag">EFFECTS ON</span></h2>
     <div class="preview-frame">
       <div id="hud-experimental" class="hud-top exp-hud"></div>
+    </div>
+  </div>
+
+  <!-- Third row: preset combo of the user's recommended sweet spot
+       (canvas text + selection pulse + LED + edge trace + bloom).
+       Always-on so we can compare it against baseline + the toggle row. -->
+  <div class="preview-section">
+    <h2>SWEET SPOT <span class="tag">RECOMMENDED COMBO</span></h2>
+    <div class="preview-frame">
+      <div id="hud-sweetspot" class="hud-top exp-hud fx-canvas-text fx-edge-trace fx-add-ring fx-led fx-cr-bloom fx-tile-pop"></div>
     </div>
   </div>
 
@@ -644,6 +769,21 @@
     <label><input type="checkbox" data-fx="wireframe"> Wireframe panels</label>
     <span class="fx-desc">Dashed borders + ghost icons (holo vibe)</span>
 
+    <label><input type="checkbox" data-fx="canvas-text"> Canvas title text</label>
+    <span class="fx-desc">JS-drawn canvas (procedural flicker + scanlines)</span>
+
+    <label><input type="checkbox" data-fx="boot-reveal"> Letter-by-letter reveal</label>
+    <span class="fx-desc">Title boots up character by character</span>
+
+    <label><input type="checkbox" data-fx="led"> Status LED dot</label>
+    <span class="fx-desc">Pulsing cyan dot beside title</span>
+
+    <label><input type="checkbox" data-fx="add-ring"> Selection pulse ring</label>
+    <span class="fx-desc">Additive-blend ring on tile #2</span>
+
+    <label><input type="checkbox" data-fx="edge-trace"> Edge-trace orbit</label>
+    <span class="fx-desc">Glowing dot orbits the center panel</span>
+
     <div class="btn-row">
       <button id="all-on">ALL ON</button>
       <button id="all-off">ALL OFF</button>
@@ -652,15 +792,28 @@
   </aside>
 
   <section class="discarded">
-    <h2>DISCARDED SUGGESTIONS (don't apply to a DOM HUD)</h2>
+    <h2>SUGGESTIONS MAPPED — WHAT TRANSLATED, WHAT DIDN'T</h2>
+    <p style="margin-bottom: 12px; color: #aabbcc;">
+      Both rounds of suggestions had a lot of overlap. Here's the honest accounting:
+    </p>
     <ul>
-      <li><strong>TextGeometry / FontLoader</strong> — 3D text only. Our title is HTML text; CSS text-shadow + animated gradient gives the same visual without the rebuild.</li>
-      <li><strong>BoxGeometry / PlaneGeometry buttons</strong> — would require rebuilding the HUD inside the WebGL scene. Our tiles already render as DOM elements with hover states.</li>
-      <li><strong>SpotLight / RectAreaLight banner sweep</strong> — Three.js lights don't illuminate DOM. The "light sweep" effect is the CSS-equivalent above.</li>
-      <li><strong>UnrealBloomPass</strong> — postprocessing only affects the WebGL canvas, not DOM elements floating over it. CSS <code>filter: drop-shadow</code> is the practical equivalent.</li>
-      <li><strong>material.wireframe = true</strong> — only valid on 3D mesh materials. "Wireframe" toggle above uses dashed CSS borders + ghosted icons as a holographic stand-in.</li>
-      <li><strong>Group.position.lerp() for menu slide-in</strong> — CSS keyframes handle DOM slide-in natively, no need for a Three.js animation system.</li>
-      <li><strong>Procedural GLSL noise shader</strong> — replaced with SVG <code>feTurbulence</code>, which is the W3C-standard procedural noise filter for DOM content. Same visual outcome, no shader pipeline.</li>
+      <li><strong>CanvasTexture / bitmap text</strong> → kept. The "Canvas title text" toggle draws "BUILD PHASE" into a real <code>&lt;canvas&gt;</code> with per-frame procedural flicker. No Three.js needed — the DOM has its own canvas, same API.</li>
+      <li><strong>Additive blend sprites (selection ring)</strong> → kept. The "Selection pulse ring" toggle uses <code>mix-blend-mode: screen</code>, which is the DOM equivalent of Three.js additive blending.</li>
+      <li><strong>Sprite icons (SpriteMaterial)</strong> → already done. Our tiles use <code>&lt;img&gt;</code> with pixelated rendering — visually identical, lighter.</li>
+      <li><strong>Hover tint / scale animation</strong> → already done via CSS <code>:hover</code>. "Tile hover-pop" makes it more dramatic.</li>
+      <li><strong>Procedural Layout (Group + position.lerp)</strong> → "Tile slide-in" toggle uses CSS keyframes for the same effect.</li>
+      <li><strong>Shader glow / GLSL radial gradient</strong> → "Title neon boost" + "CR bloom pulse" use CSS <code>text-shadow</code> + <code>filter</code>. Same look, no shader compiler.</li>
+      <li><strong>Procedural GLSL noise</strong> → SVG <code>feTurbulence</code> filter ("Procedural noise" toggle). This is the W3C-standard procedural-noise primitive; visually equivalent to a simplex-noise shader.</li>
+      <li><strong>Pulse / Math.sin breathing</strong> → CSS <code>@keyframes</code> with <code>ease-in-out infinite</code>. Same math, declarative.</li>
+      <li><strong>Scrolling starfield plane / UV-offset</strong> → "Animated starfield" toggle, CSS <code>background-position</code> animation.</li>
+    </ul>
+    <p style="margin-top: 14px; margin-bottom: 8px; color: #ddccaa;">Still inapplicable without rewriting the HUD into the Three.js scene:</p>
+    <ul>
+      <li><strong>TextGeometry / FontLoader</strong> — 3D extruded text. Different look entirely; not equivalent to canvas-text.</li>
+      <li><strong>BoxGeometry / PlaneGeometry buttons</strong> — requires a 3D mesh HUD with raycaster-driven input.</li>
+      <li><strong>SpotLight / RectAreaLight</strong> — Three.js lights illuminate 3D meshes, not DOM nodes.</li>
+      <li><strong>UnrealBloomPass</strong> — postprocessing acts on the WebGL framebuffer, not the DOM overlay.</li>
+      <li><strong>Three.Group + scene-graph hierarchy</strong> — solved at the DOM level by container <code>&lt;div&gt;</code>s; no Group is needed.</li>
     </ul>
   </section>
 
@@ -708,6 +861,12 @@
         <circle cx="306" cy="14" r="1.6" fill="${dot}" fill-opacity="0.65"/>
         <circle cx="14" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
         <circle cx="306" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+      </svg>
+      <svg class="edge-trace" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
+        <circle r="3.5" fill="#b8e8ff">
+          <animateMotion dur="6s" repeatCount="indefinite" rotate="auto"
+            path="M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z"/>
+        </circle>
       </svg>`
     }
 
@@ -750,31 +909,147 @@
 
     renderHud(document.getElementById('hud-baseline'))
     renderHud(document.getElementById('hud-experimental'))
+    renderHud(document.getElementById('hud-sweetspot'))
 
-    const expHud = document.getElementById('hud-experimental')
-    const checkboxes = document.querySelectorAll('.exp-controls input[type="checkbox"]')
+    const expHud      = document.getElementById('hud-experimental')
+    const sweetHud    = document.getElementById('hud-sweetspot')
+    const checkboxes  = document.querySelectorAll('.exp-controls input[type="checkbox"]')
 
-    function applyFx(fx, on) {
-      expHud.classList.toggle(`fx-${fx}`, on)
+    // ─── Canvas-text effect ──────────────────────────────────────────
+    // Replaces the .center-phase HTML text with a <canvas> that's
+    // redrawn each frame with random per-frame flicker + breathing glow.
+    // This is the only "Three.js CanvasTexture" suggestion that adds
+    // something CSS can't do — per-frame procedural noise on text.
+    function drawSpaced(ctx, text, cx, cy, spacing) {
+      const chars = text.split('')
+      let total = -spacing
+      chars.forEach(c => { total += ctx.measureText(c).width + spacing })
+      let x = cx - total / 2
+      chars.forEach(c => {
+        const w = ctx.measureText(c).width
+        ctx.fillText(c, x + w / 2, cy)
+        x += w + spacing
+      })
+    }
+    function startPhaseCanvas(canvas, parentEl, text) {
+      const ctx = canvas.getContext('2d')
+      function frame(t) {
+        if (!canvas.isConnected) return
+        const rect = parentEl.getBoundingClientRect()
+        if (rect.width === 0) { requestAnimationFrame(frame); return }
+        const dpr = window.devicePixelRatio || 1
+        const targetW = Math.max(220, Math.round(rect.width || 240))
+        const targetH = Math.max(36,  Math.round(rect.height || 40))
+        if (canvas.width !== Math.round(targetW * dpr)) {
+          canvas.width  = Math.round(targetW * dpr)
+          canvas.height = Math.round(targetH * dpr)
+          canvas.style.width  = targetW + 'px'
+          canvas.style.height = targetH + 'px'
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, targetW, targetH)
+        const flicker = 0.88 + 0.12 * Math.random()
+        const glow    = 12 + 5 * Math.sin(t * 0.003)
+        ctx.font = '900 22px Orbitron, "Courier New", monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        // Deep aura
+        ctx.shadowColor = '#2090e0'
+        ctx.shadowBlur = glow + 12
+        ctx.fillStyle = `rgba(60, 130, 200, ${flicker * 0.5})`
+        drawSpaced(ctx, text, targetW / 2, targetH / 2, 6)
+        // Neon
+        ctx.shadowColor = '#6ac4ff'
+        ctx.shadowBlur = glow
+        ctx.fillStyle = `rgba(184, 232, 255, ${flicker})`
+        drawSpaced(ctx, text, targetW / 2, targetH / 2, 6)
+        // Hot core
+        ctx.shadowBlur = 0
+        ctx.fillStyle = `rgba(244, 250, 255, ${flicker})`
+        drawSpaced(ctx, text, targetW / 2, targetH / 2, 6)
+        // Scanlines
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.20)'
+        for (let y = 2; y < targetH; y += 3) ctx.fillRect(0, y, targetW, 1)
+        requestAnimationFrame(frame)
+      }
+      requestAnimationFrame(frame)
+    }
+    function initCanvasText(hudEl) {
+      hudEl.querySelectorAll('.center-phase').forEach(el => {
+        if (el.querySelector('.phase-canvas')) return
+        const text = (el.dataset.original = el.dataset.original || el.textContent)
+        el.textContent = ''
+        const canvas = document.createElement('canvas')
+        canvas.className = 'phase-canvas'
+        canvas.style.width = '240px'
+        canvas.style.height = '40px'
+        el.appendChild(canvas)
+        startPhaseCanvas(canvas, el, text)
+      })
+    }
+    function teardownCanvasText(hudEl) {
+      hudEl.querySelectorAll('.center-phase').forEach(el => {
+        const canvas = el.querySelector('.phase-canvas')
+        if (canvas) canvas.remove()
+        if (el.dataset.original) el.textContent = el.dataset.original
+      })
+    }
+
+    // ─── Boot-reveal effect ──────────────────────────────────────────
+    function initBootReveal(hudEl) {
+      hudEl.querySelectorAll('.center-phase').forEach(el => {
+        if (el.querySelector('.phase-canvas')) return // canvas-text wins
+        const text = (el.dataset.original = el.dataset.original || el.textContent)
+        el.innerHTML = text.split('').map((c, i) =>
+          `<span class="boot-char" style="animation-delay:${i*45 + 50}ms">${c === ' ' ? '&nbsp;' : c}</span>`
+        ).join('')
+      })
+    }
+    function teardownBootReveal(hudEl) {
+      hudEl.querySelectorAll('.center-phase').forEach(el => {
+        if (el.querySelector('.phase-canvas')) return
+        if (el.dataset.original) el.textContent = el.dataset.original
+      })
+    }
+
+    const fxHandlers = {
+      'canvas-text': { on: initCanvasText, off: teardownCanvasText },
+      'boot-reveal': { on: initBootReveal, off: teardownBootReveal },
+    }
+
+    function applyFx(hudEl, fx, on) {
+      hudEl.classList.toggle(`fx-${fx}`, on)
+      const h = fxHandlers[fx]
+      if (h) (on ? h.on : h.off)(hudEl)
     }
 
     checkboxes.forEach(cb => {
       cb.addEventListener('change', e => {
-        applyFx(e.target.dataset.fx, e.target.checked)
+        applyFx(expHud, e.target.dataset.fx, e.target.checked)
       })
     })
 
     document.getElementById('all-on').addEventListener('click', () => {
-      checkboxes.forEach(cb => { cb.checked = true; applyFx(cb.dataset.fx, true) })
+      checkboxes.forEach(cb => { cb.checked = true; applyFx(expHud, cb.dataset.fx, true) })
     })
     document.getElementById('all-off').addEventListener('click', () => {
-      checkboxes.forEach(cb => { cb.checked = false; applyFx(cb.dataset.fx, false) })
+      checkboxes.forEach(cb => { cb.checked = false; applyFx(expHud, cb.dataset.fx, false) })
     })
-    // Re-render to replay any animation effects (entry slide-in, etc.).
+    // Re-render to replay slide-in / boot-reveal animations.
     document.getElementById('replay').addEventListener('click', () => {
       renderHud(expHud)
-      // Class state survives because expHud reference is preserved.
+      // Re-apply JS-driven effects that depend on DOM injection.
+      if (expHud.classList.contains('fx-canvas-text')) initCanvasText(expHud)
+      if (expHud.classList.contains('fx-boot-reveal')) initBootReveal(expHud)
+      renderHud(sweetHud)
+      initCanvasText(sweetHud)
     })
+
+    // Initialize the always-on sweet-spot row (preset effects from the
+    // user's recommended combo). The class names are baked into its
+    // markup; we still need to run the JS initializers for the effects
+    // that aren't pure CSS (canvas-text).
+    initCanvasText(sweetHud)
   </script>
 
 </body>
