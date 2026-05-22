@@ -142,6 +142,14 @@ export class HUD {
         <circle cx="306" cy="14" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
         <circle cx="14" cy="196" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
         <circle cx="306" cy="196" r="1.6" fill="${side === 'def' ? '#8fd0f2' : '#f28fa6'}" fill-opacity="0.65"/>
+      </svg>
+      <!-- Edge-trace orbit: glowing dot circles the panel perimeter.
+           Path matches the panel-frame chamfer exactly. -->
+      <svg class="edge-trace" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
+        <circle r="3.5" fill="${side === 'def' ? '#b8e8ff' : '#ffc8d2'}">
+          <animateMotion dur="6s" repeatCount="indefinite" rotate="auto"
+            path="M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z"/>
+        </circle>
       </svg>`
 
     this.container.innerHTML = `
@@ -438,8 +446,21 @@ export class HUD {
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
     const setCenter = (title: string, buttonLabel: string | null) => {
+      // Wrap each character in a .boot-char span so the CSS keyframe
+      // (phase-boot-in in index.html) runs the letter-by-letter reveal.
+      // All spans are nested inside one .phase-chars wrapper because
+      // .center-phase is `display: inline-flex` with a gap — without
+      // the wrapper, each letter would become a separate flex item and
+      // the gap would explode the title spacing. The wrapper keeps the
+      // flex container's child count at 1 (bracket / chars / bracket).
+      // Per-char animation-delay staggers the entrance.
+      const chars = title.split('').map((c, i) => {
+        const ch = c === ' ' ? '&nbsp;' : c
+        return `<span class="boot-char" style="animation-delay:${i * 45 + 50}ms">${ch}</span>`
+      }).join('')
+      const html = `<span class="phase-chars">${chars}</span>`
       this.container.querySelectorAll<HTMLElement>('.hud-panel.hud-center .center-phase')
-        .forEach(el => { el.textContent = title })
+        .forEach(el => { el.innerHTML = html })
       this.container.querySelectorAll<HTMLButtonElement>('.center-action-btn').forEach(btn => {
         if (buttonLabel === null) {
           btn.classList.add('hidden')
