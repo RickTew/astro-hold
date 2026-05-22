@@ -657,6 +657,53 @@
       padding: 4px 6px;
     }
 
+    /* ── No-boxes variant — strip the dark blue tile background, the
+       tile border, AND the inner .tile-icon frame so each unit sits
+       directly on the panel with just its label + cost. Sprite art
+       does the heavy lifting; the only "container" cue is the cyan
+       panel border around the whole shop. */
+    .no-boxes .tile-grid {
+      grid-template-columns: repeat(4, auto);
+      grid-template-rows: repeat(2, auto);
+      justify-content: center;
+      align-content: center;
+      gap: 14px 18px;
+    }
+    .no-boxes .hud-tile {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 2px 4px;
+    }
+    .no-boxes .hud-tile:hover {
+      background: transparent;
+      box-shadow: none;
+      border: none;
+      transform: translateY(-2px) scale(1.05);
+    }
+    .no-boxes .hud-tile .tile-icon {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+    .no-boxes .hud-tile .tile-icon img {
+      filter:
+        brightness(1.05)
+        drop-shadow(0 0 4px rgba(106, 196, 255, 0.55))
+        drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    }
+    .no-boxes .hud-tile:hover .tile-icon {
+      background: transparent;
+      box-shadow: none;
+      border: none;
+    }
+    .no-boxes .hud-tile:hover .tile-icon img {
+      filter:
+        brightness(1.20)
+        drop-shadow(0 0 8px rgba(180, 220, 255, 0.85))
+        drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+    }
+
     /* ─── Controls panel (fixed right) ─────────────────────────────── */
     .exp-controls {
       position: fixed;
@@ -781,6 +828,16 @@
     <h2>SWEET SPOT <span class="tag">RECOMMENDED COMBO</span></h2>
     <div class="preview-frame">
       <div id="hud-sweetspot" class="hud-top exp-hud fx-canvas-text fx-edge-trace fx-add-ring fx-led fx-cr-bloom fx-tile-pop"></div>
+    </div>
+  </div>
+
+  <!-- Fifth row: NO TILE BOXES — strip the dark blue tile background
+       + border + inner icon frame so units float directly on the
+       panel. Compare against TIGHTER TILES (4th row, current prod). -->
+  <div class="preview-section">
+    <h2>NO TILE BOXES <span class="tag">CLEAN VARIANT</span></h2>
+    <div class="preview-frame">
+      <div id="hud-noboxes" class="hud-top no-boxes exp-hud fx-tile-pop fx-cr-bloom fx-edge-trace"></div>
     </div>
   </div>
 
@@ -978,6 +1035,7 @@
     renderHud(document.getElementById('hud-experimental'))
     renderHud(document.getElementById('hud-sweetspot'))
     renderHud(document.getElementById('hud-tight'), tightTiles)
+    renderHud(document.getElementById('hud-noboxes'), tightTiles)
 
     const expHud      = document.getElementById('hud-experimental')
     const sweetHud    = document.getElementById('hud-sweetspot')
