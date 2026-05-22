@@ -541,6 +541,7 @@
       color: #99bbcc;
       padding-right: 4px;
       scrollbar-width: thin;
+      text-align: center;
     }
     .center-log .log-turn {
       color: #ffcc66;
@@ -1104,6 +1105,12 @@
         drop-shadow(0 0 10px #6ac4ff)
         drop-shadow(0 0 18px rgba(0, 140, 220, 0.7));
     }
+    /* Hide the orbiting trace dot during REVEAL — the combat log fills the
+       center panel and the moving dot reads as visual noise on top of the
+       constantly-updating log text. HUD.setPhase adds .phase-reveal to the
+       top container when entering REVEAL and removes it on other phases. */
+    #hud-top.phase-reveal .edge-trace,
+    #hud-top-att.phase-reveal .edge-trace { display: none; }
     .hud-panel[data-side="att"] .edge-trace circle {
       filter:
         drop-shadow(0 0 4px #ff7a9a)

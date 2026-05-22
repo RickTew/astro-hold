@@ -25,6 +25,11 @@ export const Config = {
   ATTACKER_MIN_X: 200,
   GRID_CELL: 50,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
+  // The AI side gets START_CREDITS × (1 + AI_CREDIT_BONUS) to compensate
+  // for not having a human's positional judgement. Cyborgs especially get
+  // shredded by entrenched defender Sphere + Laser arrays, so the AI needs
+  // bodies. 0.5 = +50% (1500 cr). Tune up if AI still loses too easily.
+  AI_CREDIT_BONUS: 0.5,
   TURN_INTERVAL: 0.65,   // seconds per battle turn — also drives unit move speed
   // Cost to add an extra fire-arc facing to a directional structure (turret /
   // bomber / cannon / gun / laser). Player opens the compass-rose popup by

@@ -61,7 +61,7 @@ export class Game {
   // and Reveal both read from this array across turns.
   private structures: Structure[] = []
 
-  private attCredits = Config.START_CREDITS
+  private attCredits: number = Config.START_CREDITS
   private attZoneMesh: THREE.LineSegments | null = null
   private defZoneMesh: THREE.LineSegments | null = null
 
@@ -310,11 +310,18 @@ private enterBuildPhase() {
     this.phase = 'build'
     this.attackerUnits = []
     this.defenderUnits = []
-    this.attCredits = Config.START_CREDITS
+    // AI side gets a credit bonus — the human's positional judgement
+    // outweighs raw piece count, so the AI fields a bigger squad to
+    // compensate. Player side keeps START_CREDITS exactly.
+    const aiSideCredits = Math.floor(Config.START_CREDITS * (1 + Config.AI_CREDIT_BONUS))
+    const aiIsAttacker  = this.playerSide === 'defender'
+    const aiIsDefender  = this.playerSide === 'attacker'
+    this.attCredits = aiIsAttacker ? aiSideCredits : Config.START_CREDITS
     this.hud.setPhase('build')
     this.hud.setAttCredits(this.attCredits)
+    const buildPhaseCredits = aiIsDefender ? aiSideCredits : Config.START_CREDITS
     this.buildPhase = new BuildPhase(
-      this.scene, this.camera, this.hud, Config.START_CREDITS,
+      this.scene, this.camera, this.hud, buildPhaseCredits,
       // Cross-system occupancy: structures must respect existing
       // spheres/cyborgs/core, which BuildPhase doesn't track.
       (col, row) => {

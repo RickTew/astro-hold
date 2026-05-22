@@ -156,15 +156,16 @@ const MANIFEST: Record<string, AnimManifest> = {
     throw:   { fps: 12, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
     die:     { fps: 10, loop: false, presentDirs: ['east'], frameCount: 9 },
   },
-  // Cyborg Medic — support unit. PixelLab export ships two animation states:
+  // Cyborg Medic — support unit. PixelLab export ships three animation states:
   //  - idle (Breathing_Idle): 4 frames × all 8 directions.
   //  - walking: 6 frames × all 8 directions.
-  // No throw / shoot / die clips yet — the medic snaps to the static
-  // rotation pose for the brief throw moment and silently disappears when
-  // killed (no death anim).
+  //  - die (stops_and_drops_dead): 9 frames × all 8 directions.
+  // No throw / shoot clip — the medic snaps to the static rotation pose
+  // for the brief throw moment.
   medic: {
     idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
     walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 6 },
+    die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
   },
 }
 

@@ -448,6 +448,12 @@ export class HUD {
   }
 
   setPhase(phase: 'build' | 'planning' | 'reveal' | 'win' | 'lose') {
+    // Stamp the top strip with the current phase so CSS can switch
+    // ambient effects on/off (e.g. hide the edge-trace orbit during
+    // REVEAL where it competes with the combat log).
+    this.container.querySelectorAll('#hud-top, #hud-top-att').forEach(el => {
+      el.classList.toggle('phase-reveal', phase === 'reveal')
+    })
     const setCenter = (title: string, buttonLabel: string | null) => {
       // Wrap each character in a .boot-char span so the CSS keyframe
       // (phase-boot-in in index.html) runs the letter-by-letter reveal.
