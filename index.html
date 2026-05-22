@@ -126,14 +126,19 @@
       padding: 4px 8px;
     }
 
-    /* ── Tile grid — 4 cols × 2 rows = 8 tiles per side. Slimmer roster
-       per side, but each tile is ~25% larger so pieces are easier to read
-       at a glance. ─────────────────────────────────────────────────── */
+    /* ── Tile grid — 4 cols × 2 rows = 8 tiles per side. Tiles are
+       content-sized (auto columns/rows) and centered both ways, so the
+       cluster sits with breathing room inside the cyan panel border
+       instead of stretching tile boxes edge to edge. Unit icons keep
+       their existing size — only the surrounding box hugs the content
+       tighter. ─────────────────────────────────────────────────────── */
     .tile-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      grid-template-rows: repeat(2, 1fr);
-      gap: 6px;
+      grid-template-columns: repeat(4, auto);
+      grid-template-rows: repeat(2, auto);
+      justify-content: center;
+      align-content: center;
+      gap: 10px;
       width: 100%;
       height: 100%;
     }
@@ -144,7 +149,7 @@
       align-items: center;
       justify-content: flex-start;
       gap: 1px;
-      padding: 4px 2px 4px;
+      padding: 4px 6px;
       cursor: pointer;
       background: linear-gradient(180deg, #0d1c2e 0%, #061320 100%);
       border: 1px solid #2a5577;
@@ -259,7 +264,8 @@
        crashes when squeezed. */
     @media (max-width: 1100px) {
       :root { --hud-top-h: 200px; }
-      .hud-tile { padding: 3px 1px; }
+      .hud-tile { padding: 3px 4px; }
+      .tile-grid { gap: 8px; }
     }
     @media (max-width: 860px) {
       :root { --hud-top-h: 180px; }
@@ -270,7 +276,8 @@
       }
       #hud-top > .hud-panel:nth-child(3),
       #hud-top-att > .hud-panel:nth-child(3) { display: none; }
-      .hud-tile { padding: 2px 1px; }
+      .hud-tile { padding: 2px 3px; }
+      .tile-grid { gap: 6px; }
     }
     @media (max-width: 640px) {
       :root { --hud-top-h: 160px; }
