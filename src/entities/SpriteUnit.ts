@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
-import { spawnHealVfx } from './HealVfx'
+import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
 // treat them interchangeably). Body is an 8-direction sprite with per-state
@@ -474,7 +474,7 @@ export class SpriteUnit {
   // Medic heal target — restore HP up to maxHp, trigger green pulse VFX on
   // the sprite material. Returns true if any HP was actually restored
   // (used by the medic AI to decide whether the action was worth it).
-  heal(amount: number): boolean {
+  heal(amount: number, vfxVariant: HealVfxVariant = 'plus'): boolean {
     if (this.isDead || this.hp >= this.maxHp) return false
     const before = this.hp
     this.hp = Math.min(this.maxHp, this.hp + amount)
@@ -487,15 +487,22 @@ export class SpriteUnit {
       mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
       if (this.hpRing) this.updateHpRing(ratio)
       this.pulseHealVfx()
-      // Floating heal-amount VFX (random variant: number / bubble / plus)
-      // so the player has a clear visual that a heal landed AND how much.
+      // Floating heal VFX — variant chosen by the caller so each heal
+      // mechanic has its own signature visual (tether=plus, throw=number,
+      // pad=bubble).
       const scene = this.mesh.parent
       if (scene instanceof THREE.Scene) {
-        spawnHealVfx(scene, this.logicalX, this.logicalY, restored)
+        spawnHealVfx(scene, this.logicalX, this.logicalY, restored, vfxVariant)
       }
     }
     return restored > 0
   }
+
+  // Expose HP bar toggle so tethers can show a temp bar during a heal-link
+  // and hide it when the link ends. Other code paths keep the bar hidden
+  // per the plan-then-watch design rule.
+  showHpBar() { this.hpBarGroup.visible = true }
+  hideHpBar() { this.hpBarGroup.visible = false }
 
   // Briefly tint the sprite material green to signal the heal landed.
   // SpriteMaterial.color multiplies the texture, so 0x88ff88 + alpha-mix

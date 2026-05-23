@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { spawnHealVfx } from './HealVfx'
+import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { playExplosion } from '../audio/sfx'
 
@@ -131,7 +131,7 @@ export class PixelPowerCore {
 
   // Repair-bot heal target. Refuses to restore HP once the core has started
   // dying — the death animation is final. Returns true iff any HP was added.
-  heal(amount: number): boolean {
+  heal(amount: number, vfxVariant: HealVfxVariant = 'plus'): boolean {
     if (this.dying || this.hp >= this.maxHp) return false
     const before = this.hp
     this.hp = Math.min(this.maxHp, this.hp + amount)
@@ -145,10 +145,13 @@ export class PixelPowerCore {
     this.pulseRepairVfx()
     const scene = this.mesh.parent
     if (scene instanceof THREE.Scene) {
-      spawnHealVfx(scene, this.mesh.position.x, this.mesh.position.y, restored)
+      spawnHealVfx(scene, this.mesh.position.x, this.mesh.position.y, restored, vfxVariant)
     }
     return true
   }
+
+  showHpBar() { this.hpBarGroup.visible = true }
+  hideHpBar() { this.hpBarGroup.visible = false }
 
   private repairPulseTimer: number | null = null
   private pulseRepairVfx() {

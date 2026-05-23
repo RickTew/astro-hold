@@ -112,7 +112,9 @@ export class MedicPad {
       if (a.isDead || a.hp >= a.maxHp) continue
       const d = Math.hypot(a.worldX - this.worldX, a.worldY - this.worldY)
       if (d > radius) continue
-      if (a.heal(HEAL_PER_CYCLE)) healed++
+      // 'bubble' VFX so pad pulses read as zone-aura heals — visually
+      // distinct from tether 'plus' stamps and throw 'number' floats.
+      if (a.heal(HEAL_PER_CYCLE, 'bubble')) healed++
     }
     this.chargesRemaining--
     const expired = this.chargesRemaining <= 0

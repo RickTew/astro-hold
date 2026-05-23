@@ -208,6 +208,7 @@ export class RevealPhase {
       if (shouldEnd) {
         medic.tether = null
         target.tether = null
+        target.hideHpBar()    // hide the temp HP bar shown during the link
         t.end()
         this.log('attacker', `${this.actorLabel(medic)} releases the tether on ${this.actorLabel(target)}`)
         continue
@@ -260,10 +261,8 @@ export class RevealPhase {
         t.ticksActive >= t.maxTicks
       if (shouldEnd) {
         bot.tether = null
-        // Defender mobile target also gets the pin released so default-action
-        // resumes; non-unit targets (structures/sphere/core) don't have a
-        // tether field — they were stationary the whole time.
         if (target instanceof SpriteUnit) target.tether = null
+        target.hideHpBar()    // hide temp HP bar shown during the weld
         t.end()
         this.log('defender', `${this.actorLabel(bot)} releases the weld on ${this.targetLabel(target)}`)
         continue
@@ -1429,6 +1428,9 @@ export class RevealPhase {
     // are already stationary.
     if (target instanceof SpriteUnit) target.tether = tether
     this.repairTethers.push(tether)
+    // Show the target's HP bar for the duration of the weld so the player
+    // sees the bar climb as repair ticks land. Hidden again on release.
+    target.showHpBar()
 
     target.heal(tether.healPerTick)
     actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1)
@@ -1460,6 +1462,8 @@ export class RevealPhase {
     actor.tether = tether
     target.tether = tether
     this.tethers.push(tether)
+    // Temp HP bar visible during the heal-link — hidden again on release.
+    target.showHpBar()
 
     // First tick happens NOW so the player sees an immediate heal + spend.
     target.heal(tether.healPerTick)
@@ -1542,7 +1546,10 @@ export class RevealPhase {
         this.log(side, `${sourceLabel}'s med-pack arrives too late for ${targetLabel}`)
         return
       }
-      const healed = target.heal(healAmount)
+      // 'number' VFX — med-pack throw shows the exact amount restored
+      // (the player wanted a clear number on the impact, distinct from
+      // the sustained 'plus' tether ticks).
+      const healed = target.heal(healAmount, 'number')
       this.log(side, healed
         ? `${sourceLabel} heals ${targetLabel} (+${healAmount})`
         : `${sourceLabel}'s med-pack lands but ${targetLabel} is already full`)

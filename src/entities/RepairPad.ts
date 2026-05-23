@@ -24,7 +24,7 @@ export interface RepairTarget {
   readonly isDead: boolean
   readonly worldX: number
   readonly worldY: number
-  heal(amount: number): boolean
+  heal(amount: number, vfxVariant?: 'number' | 'bubble' | 'plus'): boolean
 }
 
 let padTexture: THREE.CanvasTexture | null = null
@@ -134,7 +134,8 @@ export class RepairPad {
       if (t.isDead) return
       const d = Math.hypot(t.worldX - this.worldX, t.worldY - this.worldY)
       if (d > radius) return
-      if (t.heal(REPAIR_PER_CYCLE)) healed++
+      // 'bubble' VFX — area-aura look, matches MedicPad styling.
+      if (t.heal(REPAIR_PER_CYCLE, 'bubble')) healed++
     }
     for (const s of structures)    tryHeal(s)
     for (const u of defenderUnits) tryHeal(u)
@@ -148,7 +149,7 @@ export class RepairPad {
         const d = Math.hypot(cc.x - this.worldX, cc.y - this.worldY)
         if (d < nearest) nearest = d
       }
-      if (nearest <= radius && core.heal(REPAIR_PER_CYCLE)) healed++
+      if (nearest <= radius && core.heal(REPAIR_PER_CYCLE, 'bubble')) healed++
     }
     this.chargesRemaining--
     const expired = this.chargesRemaining <= 0

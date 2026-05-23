@@ -555,10 +555,6 @@ export class HUD {
       ${headline}
       <small>${subtitle}</small>
       <button id="play-again-btn" type="button">
-        <span class="pa-corner pa-tl"></span>
-        <span class="pa-corner pa-tr"></span>
-        <span class="pa-corner pa-bl"></span>
-        <span class="pa-corner pa-br"></span>
         <span class="pa-arrow"></span>
         <span class="pa-label">Play Again</span>
       </button>

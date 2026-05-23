@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { spawnHealVfx } from './HealVfx'
+import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
@@ -182,7 +182,7 @@ export class SphereDefender {
 
   // Repair-bot heal target. Returns true iff any HP was restored. Skips if
   // dead or already-full.
-  heal(amount: number): boolean {
+  heal(amount: number, vfxVariant: HealVfxVariant = 'plus'): boolean {
     if (this.isDead || this.hp >= this.maxHp) return false
     const before = this.hp
     this.hp = Math.min(this.maxHp, this.hp + amount)
@@ -196,10 +196,13 @@ export class SphereDefender {
     this.pulseRepairVfx()
     const scene = this.mesh.parent
     if (scene instanceof THREE.Scene) {
-      spawnHealVfx(scene, this.worldX, this.worldY, restored)
+      spawnHealVfx(scene, this.worldX, this.worldY, restored, vfxVariant)
     }
     return true
   }
+
+  showHpBar() { this.hpBarGroup.visible = true }
+  hideHpBar() { this.hpBarGroup.visible = false }
 
   private repairPulseTimer: number | null = null
   private pulseRepairVfx() {

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Config, StructureType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
-import { spawnHealVfx } from './HealVfx'
+import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 
 // Pixel-sprite atlases for sprite-based structures. Walls/mines stay
 // geometric (Box / Sphere). The five "preview" pieces (defense/dog/gun/laser/
@@ -475,7 +475,7 @@ export class Structure {
   // Repair-bot heal target — restore HP up to maxHp, refresh the HP bar (or
   // wall scale) the same way takeDamage does. Returns true iff any HP was
   // actually restored. Refuses to repair a dead/dying structure (no Lazarus).
-  heal(amount: number): boolean {
+  heal(amount: number, vfxVariant: HealVfxVariant = 'plus'): boolean {
     if (this.isDead || this.dying || this.hp >= this.maxHp) return false
     const before = this.hp
     this.hp = Math.min(this.maxHp, this.hp + amount)
@@ -496,14 +496,17 @@ export class Structure {
       this.applySpriteDamageTint(ratio)
     }
     this.pulseRepairVfx()
-    // Floating heal-amount VFX so the player can see repair landing on
-    // structures the same way they see it on mobile units.
     const scene = this.mesh.parent
     if (scene instanceof THREE.Scene) {
-      spawnHealVfx(scene, this.worldX, this.worldY, restored)
+      spawnHealVfx(scene, this.worldX, this.worldY, restored, vfxVariant)
     }
     return true
   }
+
+  // Tether visibility toggle — Repair-bot welds show a temp HP bar on
+  // the target so the player sees the bar climb until the link ends.
+  showHpBar() { this.hpBarGroup.visible = true }
+  hideHpBar() { this.hpBarGroup.visible = false }
 
   // Brief warm-orange material flash on the structure's main sprite so the
   // player can see a repair just landed. Wall has no sprite — skipped there.

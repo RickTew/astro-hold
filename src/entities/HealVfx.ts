@@ -14,7 +14,7 @@ import * as THREE from 'three'
 //   'plus'   — 3 "+" glyphs that pop outward at random angles. Crisp
 //              medical/sci-fi feel; reads as a med-pack discharge.
 
-type Variant = 'number' | 'bubble' | 'plus'
+export type HealVfxVariant = 'number' | 'bubble' | 'plus'
 
 // Cached text textures keyed by display string. The "+30" / "+20" / "+15"
 // values come up over and over per game; rendering them once and reusing
@@ -87,12 +87,20 @@ function makeBubbleTexture(): THREE.Texture {
   return tex
 }
 
-// Drop a heal effect at (x, y) in `scene`. Picks a random variant each
-// call. `amount` is the HP restored — used by the 'number' variant; the
-// other two just show "a heal happened" without the exact number.
-export function spawnHealVfx(scene: THREE.Scene, x: number, y: number, amount: number) {
-  const variants: Variant[] = ['number', 'bubble', 'plus']
-  const variant = variants[Math.floor(Math.random() * variants.length)]
+// Drop a heal effect at (x, y) in `scene`. Variants:
+//   'number' — floating "+N" text. Reserved for med-pack THROWS so the
+//              player sees the exact amount restored on impact.
+//   'plus'   — "+" sparkle stamp. Reserved for TETHER ticks so the
+//              sustained beam reads as steady support healing.
+//   'bubble' — green-orb swarm. Reserved for PAD pulses so the area
+//              aura reads as zone-of-effect healing.
+// Default behavior (no variant arg) is 'plus' since it's the most common.
+export function spawnHealVfx(
+  scene: THREE.Scene,
+  x: number, y: number,
+  amount: number,
+  variant: HealVfxVariant = 'plus',
+) {
   switch (variant) {
     case 'number': spawnNumberVfx(scene, x, y, amount); break
     case 'bubble': spawnBubbleVfx(scene, x, y); break
