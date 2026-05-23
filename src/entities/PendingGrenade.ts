@@ -2,12 +2,25 @@ import * as THREE from 'three'
 import { getGrenadeTexture } from './Structure'
 import { nextActorId } from '../game/TurnTypes'
 
-// A live proximity-trigger grenade sitting on an empty cell. Lobbed by a
-// Bomber / Grenadier — the projectile lands here, the visual transitions to
-// this pulsing sprite, and the bomb stays in place until any enemy enters
-// the aoeRadius. Then it detonates (handled by RevealPhase). The owner ID
-// gates one-bomb-per-thrower: a Bomber/Grenadier can't throw a new bomb
-// while any PendingGrenade with their ownerId is still on the field.
+// A live grenade sitting on an empty cell. Two trigger modes:
+//
+//   'proximity' (Bomber)
+//     Used by both the defender Bomber structure and the cyborg Bomber unit.
+//     After arming, detonates the moment any ENEMY enters the aoeRadius.
+//     A safety timer (proximityFuseTurns) force-detonates if the trap is
+//     ignored — stops bombs from sitting forever as zone-of-denial cheese.
+//
+//   'timed' (Grenadier)
+//     Throws a TIMED GRENADE, not a proximity mine. Detonates exactly
+//     `timerTurns` reveals after arming, regardless of who's nearby.
+//     Reverted from the previous proximity-bomb behavior at user
+//     direction — grenadiers cook grenades, they don't lay mines.
+//
+// The owner ID gates one-bomb-per-thrower for both modes: a Bomber/Grenadier
+// can't throw a new bomb while any PendingGrenade with their ownerId is
+// still on the field.
+export type GrenadeTriggerMode = 'proximity' | 'timed'
+
 export class PendingGrenade {
   readonly id: string
   sprite: THREE.Sprite
@@ -16,12 +29,16 @@ export class PendingGrenade {
 
   // armed=false: bomb just landed, can't trigger this turn (gives enemies
   // a planning window). RevealPhase.onComplete flips this to true at end
-  // of turn. armed=true: live proximity trigger.
+  // of turn. armed=true: live (proximity-checking OR ticking toward boom).
   armed = false
   // Reveals the bomb has spent in the armed state. Game.advanceTurn() bumps
-  // this each end-of-reveal. RevealPhase force-detonates at turnsArmed >=
-  // ARMED_LIFETIME so bombs don't sit on the field forever as ignored traps.
+  // this each end-of-reveal. RevealPhase force-detonates at turnsArmed
+  // >= timerTurns for the configured mode.
   turnsArmed = 0
+  // Proximity bombs sit on the field for up to 3 armed reveals before
+  // force-detonating (the safety fuse). Timed bombs detonate at exactly
+  // 1 armed reveal — they're cooked grenades, not traps.
+  readonly timerTurns: number
 
   constructor(
     scene: THREE.Scene,
@@ -31,8 +48,10 @@ export class PendingGrenade {
     public aoeRadius: number,
     public side: 'attacker' | 'defender',
     public ownerId: string,
+    public triggerMode: GrenadeTriggerMode = 'proximity',
     baseSize = 16,
   ) {
+    this.timerTurns = triggerMode === 'timed' ? 1 : 3
     this.id = nextActorId('bomb')
     this.baseSize = baseSize
     const tex = getGrenadeTexture()

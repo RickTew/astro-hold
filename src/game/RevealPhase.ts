@@ -62,10 +62,11 @@ const STRUCTURE_OMNI_FIRE: Partial<Record<StructureType, true>> = {
   sentry: true,
 }
 
-// Max reveals an armed bomb stays on the field before force-detonating. Plus
-// the 1-reveal arming delay = ~4 reveals total lifespan. Stops bombs from
-// becoming ignored permanent traps when both sides flee them indefinitely.
-const ARMED_LIFETIME = 3
+// Each bomb now carries its own timerTurns based on triggerMode (see
+// PendingGrenade). Proximity bombs default to 3 armed reveals (safety
+// fuse against ignored traps); timed grenades default to 1 (grenadier
+// cooked grenade). This constant is no longer used — kept for now as
+// documentation; remove if no other reference picks it up.
 
 // Repair-priority for a given defender structure type. Higher = the repair
 // bot will tether/throw at it before lower-priority pieces tie-breaking on
@@ -159,7 +160,10 @@ export class RevealPhase {
 
   private expireOldBombs() {
     for (const g of [...this.pendingGrenades]) {
-      if (g.armed && g.turnsArmed >= ARMED_LIFETIME) {
+      // Each bomb carries its own timer based on trigger mode:
+      //   proximity → timerTurns = 3 (safety fuse against ignored traps)
+      //   timed     → timerTurns = 1 (grenadier's cooked grenade)
+      if (g.armed && g.turnsArmed >= g.timerTurns) {
         this.detonatePendingGrenade(g, 'expired')
       }
     }
@@ -1076,17 +1080,26 @@ export class RevealPhase {
     const erow = Math.floor((nearest.y - Config.WORLD.BOTTOM) / cs)
     const SEARCH = 4
 
-    // ZERO-ALLY rule: the thrower refuses to drop a bomb in a cell where
-    // ANY friendly unit's center sits inside the AoE. Even one ally caught
-    // is unacceptable from the player's POV ("don't damage my team"). If
-    // no clean cell is reachable, the thrower holds and walks instead.
+    // Two scoring rules depending on the thrower:
     //
-    // BEYOND-ENEMY preference: among clean (zero-ally) cells, prefer cells
-    // on the FAR side of the target — i.e., cells whose distance from the
-    // thrower is greater than the enemy's distance from the thrower. A
-    // bomb thrown "past" the enemy catches them in its AoE without putting
-    // the AoE between thrower and target where own allies might advance.
-    let best: { col: number; row: number; hits: number; nearD: number; beyondEnemy: boolean } | null = null
+    //   Grenadier (timed cooked grenade): friendly-fire is acceptable to
+    //   some extent — grenadiers don't always have a clean angle on
+    //   defenders, and the user has explicitly said "it's OK for the
+    //   grenadier bombs to do damage to their own." Score as enemies
+    //   minus allies (net positive required). One ally caught alongside
+    //   two enemies is still a good throw.
+    //
+    //   Bomber (proximity mine): MUST NOT include the bomber itself in
+    //   the AoE — a bomb at the bomber's feet is dumb and the user
+    //   called it out. Other allies in AoE incur a softer penalty but
+    //   net-positive throws are allowed.
+    //
+    // Both: prefer cells "beyond" the nearest enemy (further from thrower
+    // than the target) so the AoE lands past the enemy line.
+    const isGrenadier = actor instanceof SpriteUnit && actor.type === 'grenadier'
+    const isBomber = (actor instanceof SpriteUnit && actor.type === 'bomber')
+                     || (actor instanceof Structure && actor.type === 'bomber')
+    let best: { col: number; row: number; net: number; hits: number; nearD: number; beyondEnemy: boolean } | null = null
     const enemyD = Math.hypot(nearest.x - ax, nearest.y - ay)
     for (let dc = -SEARCH; dc <= SEARCH; dc++) {
       for (let dr = -SEARCH; dr <= SEARCH; dr++) {
@@ -1099,7 +1112,10 @@ export class RevealPhase {
         if (Math.hypot(x - ax, y - ay) > range) continue
         if (actor instanceof Structure && !this.targetInFireArc(actor, x - ax, y - ay)) continue
         if (!this.isCellEmptyForBomb(x, y)) continue
-        // Count enemies + allies that would be caught in the AoE.
+        // Bomber MUST stay outside its own bomb's AoE. Skip cells that
+        // would catch the thrower itself in the blast.
+        if (isBomber && Math.hypot(ax - x, ay - y) <= aoeRadius) continue
+        // Count enemies + allies caught in the AoE.
         let hits = 0
         let nearD = Infinity
         for (const e of enemies) {
@@ -1109,15 +1125,22 @@ export class RevealPhase {
         if (hits === 0) continue
         let allyHits = 0
         for (const a of allies) {
-          if (Math.hypot(a.x - x, a.y - y) <= aoeRadius) { allyHits++; break }
+          if (Math.hypot(a.x - x, a.y - y) <= aoeRadius) allyHits++
         }
-        if (allyHits > 0) continue  // hard skip — never bomb own team
+        const net = hits - allyHits
+        // Grenadier accepts any net-positive throw (allies in AoE OK
+        // as long as enemies > allies). Bomber wants a CLEAN throw —
+        // zero ally-hits if available, else net-positive with penalty
+        // accepted as a tradeoff.
+        if (isGrenadier && net <= 0) continue
+        if (!isGrenadier && allyHits > 0) continue
         const beyondEnemy = Math.hypot(x - ax, y - ay) > enemyD
         if (!best
-            || hits > best.hits
-            || (hits === best.hits && beyondEnemy && !best.beyondEnemy)
-            || (hits === best.hits && beyondEnemy === best.beyondEnemy && nearD < best.nearD)) {
-          best = { col, row, hits, nearD, beyondEnemy }
+            || net > best.net
+            || (net === best.net && hits > best.hits)
+            || (net === best.net && hits === best.hits && beyondEnemy && !best.beyondEnemy)
+            || (net === best.net && hits === best.hits && beyondEnemy === best.beyondEnemy && nearD < best.nearD)) {
+          best = { col, row, net, hits, nearD, beyondEnemy }
         }
       }
     }
@@ -1311,11 +1334,12 @@ export class RevealPhase {
     }
   }
 
-  // Proximity-fuse bombs: any non-dead piece entering the aoeRadius
-  // detonates the bomb immediately — friendly-fire model, no side
-  // discrimination. The thrower's own teammates can set off the bomb
-  // (and take damage from the blast), so the AI penalizes ally-overlap
-  // when picking throw cells.
+  // Proximity-trigger applies only to bombs in 'proximity' mode (Bomber's
+  // mines). Timed grenades (Grenadier's cooked grenades) ignore proximity
+  // and detonate purely on their armed-turn timer via expireOldBombs.
+  // Detonation is friendly-fire on the AoE side: the bomb hits everyone
+  // in radius, but the TRIGGER for proximity bombs is enemy-only (allies
+  // don't set them off).
   private tickPendingGrenades(delta: number) {
     for (let i = this.pendingGrenades.length - 1; i >= 0; i--) {
       const g = this.pendingGrenades[i]
@@ -1324,6 +1348,9 @@ export class RevealPhase {
       // Unarmed bombs ignore proximity — they're in the 1-turn fuse window
       // that gives enemies a chance to plan around them.
       if (!g.armed) continue
+      // Timed bombs skip proximity entirely; their detonation is handled
+      // exclusively by expireOldBombs (next reveal start).
+      if (g.triggerMode === 'timed') continue
       if (this.shouldDetonateGrenade(g)) {
         this.detonatePendingGrenade(g)
       }
@@ -1855,21 +1882,25 @@ export class RevealPhase {
         }
       }
     } else if (isLobbed) {
-      // Proximity bomb — grenade lands silently, sits on the target cell as
-      // a pulsing trap, and detonates when any enemy steps into its aoe
-      // radius (see tickPendingGrenades). One bomb per thrower at a time —
-      // the lobbed-thrower auto-action enforces that gate.
+      // Lobbed AoE — two mechanics on the same projectile pipeline:
+      //   Bomber → 'proximity' (lands as a trap, waits for enemies)
+      //   Grenadier → 'timed' (cooked grenade, explodes on its own timer)
+      // Both arm at end-of-reveal; the difference is what triggers
+      // detonation. Grenadiers throw TIMED GRENADES, not mines.
       proj.silentLanding = true
       const side = actor.side
       const ownerId = actor.id
       const ownerLabel = this.actorLabel(actor)
+      const isGrenadier = actor instanceof SpriteUnit && actor.type === 'grenadier'
+      const triggerMode = isGrenadier ? 'timed' : 'proximity'
       proj.onHit = () => {
         this.pendingGrenades.push(new PendingGrenade(
-          this.scene, aim.x, aim.y, damage, aoeRadius, side, ownerId,
+          this.scene, aim.x, aim.y, damage, aoeRadius, side, ownerId, triggerMode,
         ))
       }
       const cell = (action as { cell: CellRef }).cell
-      this.log(actor.side, `${ownerLabel} throws a bomb to (${cell.col}, ${cell.row})`)
+      const what = isGrenadier ? 'a grenade' : 'a bomb'
+      this.log(actor.side, `${ownerLabel} throws ${what} to (${cell.col}, ${cell.row})`)
     } else {
       // Direct-fire AoE — splash everything in range of the impact point
       // immediately. Defender AoE hits cyborgs only; attacker AoE hits
