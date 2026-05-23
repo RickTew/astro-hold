@@ -228,12 +228,14 @@ pad/tether actions and re-fires each tether tick). Death duplicates the
 | Stat | Value |
 |---|---|
 | Cost | 60 |
-| HP | 200 |
+| HP | **150** (nerfed from 200) |
 | Damage | 25 |
 | Range | 200 |
 | Ammo | 5 |
 | AP | 1 |
 | Fire interval | 2 |
+| Sprite size | 84 (matches Hulk) |
+| Fire arc | **Omnidirectional** — sprite auto-rotates to target |
 
 Heavy-armor tower on tracks. The art (originally generated as "Robot_Wall"
 but the internal zip folder was "Robot_Tank" — closer to its true nature)
@@ -323,6 +325,31 @@ battlefield to reach the Power Core at (-550, 0). All cyborg costs are
 multiples of 10 so leftover credits stay spendable.
 
 ---
+
+## Build-Phase Credit Allocation (session 16)
+Two stacking bonuses on top of `START_CREDITS` (1000):
+
+| Side | Bonus | Player budget | AI budget |
+|---|---|---|---|
+| Defender | base × 1.0 | **1000** | **1500** (× AI_CREDIT_BONUS 1.5) |
+| Attacker | base × 1.3 (ATTACKER_CREDIT_BONUS) | **1300** | **1950** (× 1.5 on top) |
+
+Attacker bonus added in session 16 — defender pieces are stationary
+and healable so cyborgs need more bodies to compensate. AI bonus is
+unchanged (0.5).
+
+## Ammo Crates (session 16)
+Resupply boxes drop in the middle no-build zone every 5 reveals during
+BATTLE (cap 4 on-field). Random cell, weighted bag:
+- 55% ammo
+- 20% grenade
+- 15% medkit
+- 10% repair_kit
+
+Each pickup grants `+2` to the unit's `ammoRemaining` (capped at the
+Config max). Crates have 1 HP — destroyed by grenades in their AoE or
+by defender direct-fire when no cyborg is in range. Gated by unit
+family via `kitForUnit()`: a medic can't pick up a bullet crate.
 
 ## Build-Phase Economy (proposed expansion)
 

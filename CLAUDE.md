@@ -1,11 +1,15 @@
 # AstroHold — Project Rules for Claude
 
-## Status: Single-player D&D-style strategy LIVE (session 15)
-Chess-like turn-based grid strategy. **BUILD → REVEAL** is the live flow
-(PLAN phase code exists but is currently skipped — see Phase flow section).
-After the first BATTLE click, reveals **auto-chain** until win / lose /
-stalemate — the player just watches. **NOT an RTS.** Mechanics tuned for
-D&D-style strategy:
+## Status: Single-player D&D-style strategy LIVE (session 16)
+Turn-based grid strategy. **BUILD → REVEAL** is the live flow (PLAN code
+exists but is skipped — see Phase flow). After the first BATTLE click,
+reveals **auto-chain** until win / lose. **NO stalemate rule** — the
+game is die-or-survive (`feedback_die_or_survive`). Two terminal states
+only: `core.isDead` (defender loses) or all-cyborgs-dead (defender wins).
+Cyborgs who run out of ammo + can't damage the core trigger an attrition
+win for defender via `cyborgsCanAttack()` in onComplete.
+
+Mechanics tuned for D&D-style strategy:
 - **Single-player mode (session 13).** Asset preload → side-picker modal
   (ROBOTS or CYBORGS) → BUILD. The unpicked side runs on autopilot via
   `OpponentAI` (`src/ai/OpponentAI.ts`). AI handles BUILD purchases as a
@@ -50,9 +54,13 @@ D&D-style strategy:
   SIGNAL preview tile in the robot grid (bottom-right of the 4×2 layout).
 - **Sentry (Robot_Wall art)** — defender structure. Tracked-vehicle turret
   with gun arms — reads as a heavy tower, NOT a wall (renamed from gunwall
-  for clarity). HP 200 (vs tower 80), damage 25 (matches tower), range 200
-  (vs tower 250), cost 60, ammo 5. 8-direction sprite art (no anims). Uses
-  the tower's fire-arc compass-rose mechanic.
+  for clarity). **HP 150** (nerfed from 200 — repair-bot healing made it
+  effectively unkillable), damage 25, range 200 (vs tower 250), cost 60,
+  ammo 5. Sprite size 84 (matches Hulk). **Omni-fire** — sprite auto-rotates
+  to face current target via `setSingleFacing` on each shot
+  (`STRUCTURE_OMNI_FIRE` table in RevealPhase). The compass-rose UI for
+  sentry is single-direction-picker (initial facing only); during combat
+  it tracks targets freely.
 - **Wall** — defender structure (procedural laser-wall, no sprite). Two
   metallic emitter plates at top + bottom of the cell with a pulsing cyan
   energy beam between them. The original brown-box wall visual was replaced
@@ -61,6 +69,42 @@ D&D-style strategy:
   via `Structure.update()` running every frame regardless of dying state.
   HUD icon is a CSS-gradient mini-version of the in-game visual (no SVG,
   no PNG). Wall is now buyable via the robot HUD (replaced DEFENSE preview).
+  Auto-orients horizontal/vertical based on neighbors at placement time
+  (right-click toggles individual).
+- **Bombs vs Grenades** (`project_grenadier_vs_bomber` memory). Two
+  pieces, two mechanics on the same `PendingGrenade` class via the
+  `triggerMode` field:
+  - **Bomber** (cyborg unit AND defender structure) → `'proximity'`
+    mines, 3-reveal safety fuse. Bomber-side targeting STRICT: zero
+    allies in AoE + bomber must be outside its own bomb's blast.
+  - **Grenadier** (cyborg) → `'timed'` cooked grenades, detonate at
+    exactly 1 armed reveal after landing. Friendly-fire OK on
+    grenadier throws per user; targeting requires net positive
+    (enemies > allies).
+  Detonation: **enemy-only trigger** (allies walking past idle bombs
+  don't set them off), but the AoE on detonation hits **everyone** in
+  radius regardless of side.
+- **Hulk core-march.** Single decision tree: slam wedge (if 2+ enemies
+  cluster) → punch (melee 70 range, **unlimited fists** — no ammo cost)
+  → otherwise march straight at the Power Core. Doesn't get distracted
+  by sighted enemies; the core is the only goal.
+- **Sniper crouch-and-anchor.** Walk into range → fire from crouched
+  pose (`aim` AnimState shows `crouches_and_prepares` final frame for
+  E/W). Stays anchored while in range. On ammo=0: detour to compatible
+  ammo crate if sighted, else retreat east; `standUpFromAim()` swaps to
+  upright static rotation at the retreat edge ("rifle empty"). AI build
+  enforces 3-cell sniper spacing.
+- **Universal melee fallback.** When a SpriteUnit hits `ammoRemaining=0`
+  AND an enemy is within ~1.4 cells, swings for `MELEE_FALLBACK_DAMAGE`
+  (10) at no ammo cost. Excludes hulk (already unlimited at 55), sniper
+  (retreats), medic + repair (retreat). Keeps combat moving when both
+  sides are dry.
+- **Ammo crates.** Resupply boxes drop in the middle no-build zone every
+  5 reveals (cap 4). Four kit types gated by unit family:
+  ammo / grenade / medkit / repair_kit. AI: every out-of-ammo unit prefers
+  detouring to a compatible crate over retreat/wander. Crates are
+  destructible (1 HP) — grenades destroy them, defender structures with
+  no cyborg target fire on crates to deny enemy reloads. See `AmmoBox.ts`.
 
 ## HUD (session 15)
 Floating top strip with three SVG-silhouetted panels — DO NOT reserve
@@ -260,16 +304,42 @@ session 8 in DEVNOTES.
   actions + auto-fire for structures + default fallback actions for
   unplanned mobile units. Steps through at ~600ms per action with
   strict-skip on invalid. Auto-loops via `Game.enterRevealPhase` until
-  win/lose/stalemate. Exposes `totalSteps` (for zero-action stalemate)
-  and `combatThisReveal` (for "no combat for N turns" stalemate — Game
-  halts after 5 no-combat reveals so the dog can't wander forever).
-- `PendingGrenade.ts` — proximity-trap bomb. Lobbed AoE units (Bomber,
-  Grenadier) spawn one when their thrown projectile lands. Has
-  `armed` (false on land, true at end-of-reveal — gives opponents
-  a planning turn), `turnsArmed` (auto-detonate at 3 to stop ignored
-  traps), `ownerId` (one-per-thrower gate), `side` (proximity check
-  only triggers on enemies). Visual: dim grey @ 55% opacity when
-  unarmed, hot red @ 100% when armed.
+  win/lose (no stalemate — see Status). Streams combat log lines via
+  `onLogEntry` callback so the HUD panel updates in step with the
+  visible action. Holds: AmmoBox array, medic/repair pads + tethers,
+  pendingGrenades, projectiles, explosions.
+- `PendingGrenade.ts` — lobbed AoE bomb with two `triggerMode` flavors:
+  - `'proximity'` (Bomber): waits for enemies, 3-reveal safety fuse.
+  - `'timed'` (Grenadier): cooked grenade, detonates at 1 armed reveal.
+  Common: `armed` (true at end-of-throw-reveal), `turnsArmed`,
+  `timerTurns` (3 vs 1), `ownerId` (one-per-thrower gate), `side`.
+  Detonation AoE is **friendly-fire** (everyone in radius); the
+  trigger for proximity is **enemy-only**. Visual: dim grey unarmed,
+  hot red armed.
+- `AmmoBox.ts` — resupply crate. Spawns every 5 reveals in the middle
+  no-build zone. Four kit types (`ammo / grenade / medkit /
+  repair_kit`) gated by unit family via `kitForUnit()`. 1 HP — any
+  hit destroys. Picked up when a SpriteUnit's logical position lands
+  on the cell (refills `ammoRemaining += 2` capped at Config max).
+- `HealVfx.ts` — three variants of floating heal feedback:
+  - `'number'` (throws): floating +N text.
+  - `'plus'` (tethers): sparkle stamps.
+  - `'bubble'` (pads): orb swarm with additive blending.
+  Optional `scale` parameter for big targets (Power Core uses 1.8).
+  Cell-glow square spawns underneath every heal so "the cell is being
+  healed" reads even on huge pieces. RAF-driven self-disposal.
+- `SpeechBubble.ts` — status callouts above units / structures. Two
+  voices (cyborg italic peach / robot mono cyan), three triggers
+  (low_hp ≤25% / low_ammo count templates / out_of_ammo) + sniper_shot
+  + medic_low_packs. Lines use `{n}` (count) and `{s}/{S}` (auto-
+  pluralizer — empty when n==1). One bubble per (trigger, count) key
+  per entity via `spokenSet`. Canvas 320×80 to fit longer monospace
+  robot lines.
+- `BattleStats.ts` — per-game metrics persisted to localStorage.
+  Records outcome / endType / playerSide / turns / alive counts /
+  damage dealt / kills / coreHpEnd. Console API installed at boot:
+  `astrohold.statsSummary() / dumpStats() / statsJSON() / clearStats()`.
+  Capped at 50 records (oldest pruned).
 - `BuildPhase.ts` — credit ledger + structure placement. Takes a
   cross-system occupancy callback from Game so structures respect
   spheres / cyborgs / dogs / core cells. Occupancy is derived LIVE

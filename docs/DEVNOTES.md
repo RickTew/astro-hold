@@ -1572,3 +1572,312 @@ asking the user to confirm direction mid-build).
   loop, so currently nothing damages them). They self-destruct
   on charge expiry. Add direct-fire targeting + AoE inclusion if
   balance shifts.
+
+---
+
+## Session 16 (2026-05-23) — Robot Repair + Sentry + procedural Wall + behaviors + speech + ammo crates
+
+Big session. Twelve+ feature passes, all driven by playtest feedback.
+Production at https://astrohold3.vercel.app stayed live the whole time
+— commit → push → vercel --prod after every change.
+
+### New pieces
+
+**Robot Repair** (defender mobile unit, twin of Medic)
+- PixelLab sprite — 9-frame walking + 9-frame repair (welding pose) +
+  4-frame death. Diagonal-capable (`allowDiagonalMove: true`).
+- Two repair modes (throw was dropped after sniper rejected — only
+  ammo budget supports pad + tether):
+  - **Pad** (2 charges): drops a wrench/anvil station, +15 HP/tick
+    to adjacent defender pieces for 4 ticks. RepairPad.ts.
+  - **Tether** (1 charge/turn): amber weld-beam, pins both endpoints,
+    +20 HP/turn until target full / bot dead / 5-tick cap.
+    RepairTether.ts.
+- Heals ANYTHING defender-side: structures, sphere, dog, Power Core.
+- AI priority: Core (12) > Cannon (9) > Bomber (8) ≈ Sentry (8)
+  ≈ Sphere (8) > Tower (7) > Laser > Gun > Wall > Mine.
+- HP 60, cost 70. HUD slot: replaced SIGNAL preview tile (bottom-right
+  of the robot grid).
+
+**Sentry** (defender structure, was briefly "Gunwall")
+- Robot_Wall art — tracked-vehicle turret with gun arms. Looks like a
+  heavy tower, not a wall. Renamed gunwall → sentry on user feedback.
+- HP 150 (was 200 — nerfed after balance audit, repair-bot healing made
+  HP 200 effectively unkillable), damage 25, range 200, ammo 5, cost 60.
+- **Omni-fire** — STRUCTURE_OMNI_FIRE table; pickNearestEnemyOf skips the
+  arc check, executeAttack calls setSingleFacing(targetAngle) on each
+  shot so the sprite rotates to face whichever target it just hit.
+- Sprite size 84 (matches Hulk override). Reads as a real bruiser.
+- Single-facing compass-rose mode (different UX from tower's multi-arc
+  pay-to-add). HUD slot 4 (replaced the WALL/duplicate-TOWER placeholder).
+
+**Wall** — same Config (HP 300, 0 damage, blocker) but now PROCEDURAL
+laser-fence visual instead of the brown box:
+- Two metallic emitter plates at top + bottom of the cell, cyan beam
+  between them, additive halo. Beam pulses ~5 Hz, sockets shimmer at
+  7 Hz out of phase.
+- Damage tints: beam scale.x thins (1→0.4), opacity drops (0.55²·r),
+  emitter sockets fade. Wall now buyable from the robot HUD — replaced
+  the DEFENSE preview tile.
+- **Color lesson** (saved as memory feedback_additive_blend_color_choice):
+  additive blending on the dark map pushes pale-cyan (0x88ffff) toward
+  near-white because G+B channels saturate fast. Final palette uses
+  0x33aaff for beam, 0x2266cc halo, 0x66ccff sockets.
+- **Auto-orient** (BuildPhase): wall placed next to another wall in the
+  same row flips both horizontal so the row reads as one continuous
+  barrier. Right-click toggles individual orientation.
+
+### Game rules
+
+**No more stalemate.**
+- User: "remove that rule, it is die or surive not chess."
+- Stripped the no-combat-5-turns + zero-actions gate. Game now only
+  ends on `core.isDead` (defender loses) or all-cyborgs-dead (defender
+  wins).
+- Edge case: if cyborgs are out of ammo + can't damage anything →
+  defender wins by attrition (`cyborgsCanAttack()` check at every
+  reveal end).
+- Saved as memory feedback_die_or_survive.
+
+**Friendly-fire AoE bombs.**
+- Bombs hit anyone in the radius on detonation, allies included.
+- Trigger model: **enemies only** trigger proximity bombs (otherwise
+  allies walking past idle mines would be devastating). Once detonated,
+  the AoE is side-agnostic.
+- `cellBombDanger` flees all armed bombs (own + enemy) since an enemy
+  could trigger a teammate's bomb near you.
+
+**Grenadier ≠ Bomber.** User correction during the friendly-fire pass:
+- **Grenadier** throws TIMED grenades — cooked, detonates exactly 1
+  armed reveal after landing. `triggerMode: 'timed'`. Cyborg
+  friendly-fire OK on grenadier throws (per user — "it's OK for the
+  grenadier bombs to do damage to their own").
+- **Bomber** (cyborg unit AND defender structure — same mechanic)
+  throws proximity MINES. `triggerMode: 'proximity'`, 3-reveal safety
+  fuse. STRICT bomber rule: cell where the bomb would catch the bomber
+  itself in the AoE is hard-skipped ("don't bomb your own feet").
+- PendingGrenade now carries `triggerMode` + per-bomb `timerTurns`.
+  Saved as project_grenadier_vs_bomber.
+- Saved as feedback_dont_change_mechanics — visual fixes ship, but
+  combat rules / trigger modes / piece behaviors require user sign-off
+  first.
+
+**Hulk core-march.** Single decision tree:
+1. Slam if 2+ enemies cluster in a cardinal wedge (slamAmmo-gated).
+2. Punch any enemy in melee range (70). **Fists are unlimited** —
+   ammo cost skipped in `executeAttack` for Hulk. 55 damage per punch.
+3. Otherwise MARCH AT THE CORE. Doesn't get distracted by enemies in
+   sight; only the core matters.
+
+**Universal melee fallback.** When a SpriteUnit hits ammoRemaining=0
+AND an enemy is within ~1.4 cells, swings for 10 damage at no ammo
+cost. Keeps combat moving when both sides are dry. Excludes hulk
+(has his own unlimited fists), sniper (retreats), medic + repair
+(retreat).
+
+**Sniper behavior.**
+- Move into range → STOP → fire from crouched pose. Stays anchored
+  while ammo > 0.
+- When ammoRemaining = 0:
+  - Detour to compatible ammo crate if sighted.
+  - Otherwise retreat east toward the cyborg spawn edge.
+  - At the retreat edge, `standUpFromAim()` switches sprite from
+    crouched 'aim' to upright 'idle' (= static rotation). "Rifle
+    empty, gun down" visual cue.
+- Spacing rule: sniper movement penalty for cells within 3 cells of
+  another sniper. AI build placement also enforces 3-cell spacing
+  for sniper spawns.
+- Crouch sprite: `crouches_and_prepares_to_shoot_sniper_rifle` final
+  frame (E + W only) used as the 'aim' AnimState. Other facings fall
+  back to static rotation (we only have E/W crouch art).
+- Sniper sprite swap: after shoot anim completes, `advanceFrame` drops
+  into 'aim' state (was previously freeze-on-last-frame).
+
+**Support retreat.** Medic + Repair both retreat when out of charges
+(medic east, repair west) — same logic as sniper. Detour to a
+compatible kit (medkit / repair_kit) if sighted before retreating.
+
+**Ammo crates.** Resupply boxes drop into the middle no-build zone
+every 5 reveals (cap 4 on-field). Four kit types gated by unit
+family: ammo / grenade / medkit / repair_kit. AmmoBox.ts.
+- +2 ammo per pickup, capped at the unit's Config max.
+- AI: every out-of-ammo unit prefers detouring to a compatible
+  crate over retreat/wander.
+- Crates are destructible (1 HP) — grenadier bombs landing on them
+  destroy them; defender structures with no cyborg in range will
+  fire on crates to deny enemy reloads (1 round to deny ~2).
+- Hand-drawn icon set on canvas: crosshair / grenade+fuse / red cross /
+  rotated wrench. Unicode glyphs drifted off-center based on font
+  fallback; explicit drawing puts every icon at (16, 16).
+
+### Visuals
+
+**Heal VFX** — three randomly picked variants per heal (HealVfx.ts):
+- `number` (Med-pack throws): floating "+N" green text, rises, fades.
+- `bubble` (Pads): orb swarm with additive blending.
+- `plus` (Tethers): + sparkle stamps.
+- Each callsite passes its variant explicitly (no random); the
+  variant tags the mechanic. Scale parameter so big pieces (Power Core)
+  get bigger VFX. Cell-glow square underneath every heal for "the
+  square is being healed" cue.
+
+**Temp HP bar during tether.** Every entity got `showHpBar()` /
+`hideHpBar()`. Tether attach shows it; tether release hides it.
+Bar climbs as the link ticks heals.
+
+**Sprite damage tinting for structures.** HP bars hidden globally per
+the plan-then-watch design rule — but that meant sprite structures
+showed zero visible damage. New `applySpriteDamageTint(ratio)` shifts
+the material color toward warm-orange/red as HP drops. Multiplies
+with TEAM_TINT so ownership stays readable. Repair flash re-applies
+the current-HP tint after the amber pulse expires.
+
+**Tether visuals collapse with target.** Tether.update + RepairTether
+.update self-hide the moment medic/bot OR target dies. No more
+beam dangling from a corpse.
+
+**Sentry tracks target visually.** setSingleFacing on each shot swaps
+the sprite to the matching 8-way rotation. Gun arms turn naturally
+between shots.
+
+**Sprite structures dim correctly.** `pulseRepairVfx` post-flash now
+restores to current-HP damage tint instead of pure TEAM_TINT — a
+damaged structure stays visibly bruised after the heal flash.
+
+### UX / HUD
+
+**Speech bubbles** — SpeechBubble.ts:
+- Three triggers: low_hp (≤25%) / low_ammo (count templates) /
+  out_of_ammo. Plus once-per-shot sniper_shot ("Lining one up...
+  shot.") and medic_low_packs.
+- Two voices: cyborg (italic peach on dark red) / robot (mono cyan
+  on dark blue). Same 22px size now — robot was 18px and unreadable.
+- Templates use `{n}` (count) and `{s}/{S}` (auto-pluralizer —
+  empty when n==1, else 's'/'S'). "1 shot left" / "3 shots left".
+- One bubble per (trigger, count) per unit — gates by key so a
+  unit can say "3 shots left" and later "1 shot left" without one
+  suppressing the other.
+- Canvas widened 256 → 320 to fit longer monospace robot lines.
+
+**Streaming combat log.** Combat panel used to batch a whole reveal's
+events at onComplete; player sat through 5s of animation then saw 6
+lines flash. Now `RevealPhase.onLogEntry` fires per `this.log()` call
+and HUD.appendCombatLogEntry streams them with proper turn headers.
+Empty turns get `"── Turn N — (no activity) ──"` placeholder.
+
+**Center HUD panel cleanup.** Two horizontal divider lines (old
+title/body/action partitions) removed — they cut through the
+combat log text. Vertical black scrollbar themed cyan/thin via
+scrollbar-color + ::-webkit-scrollbar.
+
+**Play Again button.** Two competing styles (clip-path chamfer +
+corner brackets) → kept the chamfer + bumped to 2px border, dropped
+the corner brackets. Replaced the ▶ Unicode (rendered as colored
+emoji on macOS) with a CSS border-triangle in currentColor.
+
+**Damage tint softened.** First pass on sprite-structure tinting
+ran (0.4, 0.1, 0.1) at 5% HP — near-black on dark sprites. Now
+(0.7+0.3r, 0.35+0.65r, 0.35+0.65r) so damage is clearly visible
+but the sprite art stays readable.
+
+### Game settings
+
+**Balance audit + tuning pass.**
+- Sentry HP 200 → 150 (was effectively unkillable with repair bot).
+- Tower / structure stats unchanged.
+- **ATTACKER_CREDIT_BONUS** = 0.3 added: cyborg side gets +30% base
+  credits over defender to compensate for stationary/healable
+  defender pieces. Stacks with AI_CREDIT_BONUS. Result:
+    player-defender: 1000   ·  AI-defender: 1500
+    player-attacker: 1300   ·  AI-attacker: 1950
+
+**Pathing fix.** `pickStepTowardPoint` was strict distance-reducing only;
+units jammed against walls. Two-tier search now:
+- Tier 1: distance-reducing candidates (preferred).
+- Tier 2: sideways (within +cs distance change) when tier 1 empty.
+- Anti-backtrack via `SpriteUnit.lastTraversedCol/Row` (persistent
+  across reveals) so units commit to a detour direction.
+
+**Bomb radii bump.** Grenadier 45→60, cyborg bomber 55→70, defender
+bomber 50→65. Old radii were too tight to catch enemies from any
+empty adjacent cell.
+
+**Bomb targeting.**
+- pickBombThrowCell requires the AoE to actually overlap an enemy
+  (was just "closest empty cell near nearest enemy" → wasted throws
+  on empty ground).
+- Bomber: hard zero-ally rule + self-out-of-AoE.
+- Grenadier: net-positive (enemies > allies) allowed; can hit own
+  team some.
+
+### Battle stats tracker
+
+**BattleStats.ts.** Per-battle metrics persisted to localStorage every
+game end. Records: outcome (win/lose from player POV), endType
+(core_destroyed / cyborgs_eliminated / attrition), playerSide, turns,
+alive counts, damage dealt + kills per side (parsed from combat log),
+core HP at end. Capped at 50 records.
+
+Console API installed at boot (`window.astrohold`):
+- `astrohold.statsSummary()` — aggregate win-rate, avg turns, etc.
+- `astrohold.dumpStats()` — console.table of every game.
+- `astrohold.statsJSON()` — copy-pasteable JSON for analysis.
+- `astrohold.clearStats()` — wipe history.
+
+### Bugs squashed
+- Dead AI corpses flashed every 3 sec — setAiPiecesVisible iterated
+  ALL pieces (including dead) and reset visible=true on every reveal.
+  Added isDead guards.
+- Combat log batch dump → live streaming.
+- Healing target dies mid-reveal → tether beam stayed dangling.
+  Now Tether/RepairTether.update self-hide on isDead.
+- Bomber-suicide on its own bomb → strict self-out-of-AoE rule.
+- Refund clears shop selection → no, now keeps selection +
+  buildPhase.requestSkipNextClick() so the click that refunded
+  doesn't auto-place a new piece.
+- Wall stacking — auto-orient on placement (horizontal row vs
+  vertical column).
+
+### Memory + project doc updates
+- feedback_die_or_survive — no stalemate.
+- feedback_dont_change_mechanics — visual ok, mechanics require ask.
+- feedback_additive_blend_color_choice — pick blue-leaning bases for
+  additive VFX on dark bg.
+- feedback_vercel_cwd_drift — vercel --prod auto-links from cwd; ALWAYS
+  run from repo root.
+- project_grenadier_vs_bomber — timed vs proximity distinction.
+
+### Open questions to revisit next session
+- **Sniper pre-shot crouch anim.** Currently sniper drops into 'aim'
+  AFTER firing. The "settle into position" anim (full 9 frames of
+  crouches_and_prepares) before each shot would make the crouch more
+  visible. Mechanic change — ask user.
+- **Sniper speed.** User said sniper "moves fast otherwise." Current
+  Config sniper.speed = 50 (slowest non-Hulk). Bump?
+- **Sentry rotation tween.** Currently snaps to facing on each shot.
+  Smooth turn might look better but requires interpolating sprite
+  texture across 8-way rotations.
+- **Player ability to target ammo crates.** Defender AI shoots them
+  if no cyborg in range. The player has no manual target control during
+  BATTLE (auto-reveal); if they want to direct fire at specific crates,
+  we'd need to add a targeting layer.
+- **Speech bubble visual.** Bigger / different shapes per voice?
+  Currently both voices use the same rounded-rect with tail.
+- **More cyborg art.** Roster is still 6 unique + 2 duplicates in the
+  4×2 grid. Same as session 15. No additions this session.
+- **Pre-fire crouch anim for sniper.** Held for user sign-off.
+- **Low-damage melee for towers/structures.** Currently towers don't
+  get the melee fallback (they're stationary). If walls/towers should
+  have a "last-stand" mechanic, that's a new design.
+
+### Open friction points (continued)
+- Sniper's crouch sprite is only E/W. N/S/diagonal facings fall back
+  to standing rotation — visually inconsistent.
+- Power Core has no "low HP" callout cooldown — could spam SYSTEMS
+  CRITICAL multiple times in rapid succession (mitigated by spokenSet
+  one-shot gating, but still feels brittle).
+- Sentry / structure speech bubbles can stack visually when multiple
+  pieces hit a threshold in the same reveal.
+- Ammo crate AI: cyborgs go to compatible crates but they don't
+  COORDINATE — multiple cyborgs might race for the same crate when
+  one would suffice.
