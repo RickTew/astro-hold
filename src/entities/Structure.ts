@@ -11,7 +11,7 @@ import { playExplosion } from '../audio/sfx'
 const STRUCTURE_SPRITE_FOLDERS: Partial<Record<StructureType, string>> = {
   turret:  'tower',    // Robot_Tower — single canonical tower (replaces tower1/tower2)
   bomber:  'bomber',   // Robot_Bomber — AoE grenade-thrower
-  gunwall: 'gunwall',  // Robot_Wall — wall-tier HP turret (8 rotations, no anims)
+  sentry:  'sentry',   // Robot_Wall art — heavy-armor turret (8 rotations, no anims)
   defense: 'defense',  // geodesic dome (preview, no rotations)
   gun:     'gun',      // twin-barrel turret (preview)
   laser:   'laser',    // twin-laser turret (preview)
@@ -28,9 +28,9 @@ const STRUCTURE_HAS_EXPLOSION: Partial<Record<StructureType, true>> = {
 const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
   turret: 64,
   bomber: 60,
-  // Gunwall — render at 64 (matching the tower's footprint) so it visually
-  // reads as a heavy front-line emplacement, not a flimsy preview piece.
-  gunwall: 64,
+  // Sentry — render at 64 (matching the tower's footprint) so it reads
+  // as a heavy front-line emplacement, not a flimsy preview piece.
+  sentry: 64,
   gun:    40,
 }
 const SPRITE_SIZE = 50   // default — one cell
@@ -41,9 +41,9 @@ const SPRITE_SIZE = 50   // default — one cell
 const STRUCTURE_DEFAULT_DIR: Partial<Record<StructureType, string>> = {
   turret: 'east',
   bomber: 'east',
-  // Gunwall ships with 8 rotations like the tower — faces east toward the
-  // incoming cyborgs by default; the compass-rose buys extra fire arcs.
-  gunwall: 'east',
+  // Sentry ships with 8 rotations — faces east toward incoming cyborgs
+  // by default; the compass-rose buys extra fire arcs.
+  sentry: 'east',
 }
 const EXPLOSION_FRAME_COUNT = 4
 const EXPLOSION_FRAME_INTERVAL = 0.09
@@ -153,10 +153,17 @@ export class Structure {
 
   private hpBarGroup!: THREE.Group
   private hpBar: THREE.Mesh
-  // For walls only: the body mesh itself shrinks as it takes damage (the wall
-  // IS the HP bar). Stored so takeDamage() can scale it.
-  private wallBody: THREE.Mesh | null = null
-  private wallBodyHeight = 0
+  // For walls only: the laser-wall visual is a Group containing two emitter
+  // plates and a beam plane between them. takeDamage/heal scale + dim the
+  // beam and dim the emitter sockets; update() runs a subtle per-frame pulse.
+  private wallBody: THREE.Group | null = null
+  private wallParts: {
+    beam: THREE.Mesh
+    beamMat: THREE.MeshBasicMaterial
+    socketMats: THREE.MeshBasicMaterial[]
+    plateMats: THREE.MeshBasicMaterial[]
+  } | null = null
+  private wallPulse = 0
   // For sprite structures: kept so the death animation can swap textures.
   private sprite: THREE.Sprite | null = null
   // Death/explosion state — for sprite structures with an explosion sequence.
@@ -190,7 +197,7 @@ export class Structure {
     switch (this.type) {
       case 'turret':
       case 'bomber':
-      case 'gunwall':
+      case 'sentry':
       case 'defense':
       case 'gun':
       case 'laser':
@@ -218,18 +225,83 @@ export class Structure {
         break
       }
       case 'wall': {
-        // Wall body acts as its own HP indicator — scaled in takeDamage().
-        // Fills most of the cell (40×40) so its shrink reads cleanly.
-        // Base brown × team tint so wall ownership is visible at a glance.
-        const H = 40
-        this.wallBodyHeight = H
-        const wallColor = new THREE.Color(0x996633)
+        // Procedural "laser wall" — two metallic emitter plates at the top
+        // and bottom of the cell, a glowing energy beam between them.
+        // Reads as an active force-field barrier rather than a static brick.
+        // Orientation is fixed (north-south emitters, vertical beam) so the
+        // wall blocks the east-west cyborg corridor; rotation per facing
+        // isn't wired since walls have no fireFacings concept yet.
+        // HP feedback: beam scale.x shrinks and beamMat dims; emitter
+        // sockets fade. update() ticks a subtle pulse so it feels alive.
+        const group = new THREE.Group()
+        const CELL_HALF = 24      // just inside the 50-cell border
+        const PLATE_W = 36
+        const PLATE_H = 8
+        const BEAM_W = 10
+        const BEAM_GAP = CELL_HALF * 2 - PLATE_H * 2  // beam height between plates
+        // Team-tinted dark steel for the emitter plates so player vs AI
+        // walls still read at a glance.
+        const plateColor = new THREE.Color(0x4a5c6a)
           .multiply(new THREE.Color(TEAM_TINT[this.team]))
-        this.wallBody = new THREE.Mesh(
-          new THREE.BoxGeometry(40, H, 12),
-          new THREE.MeshBasicMaterial({ color: wallColor })
+        const plateMat = new THREE.MeshBasicMaterial({ color: plateColor })
+        const plateMat2 = plateMat.clone()
+        const topPlate = new THREE.Mesh(
+          new THREE.BoxGeometry(PLATE_W, PLATE_H, 10), plateMat,
         )
-        this.mesh.add(this.wallBody)
+        topPlate.position.set(0,  CELL_HALF - PLATE_H / 2, 0.5)
+        const bottomPlate = new THREE.Mesh(
+          new THREE.BoxGeometry(PLATE_W, PLATE_H, 10), plateMat2,
+        )
+        bottomPlate.position.set(0, -CELL_HALF + PLATE_H / 2, 0.5)
+        group.add(topPlate)
+        group.add(bottomPlate)
+        // Glowing emitter sockets on the inner faces of the plates — thin
+        // additive-cyan strips that read as "where the beam comes from".
+        const socketMat1 = new THREE.MeshBasicMaterial({
+          color: 0xb8ffff, transparent: true, opacity: 0.95,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        })
+        const socketMat2 = socketMat1.clone()
+        const topSocket = new THREE.Mesh(
+          new THREE.PlaneGeometry(PLATE_W - 6, 2), socketMat1,
+        )
+        topSocket.position.set(0,  CELL_HALF - PLATE_H, 6)
+        const bottomSocket = new THREE.Mesh(
+          new THREE.PlaneGeometry(PLATE_W - 6, 2), socketMat2,
+        )
+        bottomSocket.position.set(0, -CELL_HALF + PLATE_H, 6)
+        group.add(topSocket)
+        group.add(bottomSocket)
+        // The laser beam — additive cyan plane between the two sockets.
+        // Slight base opacity (0.55) so it reads as light, not paint.
+        const beamMat = new THREE.MeshBasicMaterial({
+          color: 0x88ffff, transparent: true, opacity: 0.55,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        })
+        const beam = new THREE.Mesh(
+          new THREE.PlaneGeometry(BEAM_W, BEAM_GAP), beamMat,
+        )
+        beam.position.set(0, 0, 5)
+        group.add(beam)
+        // A wider, dimmer halo behind the beam to suggest spill light.
+        const haloMat = new THREE.MeshBasicMaterial({
+          color: 0x66ddee, transparent: true, opacity: 0.18,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        })
+        const halo = new THREE.Mesh(
+          new THREE.PlaneGeometry(BEAM_W + 14, BEAM_GAP + 4), haloMat,
+        )
+        halo.position.set(0, 0, 4.5)
+        group.add(halo)
+
+        this.wallBody = group
+        this.wallParts = {
+          beam,
+          beamMat,
+          socketMats: [socketMat1, socketMat2, haloMat],
+          plateMats: [plateMat, plateMat2],
+        }
+        this.mesh.add(group)
         break
       }
       case 'mine': {
@@ -278,21 +350,8 @@ export class Structure {
     this.hp = Math.max(0, this.hp - amount)
     const ratio = this.hp / this.maxHp
 
-    if (this.type === 'wall' && this.wallBody) {
-      // Wall IS the HP bar — shrink the body from the top down so the base
-      // stays planted in the cell. ratio clamped to a sliver so a deeply
-      // damaged wall is still visible (and clickable for the player to
-      // notice it's almost gone) until it actually dies.
-      const s = Math.max(0.05, ratio)
-      this.wallBody.scale.y = s
-      this.wallBody.position.y = -(1 - s) * (this.wallBodyHeight / 2)
-      // Tint darker as the wall takes a beating, but multiply with the
-      // team color so ownership stays visible all the way through.
-      const mat = this.wallBody.material as THREE.MeshBasicMaterial
-      const dim = 0.5 + 0.5 * ratio
-      const base = new THREE.Color(0.6 * dim, 0.4 * dim, 0.2 * dim)
-        .multiply(new THREE.Color(TEAM_TINT[this.team]))
-      mat.color.copy(base)
+    if (this.type === 'wall' && this.wallParts) {
+      this.applyWallDamageVisual(ratio)
     } else {
       this.hpBar.scale.x = ratio
       this.hpBar.position.x = -(1 - ratio) * 14   // half of new bar width 28
@@ -301,6 +360,30 @@ export class Structure {
     }
 
     if (this.isDead && !this.dying) this.startDying()
+  }
+
+  // Wall HP feedback — the beam thins + dims, emitter sockets fade. Called
+  // from both takeDamage (lower HP) and heal (higher HP). Clamped to a
+  // visible sliver so a deeply-damaged wall still reads in the cell.
+  private applyWallDamageVisual(ratio: number) {
+    if (!this.wallParts) return
+    const s = Math.max(0.10, ratio)
+    // Beam thins horizontally — the gap between emitters stays the same
+    // height so the structure still "fills" the cell visually.
+    this.wallParts.beam.scale.x = 0.4 + 0.6 * s
+    // Beam alpha drops faster than s so a 25%-HP wall reads as dim+thin.
+    this.wallParts.beamMat.opacity = 0.20 + 0.55 * s * s
+    // Socket + halo alpha follow beam alpha at slightly lower magnitudes.
+    for (const m of this.wallParts.socketMats) {
+      m.opacity = 0.08 + 0.85 * s
+    }
+    // Plates stay structurally visible but get a subtle dim at low HP so
+    // the whole assembly reads as "battered" near death.
+    const dim = 0.55 + 0.45 * s
+    const plateColor = new THREE.Color(0x4a5c6a)
+      .multiplyScalar(dim)
+      .multiply(new THREE.Color(TEAM_TINT[this.team]))
+    for (const m of this.wallParts.plateMats) m.color.copy(plateColor)
   }
 
   // Repair-bot heal target — restore HP up to maxHp, refresh the HP bar (or
@@ -313,15 +396,8 @@ export class Structure {
     const restored = this.hp - before
     if (restored <= 0) return false
     const ratio = this.hp / this.maxHp
-    if (this.type === 'wall' && this.wallBody) {
-      const s = Math.max(0.05, ratio)
-      this.wallBody.scale.y = s
-      this.wallBody.position.y = -(1 - s) * (this.wallBodyHeight / 2)
-      const mat = this.wallBody.material as THREE.MeshBasicMaterial
-      const dim = 0.5 + 0.5 * ratio
-      const base = new THREE.Color(0.6 * dim, 0.4 * dim, 0.2 * dim)
-        .multiply(new THREE.Color(TEAM_TINT[this.team]))
-      mat.color.copy(base)
+    if (this.type === 'wall' && this.wallParts) {
+      this.applyWallDamageVisual(ratio)
     } else {
       this.hpBar.scale.x = ratio
       this.hpBar.position.x = -(1 - ratio) * 14
@@ -369,6 +445,27 @@ export class Structure {
   }
 
   update(delta: number) {
+    // Wall pulse — runs every frame while the wall is alive so the beam +
+    // sockets shimmer subtly. Sits outside the dying gate because we want
+    // the pulse to keep running even while taking damage.
+    if (this.type === 'wall' && this.wallParts && !this.dying && !this.removed) {
+      this.wallPulse += delta
+      const ratio = this.hp / this.maxHp
+      const sBase = Math.max(0.10, ratio)
+      const k = 0.85 + 0.18 * Math.sin(this.wallPulse * 5.0)
+      // Multiply the static base opacity (set in applyWallDamageVisual) by
+      // the pulse factor — beam never goes completely dark, just dims/glows.
+      const baseOp = 0.20 + 0.55 * sBase * sBase
+      this.wallParts.beamMat.opacity = baseOp * k
+      // Sockets get a faster pulse out of phase with the beam — reads as
+      // "energy flowing into the emitter ports."
+      const socketK = 0.78 + 0.20 * Math.sin(this.wallPulse * 7.0 + 1.0)
+      const socketBase = 0.08 + 0.85 * sBase
+      const haloBase   = 0.10 + 0.20 * sBase
+      this.wallParts.socketMats[0].opacity = socketBase * socketK
+      this.wallParts.socketMats[1].opacity = socketBase * socketK
+      this.wallParts.socketMats[2].opacity = haloBase   * socketK
+    }
     if (!this.dying || this.removed) return
     const frames = structureExplosionTextures.get(this.type)
     if (!frames || !this.sprite) return

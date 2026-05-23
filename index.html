@@ -224,22 +224,37 @@
       transform: scale(0.78);
       transform-origin: center;
     }
-    /* WIP placeholder — sized to match the .tile-icon frame, neutral "?" glyph
-       so it doesn't compete visually with the real sprite art. */
+    /* Procedural laser-wall icon — two metallic emitter bars (top + bottom)
+       with a cyan energy beam between them. Matches the in-game wall visual
+       so the HUD reads consistently. Built with stacked CSS gradients;
+       sized by the .tile-icon parent's clamp() so no width/height override
+       needed. */
     .hud-tile .icon-wall {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Orbitron', sans-serif;
-      font-size: clamp(20px, 3vh, 30px);
-      font-weight: 700;
-      color: rgba(160, 200, 230, 0.55);
-      text-shadow: 0 0 6px rgba(106, 196, 255, 0.35);
+      background:
+        linear-gradient(180deg, #6c8294, #2a323c) top    / 100% 18% no-repeat,
+        linear-gradient(180deg, #2a323c, #6c8294) bottom / 100% 18% no-repeat,
+        linear-gradient(180deg,
+          transparent 18%,
+          rgba(160, 240, 255, 0.65) 26%,
+          rgba(190, 250, 255, 0.95) 50%,
+          rgba(160, 240, 255, 0.65) 74%,
+          transparent 82%) center / 30% 100% no-repeat,
+        radial-gradient(ellipse at center, rgba(106, 196, 255, 0.25) 0%, transparent 65%);
+      box-shadow: inset 0 0 12px rgba(106, 196, 255, 0.25);
     }
-    .hud-tile .icon-wall::before { content: "?"; }
-    .hud-tile.att .icon-wall { color: rgba(230, 170, 190, 0.55); text-shadow: 0 0 6px rgba(255, 122, 154, 0.35); }
+    .hud-tile.att .icon-wall {
+      background:
+        linear-gradient(180deg, #6c8294, #2a323c) top    / 100% 18% no-repeat,
+        linear-gradient(180deg, #2a323c, #6c8294) bottom / 100% 18% no-repeat,
+        linear-gradient(180deg,
+          transparent 18%,
+          rgba(255, 170, 200, 0.65) 26%,
+          rgba(255, 200, 220, 0.95) 50%,
+          rgba(255, 170, 200, 0.65) 74%,
+          transparent 82%) center / 30% 100% no-repeat,
+        radial-gradient(ellipse at center, rgba(255, 122, 154, 0.25) 0%, transparent 65%);
+      box-shadow: inset 0 0 12px rgba(255, 122, 154, 0.25);
+    }
     .hud-tile .tile-label {
       font-size: clamp(10px, 1.2vh, 12px);
       letter-spacing: 1px;

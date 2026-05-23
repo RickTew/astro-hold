@@ -62,12 +62,16 @@ export class HUD {
       { label: 'SPHERE',  cost: 100, icon: '/sprites/sphere/south.png', action: 'sphere' },
       { label: 'TOWER',   cost:  30, icon: '/sprites/tower/south.png',  dataType: 'turret' },
       { label: 'BOMBER',  cost:  70, icon: '/sprites/bomber/south.png', dataType: 'bomber' },
-      // GUNWALL — Robot_Wall art (8 rotations, no anims). A wall-tier HP
-      // turret that shoots; replaces the duplicate-TOWER placeholder that
-      // used to live here.
-      { label: 'GUNWALL', cost:  60, icon: '/sprites/gunwall/south.png', dataType: 'gunwall' },
+      // SENTRY — heavy-armor turret on tracks (Robot_Wall art reads as a
+      // tower, not a wall). HP 200 / dmg 25 / range 200 — a front-line
+      // hardpoint that eats hits while keeping its gun online.
+      { label: 'SENTRY',  cost:  60, icon: '/sprites/sentry/south.png', dataType: 'sentry' },
       { label: 'DOG',     cost:  40, icon: '/sprites/dog/south.png',    action: 'dog' },
-      { label: 'DEFENSE', cost:  20, icon: '/sprites/defense/south.png', dataType: 'defense', preview: true },
+      // WALL — procedural laser-wall (no sprite). Two metallic emitter
+      // plates at top + bottom of the cell with a pulsing cyan energy beam
+      // between them. HUD icon uses the `icon: 'wall'` magic value to
+      // render a CSS-gradient mini-version of the in-game visual.
+      { label: 'WALL',    cost:  20, icon: 'wall',                       dataType: 'wall' },
       { label: 'LASER',   cost:  40, icon: '/sprites/laser/south.png',   dataType: 'laser',   preview: true },
       { label: 'REPAIR',  cost:  70, icon: '/sprites/repair/south.png',  action: 'repair' },
     ]

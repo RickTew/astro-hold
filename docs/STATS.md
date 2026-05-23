@@ -224,7 +224,7 @@ Sprite assets: 8-direction rotations + 9-frame walking (Moving) anim +
 pad/tether actions and re-fires each tether tick). Death duplicates the
 4-frame explodes anim into every direction folder, same as the Combat Dog.
 
-### Gunwall (defender structure — session 16)
+### Sentry (defender structure — session 16, renamed from "Gunwall")
 | Stat | Value |
 |---|---|
 | Cost | 60 |
@@ -235,13 +235,42 @@ pad/tether actions and re-fires each tether tick). Death duplicates the
 | AP | 1 |
 | Fire interval | 2 |
 
-A wall that shoots. Tankier than a tower (HP 200 vs 80) with the same
-damage but shorter range (200 vs 250) — built as a hard point on the
-front line, eats hits and still bites back. Uses the same fire-arc
-compass-rose mechanic as the tower (default east, pay to add more).
-Stationary; can't walk. 8-direction static rotations from Robot_Wall
-(no walking/firing anims yet — sprite simply rotates to its fire facing).
-Sits in the HUD slot that used to be the duplicate-TOWER WALL placeholder.
+Heavy-armor tower on tracks. The art (originally generated as "Robot_Wall"
+but the internal zip folder was "Robot_Tank" — closer to its true nature)
+is a tracked vehicle with gun arms; reads as a tower, not a wall, so we
+renamed `gunwall` → `sentry` after the first deploy. Tankier than a tower
+(HP 200 vs 80) with the same damage but shorter range (200 vs 250) — built
+as a hard point on the front line, eats hits and still bites back. Same
+fire-arc compass-rose mechanic as the tower (default east, pay to add more).
+8-direction static rotations, no animations. Repair-bot priority 8 (tied
+with Bomber and Sphere).
+
+### Wall (procedural laser-wall — redesigned in session 16)
+| Stat | Value |
+|---|---|
+| Cost | 20 |
+| HP | 300 |
+| Damage | 0 |
+| Range | — |
+| AoE | — |
+| AP | 0 |
+| Ammo | 0 |
+
+Two metallic emitter plates at the top and bottom of the cell with a
+glowing cyan energy beam between them. Replaces the brown-box wall visual
+that used to fill this slot. **Stats are unchanged** — pure blocker, eats
+300 HP of hits before failing, no offensive capability of its own.
+
+The beam pulses every frame via `Structure.update()` (a subtle ~5 Hz
+opacity oscillation, with the emitter sockets shimmering out of phase at
+7 Hz). HP feedback: beam scale.x thins and beamMat opacity drops as the
+wall takes damage, with emitter sockets fading in parallel — at low HP the
+whole structure dims to a faint flicker.
+
+HUD icon is a stacked CSS-gradient mini-version of the same visual (two
+metallic bars top + bottom, beam between) so the shop tile reads the same
+way as the in-game piece. **Wall is now buyable from the player's HUD**
+(replaced the DEFENSE preview tile in the robot grid).
 
 ### Structures (production)
 

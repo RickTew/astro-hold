@@ -48,11 +48,19 @@ D&D-style strategy:
   allowed. HP 60, cost 70. See `RepairPad.ts`, `RepairTether.ts`,
   `RevealPhase.repairDefaultAction()`. **HUD note:** REPAIR replaced the
   SIGNAL preview tile in the robot grid (bottom-right of the 4×2 layout).
-- **Gunwall (Robot_Wall)** — defender structure. A wall that shoots:
-  HP 200 (vs tower 80), damage 25 (matches tower), range 200 (vs tower
-  250), cost 60, ammo 5. 8-direction sprite art (no anims). Sits in the
-  HUD slot that used to be the duplicate-TOWER WALL placeholder. Uses
-  the same fire-arc compass-rose mechanic as the tower.
+- **Sentry (Robot_Wall art)** — defender structure. Tracked-vehicle turret
+  with gun arms — reads as a heavy tower, NOT a wall (renamed from gunwall
+  for clarity). HP 200 (vs tower 80), damage 25 (matches tower), range 200
+  (vs tower 250), cost 60, ammo 5. 8-direction sprite art (no anims). Uses
+  the tower's fire-arc compass-rose mechanic.
+- **Wall** — defender structure (procedural laser-wall, no sprite). Two
+  metallic emitter plates at top + bottom of the cell with a pulsing cyan
+  energy beam between them. The original brown-box wall visual was replaced
+  in session 16; mechanics unchanged (HP 300, 0 damage, blocks one cell).
+  Beam dims + thins with damage; sockets pulse out of phase with the beam
+  via `Structure.update()` running every frame regardless of dying state.
+  HUD icon is a CSS-gradient mini-version of the in-game visual (no SVG,
+  no PNG). Wall is now buyable via the robot HUD (replaced DEFENSE preview).
 
 ## HUD (session 15)
 Floating top strip with three SVG-silhouetted panels — DO NOT reserve
@@ -79,10 +87,10 @@ pulse ring (on `.hud-tile.selected`), edge-trace orbit (SVG
 via `.phase-reveal` class), unit icon glow. All theme-matched
 (cyan defender / pink attacker).
 
-- LEFT panel — 4×2 robot tile grid (8 pieces): Sphere/Tower/Bomber/Gunwall
-  over Dog/Defense/Laser/Repair. Defense/Laser are "preview" pieces with
-  placeholder behavior (no unique mechanics yet); Gunwall + Repair are
-  fully wired (session 16). See the Robot Repair + Gunwall sections above.
+- LEFT panel — 4×2 robot tile grid (8 pieces): Sphere/Tower/Bomber/Sentry
+  over Dog/Wall/Laser/Repair. Laser is the lone "preview" piece left;
+  Sphere, Tower, Bomber, Sentry, Dog, Wall, Repair all have real mechanics.
+  See the Robot Repair + Sentry + Wall sections above.
 - CENTER panel — clean chamfered rectangle SVG with two internal dividers
   splitting it into three console "screens":
   * **Title bar** (`.cc-title`): BUILD PHASE / PLAN PHASE / BATTLE label

@@ -66,7 +66,7 @@ function structureRepairPriority(type: string): number {
   switch (type) {
     case 'cannon':  return 9
     case 'bomber':  return 8
-    case 'gunwall': return 8  // tankier than tower, costs as much as cannon — high priority
+    case 'sentry':  return 8  // tankier than tower, mid-cost — high priority for repair bots
     case 'turret':  return 7
     case 'laser':   return 6
     case 'gun':     return 5
