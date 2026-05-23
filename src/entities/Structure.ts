@@ -413,9 +413,36 @@ export class Structure {
       this.hpBar.position.x = -(1 - ratio) * 14   // half of new bar width 28
       const mat = this.hpBar.material as THREE.MeshBasicMaterial
       mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
+      // HP bars are hidden globally, so without sprite tinting the player
+      // sees zero visual change on a sentry/tower/bomber as it takes hits.
+      // Shift the sprite color toward a darker red-tinted tone as ratio
+      // drops — same idea as the wall body dimming, applied to the sprite
+      // material's multiplicative color channel.
+      this.applySpriteDamageTint(ratio)
     }
 
     if (this.isDead && !this.dying) this.startDying()
+  }
+
+  // Sprite-based damage feedback for non-wall structures. Builds a tinted
+  // color that starts at the team tint (full HP) and shifts toward a
+  // darker red multiplier as HP drops. Skipped if there's no sprite to
+  // tint (legacy mine + wall paths handle their own visuals).
+  private applySpriteDamageTint(ratio: number) {
+    if (!this.sprite) return
+    // Don't fight an active repair-pulse flash — that timer will restore
+    // the correct tint when it fires.
+    if (this.repairPulseTimer !== null) return
+    const r = Math.max(0.05, ratio)
+    // RGB multiplier: green/blue dim faster than red, so the structure
+    // tints orange → red as it gets battered. At full HP this is (1,1,1)
+    // which is a no-op; at 5% HP it's (0.42, 0.10, 0.10) = deep blood red.
+    const rChan = 0.4 + 0.6 * r
+    const gChan = 0.1 + 0.9 * r * r
+    const bChan = 0.1 + 0.9 * r * r
+    const damageColor = new THREE.Color(rChan, gChan, bChan)
+      .multiply(new THREE.Color(TEAM_TINT[this.team]))
+    this.sprite.material.color.copy(damageColor)
   }
 
   // Wall HP feedback — the beam thins + dims, emitter sockets fade. Called
@@ -459,6 +486,11 @@ export class Structure {
       this.hpBar.position.x = -(1 - ratio) * 14
       const mat = this.hpBar.material as THREE.MeshBasicMaterial
       mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
+      // Mirror takeDamage — restore the damage-tint toward white as HP
+      // climbs. The repair flash (pulseRepairVfx) handles the amber pulse,
+      // and after it expires the timer restores to the BASE color which
+      // we now compute from current HP rather than always TEAM_TINT.
+      this.applySpriteDamageTint(ratio)
     }
     this.pulseRepairVfx()
     return true
@@ -466,6 +498,9 @@ export class Structure {
 
   // Brief warm-orange material flash on the structure's main sprite so the
   // player can see a repair just landed. Wall has no sprite — skipped there.
+  // The post-flash restore re-applies the damage tint at the CURRENT HP
+  // ratio, so a partially-damaged structure stays visibly dim/red after
+  // the flash instead of snapping back to full-health team color.
   private repairPulseTimer: number | null = null
   private pulseRepairVfx() {
     const s = this.sprite
@@ -473,12 +508,8 @@ export class Structure {
     if (this.repairPulseTimer !== null) clearTimeout(this.repairPulseTimer)
     s.material.color.setHex(0xffcc66)
     this.repairPulseTimer = window.setTimeout(() => {
-      if (this.team === 'ai') {
-        s.material.color.setHex(TEAM_TINT['ai'])
-      } else {
-        s.material.color.setHex(TEAM_TINT['player'])
-      }
       this.repairPulseTimer = null
+      this.applySpriteDamageTint(this.hp / this.maxHp)
     }, 280)
   }
 
