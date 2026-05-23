@@ -394,23 +394,21 @@ export class RevealPhase {
       const slam = this.pickSlamWedge(unit)
       if (slam) return { kind: 'slam', cell: slam }
     }
-    // Sniper crouch-and-hold. Once a Sniper has ANY enemy in range from his
-    // current cell, he stays put — fires if he has ammo, holds if he
-    // doesn't. Only moves when no enemy is in range from his current spot.
-    // Matches the "marksman finds a position and locks down" trope; also
-    // stops the slow sniper from walking into close combat where he's
-    // useless. NOTE: sniper range 400 = half the world, so once positioned
-    // he's almost always anchored.
-    if (unit.type === 'sniper') {
+    // Sniper find-a-spot-and-shoot. Loop:
+    //   1. With ammo: if a target is in range → FIRE (anchor in place).
+    //      If no target in range → fall through to walk to find one.
+    //   2. Without ammo: don't bother anchoring — fall through to advance
+    //      with the rest of the cyborg push. The 'shoot' clip's last-frame
+    //      hold (in SpriteUnit.advanceFrame) gives the visual "aim pose"
+    //      while ammo > 0; once the round is spent, the anim transitions
+    //      to idle (static rotation) so the sniper visibly STANDS UP and
+    //      the player can see the rifle is empty.
+    if (unit.type === 'sniper' && unit.ammoRemaining > 0) {
       const target = this.nearestEnemy(unit, Config.UNITS.sniper.range)
       if (target) {
-        if (unit.ammoRemaining > 0) {
-          return { kind: 'fire', target: { kind: target.kind, id: target.id } }
-        }
-        return { kind: 'hold' }   // anchored even after firing his one round
+        return { kind: 'fire', target: { kind: target.kind, id: target.id } }
       }
-      // No target in current-cell range — fall through to normal advance
-      // so the sniper repositions to find a sight line.
+      // No target in current-cell range — fall through to repositioning
     }
     // Grenadier-specific: if an armed enemy bomb is adjacent (within 1.5
     // cells), prefer DIFFUSING it over anything else. Costs 1 AP, no
@@ -883,7 +881,7 @@ export class RevealPhase {
     const curDist = Math.hypot(tx - unit.worldX, ty - unit.worldY)
     type Cand = {
       col: number; row: number; x: number; y: number; d: number;
-      danger: number; isBacktrack: boolean;
+      danger: number; isBacktrack: boolean; spacing: number;
     }
     const reducing: Cand[] = []
     const sideways: Cand[] = []
@@ -904,13 +902,15 @@ export class RevealPhase {
         col, row, x, y, d,
         danger: this.cellBombDanger(x, y, unit.side),
         isBacktrack,
+        spacing: this.cellTypeClusterPenalty(unit, x, y),
       }
       if (d < curDist - 0.5) reducing.push(cand)
       else if (d <= curDist + SIDEWAYS_THRESHOLD) sideways.push(cand)
     }
-    // Score helper — distance + danger weight. Backtrack candidates get a
-    // big penalty so they only win when no non-backtrack option exists.
-    const score = (c: Cand) => c.d + c.danger * 2 + (c.isBacktrack ? 1000 : 0)
+    // Score helper — distance + danger weight + spacing penalty. Backtrack
+    // candidates get a big penalty so they only win when no non-backtrack
+    // option exists.
+    const score = (c: Cand) => c.d + c.danger * 2 + c.spacing + (c.isBacktrack ? 1000 : 0)
     const pickFrom = (pool: Cand[]): Cand | null => {
       if (pool.length === 0) return null
       pool.sort((a, b) => score(a) - score(b))
@@ -920,6 +920,24 @@ export class RevealPhase {
     // return null so the caller falls through to wander.
     const c = pickFrom(reducing) ?? pickFrom(sideways)
     return c ? { col: c.col, row: c.row } : null
+  }
+
+  // Penalty for stepping near other allies of the same type. Right now
+  // only applied to snipers — long-range units that cover overlapping
+  // arcs when clustered. Score grows as the candidate cell gets closer
+  // to an existing same-side sniper; the step picker will route the
+  // moving sniper toward a less-crowded angle.
+  private cellTypeClusterPenalty(unit: SpriteUnit, x: number, y: number): number {
+    if (unit.type !== 'sniper') return 0
+    const SPACING = Config.GRID_CELL * 3   // want >=3 cells between snipers
+    const pool = unit.side === 'attacker' ? this.units : this.defenderUnits
+    let penalty = 0
+    for (const other of pool) {
+      if (other === unit || other.isDead || other.type !== 'sniper') continue
+      const od = Math.hypot(other.worldX - x, other.worldY - y)
+      if (od < SPACING) penalty += (SPACING - od) * 0.6
+    }
+    return penalty
   }
 
   // How much armed-bomb damage would a unit standing at (x, y) absorb if

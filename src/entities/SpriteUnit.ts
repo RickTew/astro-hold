@@ -716,6 +716,16 @@ export class SpriteUnit {
           this.frameIndex = this.currentFrames.length - 1
           // One-shot finished — transition back. Death stays on final frame.
           if (this.currentState === 'shoot' || this.currentState === 'throw' || this.currentState === 'repair') {
+            // Sniper crouch-hold: while the sniper still has ammo and isn't
+            // moving, FREEZE on the final frame of 'shoot' so he reads as
+            // "still aiming" between turns instead of bouncing back to the
+            // standing pose. When ammo hits 0, fall through to the normal
+            // transition — that lands on idle → static rotation, which IS
+            // the upright "stand-up, gun empty" pose the player wants.
+            if (this.type === 'sniper' && this.currentState === 'shoot'
+                && !this.isMoving && this.ammoRemaining > 0) {
+              return
+            }
             this.playState(this.isMoving ? 'walking' : 'idle')
             return
           }
