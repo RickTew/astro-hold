@@ -419,20 +419,31 @@ export class RevealPhase {
       return { kind: 'hold' }
     }
     // Sniper find-a-spot-and-shoot. Loop:
-    //   1. With ammo: if a target is in range → FIRE (anchor in place).
-    //      If no target in range → fall through to walk to find one.
-    //   2. Without ammo: don't bother anchoring — fall through to advance
-    //      with the rest of the cyborg push. The 'shoot' clip's last-frame
-    //      hold (in SpriteUnit.advanceFrame) gives the visual "aim pose"
-    //      while ammo > 0; once the round is spent, the anim transitions
-    //      to idle (static rotation) so the sniper visibly STANDS UP and
-    //      the player can see the rifle is empty.
-    if (unit.type === 'sniper' && unit.ammoRemaining > 0) {
-      const target = this.nearestEnemy(unit, Config.UNITS.sniper.range)
-      if (target) {
-        return { kind: 'fire', target: { kind: target.kind, id: target.id } }
+    //   1. With ammo + target in range → FIRE (anchor in place; the
+    //      sprite drops into the crouched 'aim' pose between shots).
+    //   2. With ammo + no target in range → fall through to walk.
+    //   3. NO ammo → retreat to base. The sniper has no melee option,
+    //      so he runs back to the cyborg spawn edge (east) rather than
+    //      blocking forward units' paths or getting picked off doing
+    //      nothing. Stands up out of the crouched aim pose (handled by
+    //      SpriteUnit.advanceFrame's idle fallback when ammo hits 0).
+    if (unit.type === 'sniper') {
+      if (unit.ammoRemaining > 0) {
+        const target = this.nearestEnemy(unit, Config.UNITS.sniper.range)
+        if (target) {
+          return { kind: 'fire', target: { kind: target.kind, id: target.id } }
+        }
+        // No target in current-cell range — fall through to repositioning
+      } else {
+        // Empty rifle, no melee — retreat east toward the attacker spawn
+        // edge. If already at the edge, hold.
+        const retreatX = Config.WORLD.RIGHT - Config.GRID_CELL * 0.5
+        if (unit.worldX < retreatX - Config.GRID_CELL) {
+          const cell = this.pickStepTowardPoint(unit, retreatX, unit.worldY)
+          if (cell) return { kind: 'move', cell }
+        }
+        return { kind: 'hold' }
       }
-      // No target in current-cell range — fall through to repositioning
     }
     // Grenadier-specific: if an armed enemy bomb is adjacent (within 1.5
     // cells), prefer DIFFUSING it over anything else. Costs 1 AP, no

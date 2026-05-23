@@ -15,7 +15,7 @@ const DIRECTIONS = [
 type Direction = (typeof DIRECTIONS)[number]
 const ALL_DIRS = DIRECTIONS as readonly Direction[]
 
-export type AnimState = 'idle' | 'walking' | 'shoot' | 'throw' | 'die' | 'repair'
+export type AnimState = 'idle' | 'walking' | 'shoot' | 'throw' | 'die' | 'repair' | 'aim'
 
 // Sprite world size — matches the perceived height of the prior 3D cyborg.
 const SPRITE_SIZE = 60
@@ -144,6 +144,11 @@ const MANIFEST: Record<string, AnimManifest> = {
     walking: { fps: 8,  loop: true,  presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
     shoot:   { fps: 12, loop: false, presentDirs: ['east', 'west', 'north', 'north-east', 'north-west', 'south-east', 'south-west'], frameCount: 9 },
     die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
+    // Crouched-aiming "in position" pose — one static frame per direction
+    // (final frame of the PixelLab crouches_and_prepares clip). Only east
+    // and west ship; other facings fall back to static rotation via the
+    // refreshDirection chain. loop:true so the single frame holds.
+    aim:     { fps: 1,  loop: true,  presentDirs: ['east', 'west'], frameCount: 1 },
   },
   // Cyborg Hulk — bruiser. Sparse asset coverage (PixelLab export):
   //  - walking: 4 cardinal dirs (diagonals mirror-fallback off N/S)
@@ -214,7 +219,7 @@ export async function preloadSpriteUnit(type: UnitType, folder: string): Promise
 
   const manifest = MANIFEST[folder]
   const anims: Record<AnimState, AnimDef | undefined> = {
-    idle: undefined, walking: undefined, shoot: undefined, throw: undefined, die: undefined, repair: undefined,
+    idle: undefined, walking: undefined, shoot: undefined, throw: undefined, die: undefined, repair: undefined, aim: undefined,
   }
   // All states + all directions + all frames load concurrently. HTTP/2 lets
   // the browser multiplex these, so total wall-clock load time drops from
@@ -732,14 +737,16 @@ export class SpriteUnit {
           this.frameIndex = this.currentFrames.length - 1
           // One-shot finished — transition back. Death stays on final frame.
           if (this.currentState === 'shoot' || this.currentState === 'throw' || this.currentState === 'repair') {
-            // Sniper crouch-hold: while the sniper still has ammo and isn't
-            // moving, FREEZE on the final frame of 'shoot' so he reads as
-            // "still aiming" between turns instead of bouncing back to the
-            // standing pose. When ammo hits 0, fall through to the normal
-            // transition — that lands on idle → static rotation, which IS
-            // the upright "stand-up, gun empty" pose the player wants.
+            // Sniper post-shot: if he still has ammo AND isn't moving,
+            // drop into the dedicated 'aim' state (crouched-aiming sprite).
+            // 'aim' is a 1-frame loop so it holds indefinitely. When ammo
+            // hits 0 OR he starts moving, we fall through to the normal
+            // transition — idle has no clip for sniper, so refreshDirection
+            // resolves to the upright STANDING static rotation. That's the
+            // visible "stand up — gun's empty" pose the user wants.
             if (this.type === 'sniper' && this.currentState === 'shoot'
                 && !this.isMoving && this.ammoRemaining > 0) {
+              this.playState('aim')
               return
             }
             this.playState(this.isMoving ? 'walking' : 'idle')

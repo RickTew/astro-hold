@@ -173,6 +173,12 @@ export class OpponentAI {
       rowPreference: 'shuffle',
     })
 
+    // Track placed sniper positions so we can enforce a min-spacing rule
+    // (snipers should cover different angles, not stack). Distance is in
+    // world units; 3 cells = 150.
+    const placedSnipers: { x: number; y: number }[] = []
+    const SNIPER_MIN_SPACING = Config.GRID_CELL * 3
+
     let safety = 32   // hard cap on AI loop iterations
     while (safety-- > 0 && this.api.getCredits() > stopAt && baseSlots.length > 0 && pool.length > 0) {
       const type = this.weightedPick(pool)
@@ -183,7 +189,32 @@ export class OpponentAI {
         if (idx >= 0) pool.splice(idx, 1)
         continue
       }
-      const slot = baseSlots.shift()!
+      // Snipers need a slot at least 3 cells from any other sniper. Walk
+      // baseSlots until a spaced cell turns up; if none, skip this sniper
+      // and try a different pick on the next loop iteration.
+      let slot: Cell | undefined
+      if (type === 'sniper') {
+        for (let i = 0; i < baseSlots.length; i++) {
+          const c = baseSlots[i]
+          const tooClose = placedSnipers.some(p =>
+            Math.hypot(p.x - c.x, p.y - c.y) < SNIPER_MIN_SPACING)
+          if (!tooClose) {
+            slot = baseSlots.splice(i, 1)[0]
+            break
+          }
+        }
+        if (!slot) {
+          // No spaced cell available — drop sniper from the pool and try
+          // other types. Prevents the loop from spinning on the same
+          // unbuyable pick.
+          const idx = pool.findIndex(p => p.t === 'sniper')
+          if (idx >= 0) pool.splice(idx, 1)
+          continue
+        }
+        placedSnipers.push({ x: slot.x, y: slot.y })
+      } else {
+        slot = baseSlots.shift()!
+      }
       this.api.spawnAttackerUnit(type, slot.x, slot.y)
     }
   }
