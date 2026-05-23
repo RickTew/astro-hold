@@ -427,18 +427,34 @@ private enterBuildPhase() {
 
   // Show/hide every piece on the AI's side of the field. Called with false
   // after the AI's BUILD turn and true at the start of the first REVEAL.
-  // No-op if the player picked no side yet.
+  // No-op if the player picked no side yet. DEAD pieces are deliberately
+  // skipped — each reveal calls this with visible=true to drop the fog
+  // again, and without the isDead guard dead bodies would briefly flash
+  // back on screen until their own update() loop hid them 2s later. That
+  // produced a "corpses blink every 3 seconds" effect.
   private setAiPiecesVisible(visible: boolean) {
     if (!this.playerSide) return
     const aiSide: OpponentSide = this.playerSide === 'defender' ? 'attacker' : 'defender'
     if (aiSide === 'attacker') {
-      for (const u of this.attackerUnits) u.mesh.visible = visible
+      for (const u of this.attackerUnits) {
+        if (u.isDead) continue
+        u.mesh.visible = visible
+      }
     } else {
-      for (const u of this.defenderUnits) u.mesh.visible = visible
-      for (const s of this.spheres)       s.mesh.visible = visible
+      for (const u of this.defenderUnits) {
+        if (u.isDead) continue
+        u.mesh.visible = visible
+      }
+      for (const s of this.spheres) {
+        if (s.isDead) continue
+        s.mesh.visible = visible
+      }
       // Structures live on BuildPhase before reveal, on Game.structures after.
       const structs = this.buildPhase?.getStructures() ?? this.structures
-      for (const st of structs) st.mesh.visible = visible
+      for (const st of structs) {
+        if (st.isDead) continue
+        st.mesh.visible = visible
+      }
     }
   }
 
@@ -663,17 +679,39 @@ private enterBuildPhase() {
       // at the start of the next reveal (see ARMED_LIFETIME there).
       for (const g of this.pendingGrenades) g.advanceTurn()
       if (this.phase !== 'reveal') return   // game ended mid-reveal
-      // No stalemate gate — battle is die-or-survive, not chess. The auto-
-      // reveal loop continues until win (all cyborgs dead) or lose (core
-      // dead). If both sides have no productive action available, the loop
-      // keeps running with empty reveals; eventually somebody walks into
-      // somebody else's range and combat resumes.
+      // Defender-wins-by-attrition check: if no cyborg can damage the core
+      // anymore (every shooter is out of ammo, no Hulk alive to punch
+      // through), the defender survives by default. Without this rule
+      // depleted cyborgs would wander the map indefinitely, the core
+      // would stand untouched, and the auto-reveal loop would spin forever.
+      if (!this.powerCore.isDead && !this.cyborgsCanAttack()) {
+        this.phase = 'win'
+        this.hud.setPhase('win')
+        return
+      }
+      // No stalemate gate — battle is die-or-survive. Loop continues until
+      // win (all cyborgs dead OR cyborgs disarmed) or lose (core dead).
       for (const u of this.attackerUnits) u.clearPlan()
       for (const u of this.defenderUnits) u.clearPlan()
       for (const s of this.spheres)       s.clearPlan()
       for (const s of this.structures)    s.clearPlan()
       this.enterRevealPhase()
     }
+  }
+
+  // True if at least one alive cyborg can still inflict damage. Medics are
+  // excluded — their ammoRemaining tracks heal charges, not attack rounds.
+  // The Hulk is special-cased: his punches don't consume ammo (set in
+  // RevealPhase.executeAttack), so as long as a Hulk is alive cyborgs can
+  // still threaten the core via melee. Everyone else needs ammoRemaining > 0.
+  private cyborgsCanAttack(): boolean {
+    for (const u of this.attackerUnits) {
+      if (u.isDead) continue
+      if (u.type === 'medic') continue
+      if (u.type === 'hulk') return true
+      if (u.ammoRemaining > 0) return true
+    }
+    return false
   }
 
   // ── Placement (unified) ──────────────────────────────────────────────────
