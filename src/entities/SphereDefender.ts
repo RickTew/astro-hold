@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
+import { spawnSpeechBubble, SpeechTrigger } from './SpeechBubble'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
@@ -178,6 +179,24 @@ export class SphereDefender {
       this.isDead = true
       this.startDying()
     }
+    this.checkSpeechTriggers()
+  }
+
+  // Status callout — robot voice. One bubble per condition per sphere.
+  private spokenSet = new Set<SpeechTrigger>()
+  checkSpeechTriggers() {
+    if (this.isDead) return
+    if (this.hp / this.maxHp <= 0.25) this.maybeSpeak('low_hp')
+    if (this.ammoRemaining === 1) this.maybeSpeak('low_ammo')
+    else if (this.ammoRemaining === 0) this.maybeSpeak('out_of_ammo')
+  }
+  notifyAmmoChanged() { this.checkSpeechTriggers() }
+  private maybeSpeak(trigger: SpeechTrigger) {
+    if (this.spokenSet.has(trigger)) return
+    this.spokenSet.add(trigger)
+    const scene = this.mesh.parent
+    if (!(scene instanceof THREE.Scene)) return
+    spawnSpeechBubble(scene, this.worldX, this.worldY, 'robot', trigger)
   }
 
   // Repair-bot heal target. Returns true iff any HP was restored. Skips if

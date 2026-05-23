@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
+import { spawnSpeechBubble, SpeechTrigger, SpeechVoice } from './SpeechBubble'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
 // treat them interchangeably). Body is an 8-direction sprite with per-state
@@ -469,6 +470,33 @@ export class SpriteUnit {
     mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     if (this.hpRing) this.updateHpRing(ratio)
     if (this.hp <= 0) this.kill()
+    this.checkSpeechTriggers()
+  }
+
+  // Status callout system — once per unit per condition. Triggered after
+  // damage (HP threshold) and after ammo decrement (RevealPhase calls
+  // notifyAmmoChanged). Cyborg voice for attackers, robot voice for
+  // defender mobile units (dog, repair bot).
+  private spokenSet = new Set<SpeechTrigger>()
+  checkSpeechTriggers() {
+    if (this.isDead) return
+    // Medic + Repair ammo represents heal-charges, not bullets — skip
+    // the "out of clips" callouts for them since the phrasing doesn't fit.
+    const hasOffensiveAmmo = this.type !== 'medic' && this.type !== 'repair'
+    if (this.hp / this.maxHp <= 0.25) this.maybeSpeak('low_hp')
+    if (hasOffensiveAmmo) {
+      if (this.ammoRemaining === 1) this.maybeSpeak('low_ammo')
+      else if (this.ammoRemaining === 0) this.maybeSpeak('out_of_ammo')
+    }
+  }
+  notifyAmmoChanged() { this.checkSpeechTriggers() }
+  private maybeSpeak(trigger: SpeechTrigger) {
+    if (this.spokenSet.has(trigger)) return
+    this.spokenSet.add(trigger)
+    const scene = this.mesh.parent
+    if (!(scene instanceof THREE.Scene)) return
+    const voice: SpeechVoice = this._side === 'attacker' ? 'cyborg' : 'robot'
+    spawnSpeechBubble(scene, this.logicalX, this.logicalY, voice, trigger)
   }
 
   // Medic heal target — restore HP up to maxHp, trigger green pulse VFX on

@@ -2010,9 +2010,18 @@ export class RevealPhase {
   }
 
   private decrementActorAmmo(actor: Actor) {
-    if (actor instanceof SpriteUnit)     { actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1); return }
-    if (actor instanceof SphereDefender) { actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1); return }
+    if (actor instanceof SpriteUnit) {
+      actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1)
+      actor.notifyAmmoChanged()   // may pop a "low_ammo" / "out_of_ammo" bubble
+      return
+    }
+    if (actor instanceof SphereDefender) {
+      actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1)
+      actor.notifyAmmoChanged()
+      return
+    }
     actor.ammoRemaining = Math.max(0, actor.ammoRemaining - 1)
+    actor.notifyAmmoChanged()
   }
 
   private actorRange(actor: Actor): number {

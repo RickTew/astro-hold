@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
+import { spawnSpeechBubble } from './SpeechBubble'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { playExplosion } from '../audio/sfx'
 
@@ -127,7 +128,16 @@ export class PixelPowerCore {
     const mat = this.hpBar.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00ff88 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     if (this.hp <= 0) this.startDying()
+    // Power Core status callouts (robot voice, low_hp only — no ammo).
+    if (!this.dying && ratio <= 0.25 && !this.spokenLowHp) {
+      this.spokenLowHp = true
+      const scene = this.mesh.parent
+      if (scene instanceof THREE.Scene) {
+        spawnSpeechBubble(scene, this.mesh.position.x, this.mesh.position.y, 'robot', 'low_hp')
+      }
+    }
   }
+  private spokenLowHp = false
 
   // Repair-bot heal target. Refuses to restore HP once the core has started
   // dying — the death animation is final. Returns true iff any HP was added.

@@ -3,6 +3,7 @@ import { Config, StructureType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
+import { spawnSpeechBubble, SpeechTrigger } from './SpeechBubble'
 
 // Pixel-sprite atlases for sprite-based structures. Walls/mines stay
 // geometric (Box / Sphere). The five "preview" pieces (defense/dog/gun/laser/
@@ -423,6 +424,30 @@ export class Structure {
     }
 
     if (this.isDead && !this.dying) this.startDying()
+    this.checkSpeechTriggers()
+  }
+
+  // Status callout — robot voice ("SYSTEMS CRITICAL", "AMMUNITION LOW").
+  // One bubble per condition per structure. Skip walls/mines/preview
+  // pieces — a wall "speaking" reads as wrong (it's a force-field, not
+  // a sentient turret).
+  private spokenSet = new Set<SpeechTrigger>()
+  checkSpeechTriggers() {
+    if (this.isDead) return
+    if (this.type === 'wall' || this.type === 'mine' || this.type === 'defense' || this.type === 'signal') return
+    if (this.hp / this.maxHp <= 0.25) this.maybeSpeak('low_hp')
+    if (Config.STRUCTURES[this.type].ammo > 0) {
+      if (this.ammoRemaining === 1) this.maybeSpeak('low_ammo')
+      else if (this.ammoRemaining === 0) this.maybeSpeak('out_of_ammo')
+    }
+  }
+  notifyAmmoChanged() { this.checkSpeechTriggers() }
+  private maybeSpeak(trigger: SpeechTrigger) {
+    if (this.spokenSet.has(trigger)) return
+    this.spokenSet.add(trigger)
+    const scene = this.mesh.parent
+    if (!(scene instanceof THREE.Scene)) return
+    spawnSpeechBubble(scene, this.worldX, this.worldY, 'robot', trigger)
   }
 
   // Sprite-based damage feedback for non-wall structures. Builds a tinted

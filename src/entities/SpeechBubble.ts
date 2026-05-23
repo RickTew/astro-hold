@@ -1,0 +1,147 @@
+import * as THREE from 'three'
+
+// Status callouts that pop above units / structures when they hit a
+// significant threshold (low HP, low ammo, out of ammo). Self-managed:
+// each bubble adds itself to the scene, runs its own RAF animation,
+// disposes its material on completion. Texture is cached by (voice, text).
+//
+// Two voices keep the personality consistent:
+//   'cyborg' — casual lines with italics, used by attacker units
+//   'robot'  — mechanical ALL-CAPS, used by defender units + structures
+
+export type SpeechVoice = 'cyborg' | 'robot'
+export type SpeechTrigger = 'low_hp' | 'low_ammo' | 'out_of_ammo'
+
+const LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> = {
+  cyborg: {
+    low_hp:      ["Aaargh!", "I'm hit!", "Need a medic!", "Patch me up!", "Bleeding out!"],
+    low_ammo:    ["Last clip!", "Almost out!", "Should've packed more!", "One round left!"],
+    out_of_ammo: ["I'm out!", "Down to fists!", "Need ammo!", "Pistol's dry!"],
+  },
+  robot: {
+    low_hp:      ["SYSTEMS CRITICAL", "INTEGRITY: LOW", "DAMAGE: SEVERE", "ARMOR FAILING"],
+    low_ammo:    ["AMMUNITION LOW", "ROUND COUNT: 1", "RESERVES DEPLETING"],
+    out_of_ammo: ["AMMUNITION DEPLETED", "WEAPON OFFLINE", "RELOAD UNAVAILABLE"],
+  },
+}
+
+// One canvas texture per unique (voice, text). Repeat lines on later
+// units reuse the texture instead of re-rendering the canvas.
+const textureCache = new Map<string, THREE.Texture>()
+
+function makeTexture(text: string, voice: SpeechVoice): THREE.Texture {
+  const key = `${voice}:${text}`
+  const cached = textureCache.get(key)
+  if (cached) return cached
+
+  const W = 256
+  const H = 80
+  const c = document.createElement('canvas')
+  c.width = W; c.height = H
+  const ctx = c.getContext('2d')!
+
+  // Voice-specific palette. Cyborgs: warm dark red bubble with peach
+  // text + italic sans serif (organic, panicked). Robots: cold dark
+  // blue bubble with light-blue text + bold monospace (computerized).
+  const bgFill = voice === 'cyborg' ? 'rgba(45, 18, 22, 0.94)' : 'rgba(14, 28, 44, 0.94)'
+  const bgStroke = voice === 'cyborg' ? '#dd8888' : '#88c8ff'
+  const textColor = voice === 'cyborg' ? '#ffe0d0' : '#d8f0ff'
+  const font = voice === 'cyborg'
+    ? 'italic 700 22px "Helvetica Neue", sans-serif'
+    : '700 18px "Courier New", monospace'
+
+  // Rounded-rect speech bubble with a downward tail centered on the body.
+  const r = 10
+  const padL = 8, padR = 8, padT = 4, tailH = 12
+  const bodyTop = padT
+  const bodyBottom = H - tailH - 4
+  ctx.beginPath()
+  ctx.moveTo(padL + r, bodyTop)
+  ctx.lineTo(W - padR - r, bodyTop)
+  ctx.arcTo(W - padR, bodyTop, W - padR, bodyTop + r, r)
+  ctx.lineTo(W - padR, bodyBottom - r)
+  ctx.arcTo(W - padR, bodyBottom, W - padR - r, bodyBottom, r)
+  // Tail: right side of opening → tail tip → left side of opening
+  ctx.lineTo(W / 2 + 10, bodyBottom)
+  ctx.lineTo(W / 2, bodyBottom + tailH)
+  ctx.lineTo(W / 2 - 10, bodyBottom)
+  ctx.lineTo(padL + r, bodyBottom)
+  ctx.arcTo(padL, bodyBottom, padL, bodyBottom - r, r)
+  ctx.lineTo(padL, bodyTop + r)
+  ctx.arcTo(padL, bodyTop, padL + r, bodyTop, r)
+  ctx.closePath()
+  ctx.fillStyle = bgFill
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = bgStroke
+  ctx.stroke()
+
+  // Text — centered in the body region (above the tail).
+  ctx.font = font
+  ctx.fillStyle = textColor
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, W / 2, (bodyTop + bodyBottom) / 2)
+
+  const tex = new THREE.CanvasTexture(c)
+  tex.magFilter = THREE.LinearFilter
+  tex.minFilter = THREE.LinearFilter
+  tex.colorSpace = THREE.SRGBColorSpace
+  textureCache.set(key, tex)
+  return tex
+}
+
+// Drop a speech bubble at (x, y) — bubble's TAIL TIP anchors at that
+// position, so callers pass the speaker's head position. Picks a random
+// line from the voice/trigger table. Self-disposes after ~1.8 seconds.
+export function spawnSpeechBubble(
+  scene: THREE.Scene,
+  x: number, y: number,
+  voice: SpeechVoice,
+  trigger: SpeechTrigger,
+) {
+  const lines = LINES[voice][trigger]
+  const text = lines[Math.floor(Math.random() * lines.length)]
+  const tex = makeTexture(text, voice)
+  const mat = new THREE.SpriteMaterial({
+    map: tex, transparent: true,
+    depthTest: false, depthWrite: false,
+  })
+  const sprite = new THREE.Sprite(mat)
+  // Bubble world size. Canvas is 256×80 (3.2:1); render at 110 wide so
+  // text reads at roughly 22-ish world pixels per char.
+  const BUBBLE_W = 110
+  const BUBBLE_H = (H_TO_W * BUBBLE_W)
+  sprite.scale.set(BUBBLE_W, BUBBLE_H, 1)
+  // Tail tip is at the bottom-center of the sprite. Position the sprite
+  // so the tail tip is ~30 units above the speaker.
+  const tailTipOffset = 30
+  sprite.position.set(x, y + tailTipOffset + BUBBLE_H / 2, 7)
+  sprite.renderOrder = 25
+  scene.add(sprite)
+
+  const startY = sprite.position.y
+  const start = performance.now()
+  const DUR = 1.8
+
+  const tick = () => {
+    const elapsed = (performance.now() - start) / 1000
+    if (elapsed >= DUR) {
+      sprite.removeFromParent()
+      mat.dispose()
+      // Texture stays in the cache for reuse — don't dispose.
+      return
+    }
+    // Slight upward drift over lifetime so the bubble doesn't feel pinned.
+    sprite.position.y = startY + 6 * (elapsed / DUR)
+    // Fade in (0.15s) → hold → fade out (0.4s).
+    let alpha = 1
+    if (elapsed < 0.15) alpha = elapsed / 0.15
+    else if (elapsed > DUR - 0.4) alpha = Math.max(0, (DUR - elapsed) / 0.4)
+    mat.opacity = alpha
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
+const H_TO_W = 80 / 256
