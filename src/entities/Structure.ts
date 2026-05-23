@@ -255,10 +255,13 @@ export class Structure {
         bottomPlate.position.set(0, -CELL_HALF + PLATE_H / 2, 0.5)
         group.add(topPlate)
         group.add(bottomPlate)
-        // Glowing emitter sockets on the inner faces of the plates — thin
-        // additive-cyan strips that read as "where the beam comes from".
+        // Glowing emitter sockets on the inner faces of the plates. Color
+        // is BLUE-leaning cyan (not white-leaning) because additive blending
+        // adds to the dark map bg and the green/blue channels saturate fast
+        // — using a more blue base keeps the result obviously blue instead
+        // of blowing out to near-white.
         const socketMat1 = new THREE.MeshBasicMaterial({
-          color: 0xb8ffff, transparent: true, opacity: 0.95,
+          color: 0x66ccff, transparent: true, opacity: 0.95,
           blending: THREE.AdditiveBlending, depthWrite: false,
         })
         const socketMat2 = socketMat1.clone()
@@ -272,10 +275,12 @@ export class Structure {
         bottomSocket.position.set(0, -CELL_HALF + PLATE_H, 6)
         group.add(topSocket)
         group.add(bottomSocket)
-        // The laser beam — additive cyan plane between the two sockets.
-        // Slight base opacity (0.55) so it reads as light, not paint.
+        // The laser beam — saturated blue-cyan (NOT pale cyan: white channels
+        // get added on top of the brown ground and washed the beam out to
+        // near-white in the first cut). Lower opacity caps the additive
+        // contribution so the beam stays blue at full HP.
         const beamMat = new THREE.MeshBasicMaterial({
-          color: 0x88ffff, transparent: true, opacity: 0.55,
+          color: 0x33aaff, transparent: true, opacity: 0.75,
           blending: THREE.AdditiveBlending, depthWrite: false,
         })
         const beam = new THREE.Mesh(
@@ -283,9 +288,10 @@ export class Structure {
         )
         beam.position.set(0, 0, 5)
         group.add(beam)
-        // A wider, dimmer halo behind the beam to suggest spill light.
+        // Wider, dimmer halo behind the beam — deeper blue so the spill
+        // reads as colored light, not white fog.
         const haloMat = new THREE.MeshBasicMaterial({
-          color: 0x66ddee, transparent: true, opacity: 0.18,
+          color: 0x2266cc, transparent: true, opacity: 0.32,
           blending: THREE.AdditiveBlending, depthWrite: false,
         })
         const halo = new THREE.Mesh(
