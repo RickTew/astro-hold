@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
+import { spawnHealVfx } from './HealVfx'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
 // treat them interchangeably). Body is an 8-direction sprite with per-state
@@ -486,6 +487,12 @@ export class SpriteUnit {
       mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
       if (this.hpRing) this.updateHpRing(ratio)
       this.pulseHealVfx()
+      // Floating heal-amount VFX (random variant: number / bubble / plus)
+      // so the player has a clear visual that a heal landed AND how much.
+      const scene = this.mesh.parent
+      if (scene instanceof THREE.Scene) {
+        spawnHealVfx(scene, this.logicalX, this.logicalY, restored)
+      }
     }
     return restored > 0
   }

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Config, StructureType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
+import { spawnHealVfx } from './HealVfx'
 
 // Pixel-sprite atlases for sprite-based structures. Walls/mines stay
 // geometric (Box / Sphere). The five "preview" pieces (defense/dog/gun/laser/
@@ -495,6 +496,12 @@ export class Structure {
       this.applySpriteDamageTint(ratio)
     }
     this.pulseRepairVfx()
+    // Floating heal-amount VFX so the player can see repair landing on
+    // structures the same way they see it on mobile units.
+    const scene = this.mesh.parent
+    if (scene instanceof THREE.Scene) {
+      spawnHealVfx(scene, this.worldX, this.worldY, restored)
+    }
     return true
   }
 

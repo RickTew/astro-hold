@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { spawnHealVfx } from './HealVfx'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
 import { playExplosion } from '../audio/sfx'
@@ -193,6 +194,10 @@ export class SphereDefender {
     const mat = this.hpBarFill.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00cc44 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     this.pulseRepairVfx()
+    const scene = this.mesh.parent
+    if (scene instanceof THREE.Scene) {
+      spawnHealVfx(scene, this.worldX, this.worldY, restored)
+    }
     return true
   }
 

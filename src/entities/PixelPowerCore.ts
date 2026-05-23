@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { spawnHealVfx } from './HealVfx'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { playExplosion } from '../audio/sfx'
 
@@ -142,6 +143,10 @@ export class PixelPowerCore {
     const mat = this.hpBar.material as THREE.MeshBasicMaterial
     mat.color.setHex(ratio > 0.5 ? 0x00ff88 : ratio > 0.25 ? 0xffaa00 : 0xff2200)
     this.pulseRepairVfx()
+    const scene = this.mesh.parent
+    if (scene instanceof THREE.Scene) {
+      spawnHealVfx(scene, this.mesh.position.x, this.mesh.position.y, restored)
+    }
     return true
   }
 
