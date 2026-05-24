@@ -451,32 +451,32 @@
     ]
 
     // AFTER row: 16-slot proposal — LEFT and RIGHT panels carry
-    // DIFFERENT items (no duplicate sphere on both sides). 11 active
-    // pieces + 5 empty placeholder slots for future upgrades. User can
-    // reorder the lists; nothing is locked in.
+    // DIFFERENT items (no duplicates). 11 active pieces + 5 empty
+    // upgrade placeholders. User-directed swaps applied:
     //
-    //   LEFT TOP    : SPHERE | TOWER  | BOMBER | SENTRY
-    //   LEFT BOTTOM : CANNON | LASER  | MINE   | WALL
-    //   RIGHT TOP   : DOG    | REPAIR | SIGNAL | UPGRADE
+    //   LEFT TOP    : CANNON | TOWER  | BOMBER | LASER
+    //   LEFT BOTTOM : SPHERE | SENTRY | DOG    | REPAIR
+    //   RIGHT TOP   : MINE   | WALL   | SIGNAL | UPGRADE
     //   RIGHT BOTTOM: UPGRADE| UPGRADE| UPGRADE| UPGRADE
     //
-    // Cannon's `iconScale: 1.0` overrides the default 1.55× zoom that
-    // the cyborg unit sprites need — the gun-sprite stand-in is already
-    // sized correctly at its native resolution.
+    // iconScale: 1.0 overrides the default 1.55× zoom for sprites
+    // that already render at their natural HUD size (gun-as-cannon,
+    // satellite-as-signal). Other structure sprites look correct at
+    // the default scale.
     const robotTilesAfterLeft = [
-      { label: 'SPHERE', cost: 100, icon: './sprites/sphere/south.png' },
+      { label: 'CANNON', cost:  60, icon: './sprites/gun/south.png', iconScale: 1.0 },
       { label: 'TOWER',  cost:  30, icon: './sprites/tower/south.png'  },
       { label: 'BOMBER', cost:  70, icon: './sprites/bomber/south.png' },
-      { label: 'SENTRY', cost:  60, icon: './sprites/sentry/south.png' },
-      { label: 'CANNON', cost:  60, icon: './sprites/gun/south.png', iconScale: 1.0 },
       { label: 'LASER',  cost:  40, icon: './sprites/laser/south.png', preview: true },
-      { label: 'MINE',   cost:  20, icon: 'mine' },
-      { label: 'WALL',   cost:  20, icon: 'wall' },
+      { label: 'SPHERE', cost: 100, icon: './sprites/sphere/south.png' },
+      { label: 'SENTRY', cost:  60, icon: './sprites/sentry/south.png' },
+      { label: 'DOG',    cost:  40, icon: './sprites/dog/south.png'    },
+      { label: 'REPAIR', cost:  70, icon: './sprites/repair/south.png' },
     ]
     const robotTilesAfterRight = [
-      { label: 'DOG',     cost: 40, icon: './sprites/dog/south.png'    },
-      { label: 'REPAIR',  cost: 70, icon: './sprites/repair/south.png' },
-      { label: 'SIGNAL',  cost: 70, icon: './sprites/signal/south.png' },
+      { label: 'MINE',    cost: 20, icon: 'mine' },
+      { label: 'WALL',    cost: 20, icon: 'wall' },
+      { label: 'SIGNAL',  cost: 70, icon: './sprites/signal/south.png', iconScale: 1.0 },
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
