@@ -135,28 +135,12 @@
     .tile-grid {
       display: grid;
       grid-template-columns: repeat(4, auto);
-      grid-auto-rows: auto;
+      grid-template-rows: repeat(2, auto);
       justify-content: center;
       align-content: center;
       gap: 10px;
       width: 100%;
       height: 100%;
-    }
-    /* Robot panel runs 6×2 (11 tiles + 1 spacer) — wider than cyborg but
-       same row count so the HUD's vertical height stays put. Cyborg panel
-       stays 4×2 (8 tiles, includes duplicates). Going 4×3 made the HUD
-       ~1.5× taller and pushed the world view down; 6×2 keeps the original
-       footprint. Override hits both #hud-top (left) and #hud-top.right is
-       same DOM tree via class targeting, so we scope to the robot panels
-       only by the #hud-top ID (cyborg uses #hud-top-att). */
-    #hud-top .tile-grid {
-      grid-template-columns: repeat(6, auto);
-    }
-    .hud-tile.spacer {
-      visibility: hidden;
-      pointer-events: none;
-      background: transparent;
-      border: 0;
     }
     .hud-tile {
       position: relative;
@@ -270,16 +254,6 @@
           transparent 82%) center / 30% 100% no-repeat,
         radial-gradient(ellipse at center, rgba(255, 122, 154, 0.25) 0%, transparent 65%);
       box-shadow: inset 0 0 12px rgba(255, 122, 154, 0.25);
-    }
-    /* Mine HUD icon — yellow disc with orange torus ring around it, matches
-       the in-game procedural mine (sphere + torus). Stacked radial gradients
-       on the .tile-icon background paint the disc + ring on the dark panel. */
-    .hud-tile .icon-mine {
-      background:
-        radial-gradient(circle at center, #ffd24a 0%, #ffb000 28%, transparent 30%),
-        radial-gradient(circle at center, transparent 36%, #ff6600 42%, #ff6600 52%, transparent 54%),
-        radial-gradient(ellipse at center, rgba(255, 132, 22, 0.25) 0%, transparent 70%);
-      box-shadow: inset 0 0 10px rgba(255, 132, 22, 0.45);
     }
     .hud-tile .tile-label {
       font-size: clamp(10px, 1.2vh, 12px);
