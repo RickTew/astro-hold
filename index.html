@@ -142,9 +142,16 @@
       width: 100%;
       height: 100%;
     }
-    /* Robot panel runs 4×3 (11 tiles + 1 spacer). Cyborg panel stays
-       4×2 (8 tiles, includes duplicates). Both use grid-auto-rows so
-       row count is implicit per tile count. */
+    /* Robot panel runs 6×2 (11 tiles + 1 spacer) — wider than cyborg but
+       same row count so the HUD's vertical height stays put. Cyborg panel
+       stays 4×2 (8 tiles, includes duplicates). Going 4×3 made the HUD
+       ~1.5× taller and pushed the world view down; 6×2 keeps the original
+       footprint. Override hits both #hud-top (left) and #hud-top.right is
+       same DOM tree via class targeting, so we scope to the robot panels
+       only by the #hud-top ID (cyborg uses #hud-top-att). */
+    #hud-top .tile-grid {
+      grid-template-columns: repeat(6, auto);
+    }
     .hud-tile.spacer {
       visibility: hidden;
       pointer-events: none;

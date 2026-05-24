@@ -732,7 +732,18 @@ private enterBuildPhase() {
       for (const u of this.defenderUnits) u.clearPlan()
       for (const s of this.spheres)       s.clearPlan()
       for (const s of this.structures)    s.clearPlan()
-      this.enterRevealPhase()
+      // Yield to the browser before spinning up the next reveal. The
+      // previous synchronous call (`this.enterRevealPhase()` direct here)
+      // nested RevealPhase construction inside RevealPhase.update inside
+      // the RAF tick — with 25+ entities + many pending grenades / tethers,
+      // several short reveals could chain in a single frame, blow the
+      // call stack, and freeze the tab (user reported turn-19 hang).
+      // setTimeout(0) breaks the chain: the current RAF frame completes,
+      // browser repaints, then the next reveal starts cleanly. No visible
+      // change in cadence — reveals already paced by per-step animation.
+      setTimeout(() => {
+        if (this.phase === 'reveal') this.enterRevealPhase()
+      }, 0)
     }
   }
 
