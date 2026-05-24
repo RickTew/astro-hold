@@ -1211,12 +1211,12 @@ export class RevealPhase {
 
     // Two scoring rules depending on the thrower:
     //
-    //   Grenadier (timed cooked grenade): friendly-fire is acceptable to
-    //   some extent — grenadiers don't always have a clean angle on
-    //   defenders, and the user has explicitly said "it's OK for the
-    //   grenadier bombs to do damage to their own." Score as enemies
-    //   minus allies (net positive required). One ally caught alongside
-    //   two enemies is still a good throw.
+    //   Grenadier (timed cooked grenade): MUST throw to the SIDE or BEHIND
+    //   the nearest enemy (NEVER in front, between us and them). Rationale:
+    //   advancing cyborgs are usually clustered on the grenadier's side of
+    //   the enemy, so any "front" throw catches them in the blast. Behind
+    //   preferred over side. Also requires ZERO ally hits — explicit
+    //   no-friendly-fire rule per S17 update.
     //
     //   Bomber (proximity mine): MUST NOT include the bomber itself in
     //   the AoE — a bomb at the bomber's feet is dumb and the user
@@ -1228,7 +1228,11 @@ export class RevealPhase {
     const isGrenadier = actor instanceof SpriteUnit && actor.type === 'grenadier'
     const isBomber = (actor instanceof SpriteUnit && actor.type === 'bomber')
                      || (actor instanceof Structure && actor.type === 'bomber')
-    let best: { col: number; row: number; net: number; hits: number; nearD: number; beyondEnemy: boolean } | null = null
+    // For the grenadier behind/side check, vector from thrower to nearest enemy.
+    const geX = nearest.x - ax
+    const geY = nearest.y - ay
+    const geLen = Math.hypot(geX, geY) || 1
+    let best: { col: number; row: number; net: number; hits: number; nearD: number; beyondEnemy: boolean; placement: number } | null = null
     const enemyD = Math.hypot(nearest.x - ax, nearest.y - ay)
     for (let dc = -SEARCH; dc <= SEARCH; dc++) {
       for (let dr = -SEARCH; dr <= SEARCH; dr++) {
@@ -1257,19 +1261,33 @@ export class RevealPhase {
           if (Math.hypot(a.x - x, a.y - y) <= aoeRadius) allyHits++
         }
         const net = hits - allyHits
-        // Grenadier accepts any net-positive throw (allies in AoE OK
-        // as long as enemies > allies). Bomber wants a CLEAN throw —
-        // zero ally-hits if available, else net-positive with penalty
-        // accepted as a tradeoff.
-        if (isGrenadier && net <= 0) continue
+        // Grenadier S17 rule: zero ally-hits AND throw must land BEHIND
+        // or to the SIDE of the nearest enemy (never in front, where
+        // advancing cyborgs would be). Bomber keeps the older clean-throw
+        // rule (zero ally hits).
+        if (isGrenadier && allyHits > 0) continue
         if (!isGrenadier && allyHits > 0) continue
+        // placement classification for grenadier: cosine of angle between
+        // (thrower→enemy) and (enemy→cell). >+0.5 = behind (preferred),
+        // between -0.5 and +0.5 = side (acceptable), <-0.5 = front (skip).
+        let placement = 0   // non-grenadier ignores this
+        if (isGrenadier) {
+          const ecX = x - nearest.x
+          const ecY = y - nearest.y
+          const ecLen = Math.hypot(ecX, ecY) || 1
+          const cos = (geX * ecX + geY * ecY) / (geLen * ecLen)
+          if (cos > 0.5) placement = 2        // behind enemy — preferred
+          else if (cos > -0.5) placement = 1  // side — acceptable
+          else continue                        // in front of enemy — skip (catches our line)
+        }
         const beyondEnemy = Math.hypot(x - ax, y - ay) > enemyD
         if (!best
-            || net > best.net
-            || (net === best.net && hits > best.hits)
-            || (net === best.net && hits === best.hits && beyondEnemy && !best.beyondEnemy)
-            || (net === best.net && hits === best.hits && beyondEnemy === best.beyondEnemy && nearD < best.nearD)) {
-          best = { col, row, net, hits, nearD, beyondEnemy }
+            || placement > best.placement
+            || (placement === best.placement && net > best.net)
+            || (placement === best.placement && net === best.net && hits > best.hits)
+            || (placement === best.placement && net === best.net && hits === best.hits && beyondEnemy && !best.beyondEnemy)
+            || (placement === best.placement && net === best.net && hits === best.hits && beyondEnemy === best.beyondEnemy && nearD < best.nearD)) {
+          best = { col, row, net, hits, nearD, beyondEnemy, placement }
         }
       }
     }
@@ -2126,10 +2144,20 @@ export class RevealPhase {
       hits++
       if (target.isDead) kills++
     }
-    // Cyborgs (attacker units)
+    // Cyborgs (attacker units). Grenadiers wear extra explosive shielding —
+    // AoE damage halved. Models heavier blast plating around the bomb-vest
+    // role so they survive nearby detonations (own grenades + bomber AoE).
     for (const u of this.units) {
       if (u.isDead) continue
-      if (this.inRadius(u.worldX, u.worldY, cx, cy, radius)) hit(u)
+      if (!this.inRadius(u.worldX, u.worldY, cx, cy, radius)) continue
+      if (u.type === 'grenadier') {
+        const shielded = Math.max(1, Math.round(damage * 0.5))
+        u.takeDamage(shielded)
+        hits++
+        if (u.isDead) kills++
+      } else {
+        hit(u)
+      }
     }
     // Defender pieces (spheres + structures + dog/repair + core)
     for (const s of this.spheres) {

@@ -17,6 +17,12 @@ Mechanics tuned for D&D-style strategy:
   default-action heuristics. **Fog of war:** AI-side pieces have
   `mesh.visible=false` during BUILD/PLAN; revealed at REVEAL start.
   Opponent credits are never shown.
+  - **S17 build rule:** AI guarantees 1 of each TYPE first (cyborgs:
+    cannon, grenadier, doublegun, hulk, sniper, medic; defenders:
+    sphere, turret, bomber, sentry, wall, dog, repair), then spends
+    ALL remaining credits on random picks. Previous 55% per-turn cap
+    is gone — there's no PLAN phase + no second BUILD, so reserving
+    credits made no sense.
 - **Limited per-game ammo** on every offensive piece. Once spent, it's inert.
 - **Cardinal-only movement** (N/S/E/W) by default. Special characters opt in
   to diagonals via `Config.UNITS[type].allowDiagonalMove = true`.
@@ -78,9 +84,16 @@ Mechanics tuned for D&D-style strategy:
     mines, 3-reveal safety fuse. Bomber-side targeting STRICT: zero
     allies in AoE + bomber must be outside its own bomb's blast.
   - **Grenadier** (cyborg) → `'timed'` cooked grenades, detonate at
-    exactly 1 armed reveal after landing. Friendly-fire OK on
-    grenadier throws per user; targeting requires net positive
-    (enemies > allies).
+    exactly 1 armed reveal after landing. **S17 rules:**
+    * **Extra explosive shielding** — grenadiers take 50% AoE damage
+      (heavy blast plating from the bomb-vest role). Applied in
+      `RevealPhase.applyAoeForSide` cyborg loop.
+    * **Throws only to the SIDE or BEHIND the nearest enemy.** Never
+      in front (between thrower and target), since advancing cyborgs
+      cluster there. Behind preferred over side. Zero ally-hits
+      required (no more net-positive friendly-fire allowance).
+      Classification via cos of angle between thrower→enemy and
+      enemy→cell vectors in `pickBombThrowCell`.
   Detonation: **enemy-only trigger** (allies walking past idle bombs
   don't set them off), but the AoE on detonation hits **everyone** in
   radius regardless of side.

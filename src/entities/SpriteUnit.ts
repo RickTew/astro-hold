@@ -751,6 +751,24 @@ export class SpriteUnit {
     this.sprite.material.needsUpdate = true
     const size = spriteSizeFor(this.type)
     this.sprite.scale.set(mirrored ? -size : size, size, 1)
+    this.applySpriteOffset()
+  }
+
+  // Per-state sprite position offset. Most states sit centered on the cell;
+  // a few PixelLab clips render the unit's body off-center because of a
+  // protruding rifle / weapon (e.g. sniper aim pose — body on the left,
+  // rifle extending right). Shift the sprite along the facing axis so the
+  // BODY lands at the cell center even when the rifle adds extra width.
+  private applySpriteOffset() {
+    let dx = 0
+    if (this.type === 'sniper' && this.currentState === 'aim') {
+      // Body sits ~1/4 of sprite width opposite to facing. Shift the sprite
+      // along facing so the body recenters; rifle extends past cell edge.
+      const size = spriteSizeFor(this.type)
+      if (this.currentDir === 'east') dx = +size * 0.22
+      else if (this.currentDir === 'west') dx = -size * 0.22
+    }
+    this.sprite.position.set(dx, 0, 5)
   }
 
   private advanceFrame(delta: number) {

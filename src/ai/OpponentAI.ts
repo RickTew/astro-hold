@@ -27,41 +27,38 @@ type Cell = { col: number; row: number; x: number; y: number }
 const ZONE_COLS = 8     // each side's playable column count
 const TOTAL_ROWS = 8
 
-// Per-turn budget cap so the AI doesn't blow its entire bank on turn 1.
-// Leaves credits in reserve for reinforcement waves in later BUILD phases.
-const PER_TURN_BUDGET_FRAC = 0.55
-
 /**
  * Lightweight opponent that handles the AI side's BUILD phase. PLAN-phase
  * behaviour falls through to RevealPhase's defaultMobileUnitAction logic
  * (move toward enemy, fire when in range, throw bombs, etc) so we don't
  * need to queue actions here.
+ *
+ * S17 build rule: guarantee one of each type first, then spend every
+ * remaining credit on random picks. There is no PLAN phase + no later
+ * BUILD phase in the current flow, so reserving credits made no sense —
+ * the old 55% per-turn cap is removed.
  */
 export class OpponentAI {
   constructor(private side: OpponentSide, private api: OpponentAIApi) {}
 
   /** Called once at the start of every BUILD phase by Game. */
   runBuildTurn() {
-    const budget = Math.floor(this.api.getCredits() * PER_TURN_BUDGET_FRAC)
-    const startCredits = this.api.getCredits()
-    const stopAt = startCredits - budget    // halt purchases once we've burned this turn's allotment
-
+    // S17: spend everything. stopAt = 0 means "loop until broke".
+    const stopAt = 0
     if (this.side === 'defender') this.buildDefender(stopAt)
     else                          this.buildAttacker(stopAt)
   }
 
   // ── Defender (Robots) build strategy ───────────────────────────────────
-  // Priority order (each gated on credits):
-  //   1. One sphere on the back columns (high impact, 100cr)
-  //   2. Two towers on the front columns (covers approach)
-  //   3. Two walls on the mid columns (blockers)
-  //   4. One bomber in the mid lane (area control)
-  //   5. One dog on the front line (harasser)
-  //
-  // Sphere placement bias toward the rows above and below the core (rows
-  // 2-5) so it can cover the most cyborg approaches.
+  // S17 rule: guaranteed 1 of each type first (sphere, turret, bomber,
+  // sentry, wall, dog, repair — laser is a preview piece without real
+  // mechanics, excluded), then random spending until broke or no slots.
+  // Initial picks keep their strategic placement bias (sphere back, towers
+  // front, etc.); phase 2 fills the remaining grid with random affordable
+  // pieces.
   private buildDefender(stopAt: number) {
-    // SPHERES — back columns 1-2 (cols 0/1 are behind the core), middle rows.
+    // ── PHASE 1 — guaranteed 1 of each type ────────────────────────────
+    // SPHERE — back-side cols 2-4, center rows, high-impact anchor.
     {
       const slots = this.cellsInZoneSorted({
         zoneXMin: Config.WORLD.LEFT,
@@ -74,36 +71,21 @@ export class OpponentAI {
       }
     }
 
-    // TOWERS — front columns 5-7 (closest to the battlefield). Up to two.
+    // TURRET (TOWER) — front cols 5-7, flank-edge rows.
     {
       const cost = Config.STRUCTURES.turret.cost
       const slots = this.cellsInZoneSorted({
         zoneXMin: Config.WORLD.LEFT,
         colMin: 5, colMax: 7,
-        rowPreference: 'edges',   // pick top/bottom rows first so they cover flanks
-      })
-      let placed = 0
-      while (placed < 2 && this.api.getCredits() > stopAt && this.api.getCredits() >= cost && slots.length > 0) {
-        const slot = slots.shift()!
-        if (this.api.spawnStructure('turret', slot.col, slot.row)) placed++
-      }
-    }
-
-    // WALLS — mid columns 4-5. Just one per turn; walls compound across turns.
-    {
-      const cost = Config.STRUCTURES.wall.cost
-      const slots = this.cellsInZoneSorted({
-        zoneXMin: Config.WORLD.LEFT,
-        colMin: 4, colMax: 5,
-        rowPreference: 'center',
+        rowPreference: 'edges',
       })
       if (this.api.getCredits() > stopAt && this.api.getCredits() >= cost && slots.length > 0) {
         const slot = slots.shift()!
-        this.api.spawnStructure('wall', slot.col, slot.row)
+        this.api.spawnStructure('turret', slot.col, slot.row)
       }
     }
 
-    // BOMBER — area-control trap. One per turn at most.
+    // BOMBER — area-control trap, mid lane.
     {
       const cost = Config.STRUCTURES.bomber.cost
       const slots = this.cellsInZoneSorted({
@@ -117,7 +99,35 @@ export class OpponentAI {
       }
     }
 
-    // DOG — single harasser, front edge.
+    // SENTRY — heavy-armor turret on tracks, front cols.
+    {
+      const cost = Config.STRUCTURES.sentry.cost
+      const slots = this.cellsInZoneSorted({
+        zoneXMin: Config.WORLD.LEFT,
+        colMin: 5, colMax: 7,
+        rowPreference: 'center',
+      })
+      if (this.api.getCredits() > stopAt && this.api.getCredits() >= cost && slots.length > 0) {
+        const slot = slots.shift()!
+        this.api.spawnStructure('sentry', slot.col, slot.row)
+      }
+    }
+
+    // WALL — mid cols, blocker.
+    {
+      const cost = Config.STRUCTURES.wall.cost
+      const slots = this.cellsInZoneSorted({
+        zoneXMin: Config.WORLD.LEFT,
+        colMin: 4, colMax: 5,
+        rowPreference: 'center',
+      })
+      if (this.api.getCredits() > stopAt && this.api.getCredits() >= cost && slots.length > 0) {
+        const slot = slots.shift()!
+        this.api.spawnStructure('wall', slot.col, slot.row)
+      }
+    }
+
+    // DOG — harasser, front edge.
     {
       const cost = Config.UNITS.dog.cost
       const slots = this.cellsInZoneSorted({
@@ -131,10 +141,7 @@ export class OpponentAI {
       }
     }
 
-    // REPAIR — single support unit, mid-back columns so it can shuttle
-    // between the back-line sphere and the front-line towers without
-    // walking too far. Skips when budget's already tight — repair is a
-    // nice-to-have once the offensive arsenal is in place.
+    // REPAIR — support unit, mid-back cols.
     {
       const cost = Config.UNITS.repair.cost
       const slots = this.cellsInZoneSorted({
@@ -147,22 +154,68 @@ export class OpponentAI {
         this.api.spawnDefenderUnit('repair', slot.x, slot.y)
       }
     }
+
+    // ── PHASE 2 — random fill, spend everything ────────────────────────
+    // Pool excludes laser (preview piece, no real mechanic). Each random
+    // pick searches its preferred placement zone; if the zone is full it
+    // tries the broader defender zone before giving up on that type.
+    type Pick = { kind: 'structure' | 'sphere' | 'defender'; type?: StructureType | UnitType; cost: number }
+    const pool: Pick[] = [
+      { kind: 'sphere',    cost: Config.SPHERE.cost },
+      { kind: 'structure', type: 'turret', cost: Config.STRUCTURES.turret.cost },
+      { kind: 'structure', type: 'bomber', cost: Config.STRUCTURES.bomber.cost },
+      { kind: 'structure', type: 'sentry', cost: Config.STRUCTURES.sentry.cost },
+      { kind: 'structure', type: 'wall',   cost: Config.STRUCTURES.wall.cost },
+      { kind: 'defender',  type: 'dog',    cost: Config.UNITS.dog.cost },
+      { kind: 'defender',  type: 'repair', cost: Config.UNITS.repair.cost },
+    ]
+    let safety = 256
+    while (safety-- > 0 && this.api.getCredits() > stopAt) {
+      const affordable = pool.filter(p => p.cost <= this.api.getCredits())
+      if (affordable.length === 0) break
+      const pick = affordable[Math.floor(Math.random() * affordable.length)]
+      if (!this.placeDefenderPiece(pick)) {
+        // No slot for this type — drop it from the pool for the rest of this
+        // build so we don't spin forever on a saturated piece.
+        const idx = pool.indexOf(pick)
+        if (idx >= 0) pool.splice(idx, 1)
+        if (pool.length === 0) break
+      }
+    }
+  }
+
+  // Phase-2 random placement helper. Returns true if a piece was actually
+  // placed, false if no slot accepts it (caller drops the type from the pool).
+  private placeDefenderPiece(pick: { kind: 'structure' | 'sphere' | 'defender'; type?: StructureType | UnitType }): boolean {
+    // Broad search across the whole defender zone; phase 2 doesn't care
+    // about strategic placement, just filling open cells.
+    const slots = this.cellsInZoneSorted({
+      zoneXMin: Config.WORLD.LEFT,
+      colMin: 0, colMax: 7,
+      rowPreference: 'shuffle',
+    })
+    while (slots.length > 0) {
+      const slot = slots.shift()!
+      let ok = false
+      if (pick.kind === 'sphere') {
+        ok = this.api.spawnSphere(slot.x, slot.y)
+      } else if (pick.kind === 'structure') {
+        ok = this.api.spawnStructure(pick.type as StructureType, slot.col, slot.row)
+      } else {
+        ok = this.api.spawnDefenderUnit(pick.type as UnitType, slot.x, slot.y)
+      }
+      if (ok) return true
+    }
+    return false
   }
 
   // ── Attacker (Cyborgs) build strategy ──────────────────────────────────
-  // Buy a mixed squad weighted toward bread-and-butter units. Skip premium
-  // picks (Sniper, Hulk) early so credits last for ongoing pressure.
+  // S17 rule: guaranteed 1 of each cyborg type first, then random spending
+  // until broke or no slots. ATTACKER roster (per HUD): cannon, grenadier,
+  // doublegun, hulk, sniper, medic. Bomber/scout/tank/drone exist in Config
+  // but are NOT in the buyable cyborg shop, so they're excluded here too.
   private buildAttacker(stopAt: number) {
-    type Pick = { t: UnitType; weight: number }
-    const pool: Pick[] = [
-      { t: 'cannon',    weight: 3 },
-      { t: 'grenadier', weight: 3 },
-      { t: 'doublegun', weight: 2 },
-      { t: 'hulk',      weight: 1 },
-      { t: 'sniper',    weight: 1 },
-      // Medic — support unit, weight 1 so AI buys ~1 per squad when it fits.
-      { t: 'medic',     weight: 1 },
-    ]
+    const allTypes: UnitType[] = ['cannon', 'grenadier', 'doublegun', 'hulk', 'sniper', 'medic']
 
     // Spawn from the back columns (closest to the cyborg edge of the field).
     // Cyborgs march west toward the core, so back-row spawns get the most
@@ -179,19 +232,10 @@ export class OpponentAI {
     const placedSnipers: { x: number; y: number }[] = []
     const SNIPER_MIN_SPACING = Config.GRID_CELL * 3
 
-    let safety = 32   // hard cap on AI loop iterations
-    while (safety-- > 0 && this.api.getCredits() > stopAt && baseSlots.length > 0 && pool.length > 0) {
-      const type = this.weightedPick(pool)
+    const tryPlace = (type: UnitType): boolean => {
       const cost = Config.UNITS[type].cost
-      if (this.api.getCredits() < cost) {
-        // Too expensive — drop this type from the pool and retry with what's left.
-        const idx = pool.findIndex(p => p.t === type)
-        if (idx >= 0) pool.splice(idx, 1)
-        continue
-      }
-      // Snipers need a slot at least 3 cells from any other sniper. Walk
-      // baseSlots until a spaced cell turns up; if none, skip this sniper
-      // and try a different pick on the next loop iteration.
+      if (this.api.getCredits() < cost) return false
+      if (baseSlots.length === 0) return false
       let slot: Cell | undefined
       if (type === 'sniper') {
         for (let i = 0; i < baseSlots.length; i++) {
@@ -203,19 +247,41 @@ export class OpponentAI {
             break
           }
         }
-        if (!slot) {
-          // No spaced cell available — drop sniper from the pool and try
-          // other types. Prevents the loop from spinning on the same
-          // unbuyable pick.
-          const idx = pool.findIndex(p => p.t === 'sniper')
-          if (idx >= 0) pool.splice(idx, 1)
-          continue
-        }
+        if (!slot) return false
         placedSnipers.push({ x: slot.x, y: slot.y })
       } else {
         slot = baseSlots.shift()!
       }
       this.api.spawnAttackerUnit(type, slot.x, slot.y)
+      return true
+    }
+
+    // PHASE 1 — 1 of each type. Skip types that are unbuyable right now.
+    for (const t of allTypes) {
+      if (this.api.getCredits() <= stopAt) break
+      tryPlace(t)
+    }
+
+    // PHASE 2 — random fills until OOC or OOS. Each iteration picks a random
+    // affordable type; safety cap protects against pathological loops.
+    let safety = 128
+    while (safety-- > 0 && this.api.getCredits() > stopAt && baseSlots.length > 0) {
+      const affordable = allTypes.filter(t => Config.UNITS[t].cost <= this.api.getCredits())
+      if (affordable.length === 0) break
+      const type = affordable[Math.floor(Math.random() * affordable.length)]
+      if (!tryPlace(type)) {
+        // sniper spacing failure — drop sniper from this round's candidates
+        // by trying again with sniper temporarily excluded if it was the pick.
+        if (type === 'sniper') {
+          // Temporarily skip sniper if no spaced slot exists; loop continues.
+          const others = affordable.filter(t => t !== 'sniper')
+          if (others.length === 0) break
+          const fallback = others[Math.floor(Math.random() * others.length)]
+          if (!tryPlace(fallback)) break
+        } else {
+          break
+        }
+      }
     }
   }
 
@@ -265,13 +331,4 @@ export class OpponentAI {
     return cells
   }
 
-  private weightedPick<T extends { t: UnitType; weight: number }>(items: T[]): UnitType {
-    const total = items.reduce((s, x) => s + x.weight, 0)
-    let r = Math.random() * total
-    for (const x of items) {
-      r -= x.weight
-      if (r <= 0) return x.t
-    }
-    return items[0].t
-  }
 }
