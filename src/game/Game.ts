@@ -103,6 +103,13 @@ export class Game {
   // recordBattleEnd. Resets on Play Again (full page reload).
   private statsDamage = { attacker: 0, defender: 0 }
   private statsKills  = { attacker: 0, defender: 0 }
+  // S17.3 per-piece accumulators — keyed by actor type (e.g. 'hulk',
+  // 'sphere', 'tower'). Fed by RevealPhase.onPieceEvent so we don't
+  // re-parse log text. Action counts are also keyed by action name
+  // (e.g. 'throw', 'slam', 'emp', 'mine_trigger').
+  private damageByPieceType: Record<string, number> = {}
+  private killsByPieceType:  Record<string, number> = {}
+  private actionCounts:      Record<string, number> = {}
   // True if recordBattleEnd already fired for this game — prevents a
   // double-record if win/lose handlers ever stack.
   private battleRecorded = false
@@ -694,6 +701,18 @@ private enterBuildPhase() {
     this.revealPhase.onLogEntry = entry => {
       this.hud.appendCombatLogEntry(this.revealTurn, entry)
     }
+    // S17.3: per-piece + per-action telemetry. RevealPhase emits
+    // structured events; we accumulate into BattleStats fields that
+    // get flushed in recordBattleEnd.
+    this.revealPhase.onPieceEvent = e => {
+      if (e.kind === 'damage') {
+        this.damageByPieceType[e.actorType] = (this.damageByPieceType[e.actorType] ?? 0) + e.amount
+      } else if (e.kind === 'kill') {
+        this.killsByPieceType[e.actorType] = (this.killsByPieceType[e.actorType] ?? 0) + 1
+      } else if (e.kind === 'action') {
+        this.actionCounts[e.action] = (this.actionCounts[e.action] ?? 0) + 1
+      }
+    }
     this.revealPhase.onComplete = () => {
       // Flush this reveal's events to the combat-history log BEFORE we lose
       // the reference. Even a 0-action reveal gets a header so the lock-step
@@ -781,6 +800,13 @@ private enterBuildPhase() {
       this.defenderUnits.filter(u => !u.isDead).length +
       this.spheres.filter(s => !s.isDead).length +
       this.structures.filter(s => !s.isDead).length
+    // S17.3 — snapshot what was BUILT (regardless of current alive count
+    // so we can attribute behaviour to specific picks even after deaths).
+    const piecesByType = { attacker: {} as Record<string, number>, defender: {} as Record<string, number> }
+    for (const u of this.attackerUnits) piecesByType.attacker[u.type] = (piecesByType.attacker[u.type] ?? 0) + 1
+    for (const u of this.defenderUnits) piecesByType.defender[u.type] = (piecesByType.defender[u.type] ?? 0) + 1
+    for (const s of this.spheres)       piecesByType.defender.sphere = (piecesByType.defender.sphere ?? 0) + 1
+    for (const s of this.structures)    piecesByType.defender[s.type] = (piecesByType.defender[s.type] ?? 0) + 1
     recordBattle({
       endedAt: new Date().toISOString(),
       outcome: playerWon ? 'win' : 'lose',
@@ -792,6 +818,10 @@ private enterBuildPhase() {
       kills: { ...this.statsKills },
       coreHpEnd: this.powerCore.hp,
       coreMaxHp: this.powerCore.maxHp,
+      piecesByType,
+      damageByPieceType: { ...this.damageByPieceType },
+      killsByPieceType: { ...this.killsByPieceType },
+      actionCounts: { ...this.actionCounts },
     })
   }
 

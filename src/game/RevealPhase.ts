@@ -37,6 +37,13 @@ export interface CombatLogEntry {
   text: string
 }
 
+// Telemetry event emitted from damage / kill / action sites so Game can
+// roll them into BattleStats. Avoids re-parsing log text.
+export type PieceEvent =
+  | { kind: 'damage'; actorType: string; side: 'attacker' | 'defender'; amount: number }
+  | { kind: 'kill';   actorType: string; side: 'attacker' | 'defender' }
+  | { kind: 'action'; actorType: string; side: 'attacker' | 'defender'; action: string }
+
 interface AoeSummary { hits: number; damageDealt: number; kills: number }
 
 // Seconds per action in the reveal. Slow enough that the player can read each
@@ -138,6 +145,18 @@ export class RevealPhase {
   // every animation finishes. The combatLog array is still maintained for
   // anything that wants the full transcript at end-of-reveal.
   onLogEntry: ((entry: CombatLogEntry) => void) | null = null
+
+  // Per-piece + per-action telemetry. Game subscribes and accumulates
+  // into BattleStats so we can spot balance issues across many games
+  // (e.g. "Hulk dealt 60% of cyborg damage in 20 games"). Fired from
+  // the damage / kill / action sites directly so we don't re-parse
+  // log text. Optional — if no listener, events are dropped silently.
+  onPieceEvent: ((e: PieceEvent) => void) | null = null
+  private emit(e: PieceEvent) { this.onPieceEvent?.(e) }
+  private actorTypeKey(actor: Actor): string {
+    if (actor instanceof SphereDefender) return 'sphere'
+    return actor.type   // SpriteUnit + Structure both have .type
+  }
 
   constructor(
     private scene: THREE.Scene,
@@ -1577,7 +1596,7 @@ export class RevealPhase {
   // ARMED_LIFETIME fuse blew), or the Actor who shot it.
   private detonatePendingGrenade(g: PendingGrenade, trigger: Actor | 'proximity' | 'expired' = 'proximity') {
     this.explosions.push(new Explosion(this.scene, g.worldX, g.worldY, g.aoeRadius, 0.5))
-    const summary = this.applyAoeForSide(g.worldX, g.worldY, g.aoeRadius, g.damage, g.side)
+    const summary = this.applyAoeForSide(g.worldX, g.worldY, g.aoeRadius, g.damage, g.side, g.ownerType)
     playExplosion()
     g.dispose()
     const idx = this.pendingGrenades.indexOf(g)
@@ -1703,6 +1722,7 @@ export class RevealPhase {
     this.combatThisReveal = true
     this.log('defender',
       `${this.actorLabel(actor)} EMP strikes ${this.actorLabel(target)} — stunned ${stunTurns} turns`)
+    this.emit({ kind: 'action', actorType: 'signal', side: 'defender', action: 'emp' })
   }
 
   // Resolve a TargetRef to a concrete repairable defender entity. Unlike
@@ -1961,12 +1981,16 @@ export class RevealPhase {
     const damage = (Config.UNITS.hulk as { slamDamage: number }).slamDamage
     const E = 1
     let hits = 0, kills = 0
+    this.emit({ kind: 'action', actorType: 'hulk', side: actor.side, action: 'slam' })
     for (const wc of wedgeCells) {
       this.explosions.push(new Explosion(this.scene, wc.x, wc.y, 22, 0.35))
       const hit = (t: { isDead: boolean; takeDamage(n: number): void }) => {
         if (t.isDead) return
         t.takeDamage(damage); hits++
-        if (t.isDead) kills++
+        const killed = t.isDead
+        if (killed) kills++
+        this.emit({ kind: 'damage', actorType: 'hulk', side: actor.side, amount: damage })
+        if (killed) this.emit({ kind: 'kill', actorType: 'hulk', side: actor.side })
       }
       if (actor.side === 'attacker') {
         for (const s of this.spheres) {
@@ -2152,14 +2176,18 @@ export class RevealPhase {
         const targetEntity = this.resolveTargetEntity(ref)
         const targetLabel = targetEntity ? this.targetLabel(targetEntity) : 'target'
         if (targetEntity) {
+          const attackerType = this.actorTypeKey(actor)
+          const attackerSide = actor.side
           proj.onHit = () => {
             if (targetEntity.isDead) {
-              this.log(actor.side, `${this.actorLabel(actor)}'s shot at ${targetLabel} finds the target already down`)
+              this.log(attackerSide, `${this.actorLabel(actor)}'s shot at ${targetLabel} finds the target already down`)
               return
             }
             targetEntity.takeDamage(damage)
             const killed = targetEntity.isDead
-            this.log(actor.side, `${this.actorLabel(actor)} hits ${targetLabel} (−${damage}${killed ? `, killed` : ''})`)
+            this.log(attackerSide, `${this.actorLabel(actor)} hits ${targetLabel} (−${damage}${killed ? `, killed` : ''})`)
+            this.emit({ kind: 'damage', actorType: attackerType, side: attackerSide, amount: damage })
+            if (killed) this.emit({ kind: 'kill', actorType: attackerType, side: attackerSide })
           }
         } else {
           this.log(actor.side, `${this.actorLabel(actor)} fires (target lost)`)
@@ -2174,17 +2202,19 @@ export class RevealPhase {
       proj.silentLanding = true
       const side = actor.side
       const ownerId = actor.id
+      const ownerType = this.actorTypeKey(actor)
       const ownerLabel = this.actorLabel(actor)
       const isGrenadier = actor instanceof SpriteUnit && actor.type === 'grenadier'
       const triggerMode = isGrenadier ? 'timed' : 'proximity'
       proj.onHit = () => {
         this.pendingGrenades.push(new PendingGrenade(
-          this.scene, aim.x, aim.y, damage, aoeRadius, side, ownerId, triggerMode,
+          this.scene, aim.x, aim.y, damage, aoeRadius, side, ownerId, triggerMode, 16, ownerType,
         ))
       }
       const cell = (action as { cell: CellRef }).cell
       const what = isGrenadier ? 'a grenade' : 'a bomb'
       this.log(actor.side, `${ownerLabel} throws ${what} to (${cell.col}, ${cell.row})`)
+      this.emit({ kind: 'action', actorType: ownerType, side, action: 'throw' })
     } else {
       // Direct-fire AoE — splash everything in range of the impact point
       // immediately. Defender AoE hits cyborgs only; attacker AoE hits
@@ -2203,8 +2233,8 @@ export class RevealPhase {
     if (!isAoe) playGunshot()
   }
 
-  private applyAoe(cx: number, cy: number, radius: number, damage: number, _source: Actor): AoeSummary {
-    return this.applyAoeForSide(cx, cy, radius, damage, _source.side)
+  private applyAoe(cx: number, cy: number, radius: number, damage: number, source: Actor): AoeSummary {
+    return this.applyAoeForSide(cx, cy, radius, damage, source.side, this.actorTypeKey(source))
   }
 
   // Splash damage application. AoE explosions are FRIENDLY-FIRE — every
@@ -2213,13 +2243,21 @@ export class RevealPhase {
   // log label (which side fired the bomb) but no longer filters who gets
   // hit. Returns the number of pieces hit, total damage dealt, and kill
   // count for the post-action summary.
-  private applyAoeForSide(cx: number, cy: number, radius: number, damage: number, _side: 'attacker' | 'defender'): AoeSummary {
+  private applyAoeForSide(cx: number, cy: number, radius: number, damage: number, side: 'attacker' | 'defender', attackerType?: string): AoeSummary {
     let hits = 0, kills = 0
+    const emit = attackerType
+      ? (dmg: number, killed: boolean) => {
+          this.emit({ kind: 'damage', actorType: attackerType, side, amount: dmg })
+          if (killed) this.emit({ kind: 'kill', actorType: attackerType, side })
+        }
+      : () => {}
     const hit = (target: { isDead: boolean; takeDamage(n: number): void }) => {
       if (target.isDead) return
       target.takeDamage(damage)
       hits++
-      if (target.isDead) kills++
+      const killed = target.isDead
+      if (killed) kills++
+      emit(damage, killed)
     }
     // Cyborgs (attacker units). Grenadiers wear extra explosive shielding —
     // AoE damage halved. Models heavier blast plating around the bomb-vest
@@ -2231,7 +2269,9 @@ export class RevealPhase {
         const shielded = Math.max(1, Math.round(damage * 0.5))
         u.takeDamage(shielded)
         hits++
-        if (u.isDead) kills++
+        const killed = u.isDead
+        if (killed) kills++
+        emit(shielded, killed)
       } else {
         hit(u)
       }
@@ -2280,11 +2320,15 @@ export class RevealPhase {
       playExplosion()
       const dmg = Config.STRUCTURES.mine.damage
       let hits = 0, kills = 0
+      this.emit({ kind: 'action', actorType: 'mine', side: 'defender', action: 'mine_trigger' })
       for (const u of this.units) {
         if (u.isDead) continue
         if (this.inRadius(u.worldX, u.worldY, s.worldX, s.worldY, radius)) {
           u.takeDamage(dmg); hits++
-          if (u.isDead) kills++
+          const killed = u.isDead
+          if (killed) kills++
+          this.emit({ kind: 'damage', actorType: 'mine', side: 'defender', amount: dmg })
+          if (killed) this.emit({ kind: 'kill', actorType: 'mine', side: 'defender' })
         }
       }
       s.takeDamage(9999)   // mine self-destructs on trigger

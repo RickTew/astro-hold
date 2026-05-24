@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AstroHold — Battle Stats</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #050810;
+      color: #cce8ff;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 24px 32px 80px;
+    }
+    h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      letter-spacing: 4px;
+      color: #d8ecff;
+      text-shadow: 0 0 14px rgba(60, 140, 220, 0.55);
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #6ac4ff;
+      margin: 28px 0 10px;
+    }
+    .hint {
+      font-size: 12px;
+      color: #99bbcc;
+      line-height: 1.6;
+      max-width: 820px;
+      margin-bottom: 16px;
+    }
+    .hint code { color: #d4ff7a; }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin: 14px 0 24px;
+      flex-wrap: wrap;
+    }
+    .actions button {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 8px 16px;
+      background: linear-gradient(180deg, #1c4a78 0%, #0a2848 100%);
+      color: #eaf6ff;
+      border: 1.5px solid #6ac4ff;
+      cursor: pointer;
+    }
+    .actions button.danger {
+      background: linear-gradient(180deg, #781c4a 0%, #480a28 100%);
+      border-color: #d45a7a;
+    }
+    .actions button:active { transform: translateY(1px); }
+
+    .panel {
+      background: rgba(8, 18, 32, 0.55);
+      border: 1px solid rgba(106, 196, 255, 0.25);
+      padding: 14px 18px;
+      margin-bottom: 18px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+    }
+    .stat-card {
+      background: linear-gradient(180deg, #0d1c2e, #061320);
+      border: 1px solid #2a5577;
+      padding: 10px 14px;
+    }
+    .stat-card .lbl {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #88c5e0;
+      text-transform: uppercase;
+    }
+    .stat-card .val {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      font-weight: 900;
+      color: #d4ff7a;
+      margin-top: 4px;
+    }
+    .stat-card .sub {
+      font-size: 11px;
+      color: #99aabb;
+      margin-top: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(106, 196, 255, 0.12);
+    }
+    th {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: #6ac4ff;
+      text-transform: uppercase;
+    }
+    td.num { font-family: 'Orbitron', monospace; color: #d4ff7a; text-align: right; }
+    td.txt-att { color: #ff7a9a; }
+    td.txt-def { color: #6ac4ff; }
+    tr:hover { background: rgba(106, 196, 255, 0.04); }
+
+    .empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: #99aabb;
+      font-style: italic;
+    }
+    pre.json {
+      background: #020608;
+      border: 1px solid rgba(106, 196, 255, 0.18);
+      padding: 12px;
+      font-size: 11px;
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre;
+      color: #c0d8e8;
+    }
+    details summary {
+      cursor: pointer;
+      font-size: 11px;
+      color: #88c5e0;
+      letter-spacing: 1px;
+      padding: 8px 0;
+    }
+    .toast {
+      position: fixed;
+      top: 18px; right: 18px;
+      padding: 10px 18px;
+      background: rgba(180, 240, 70, 0.92);
+      color: #050810;
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      box-shadow: 0 0 18px rgba(180, 240, 70, 0.55);
+      opacity: 0;
+      transform: translateY(-6px);
+      transition: opacity 0.18s, transform 0.18s;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <h1>AstroHold — Battle Stats</h1>
+  <p class="hint">
+    Reads <code>localStorage["astrohold:battle-stats:v1"]</code>, populated by
+    <code>BattleStats.recordBattle</code> at the end of every game. Play 10–20
+    battles, then come back here to spot trends.
+    <br>
+    The <strong>COPY JSON</strong> button puts everything on your clipboard so
+    you can paste it into chat for analysis. <strong>CLEAR</strong> wipes the
+    record set (useful when starting a new balance test).
+  </p>
+
+  <div class="actions">
+    <button id="refresh">REFRESH</button>
+    <button id="copy">COPY JSON</button>
+    <button id="clear" class="danger">CLEAR ALL</button>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">SUMMARY</h2>
+    <div id="summary" class="summary-grid"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">PIECES BUILT (PER GAME AVERAGE)</h2>
+    <div id="pieces-built"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">DAMAGE BY PIECE TYPE</h2>
+    <div id="damage-by-piece"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">KILLS BY PIECE TYPE</h2>
+    <div id="kills-by-piece"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">ACTION COUNTS</h2>
+    <div id="action-counts"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0">RECENT BATTLES</h2>
+    <div id="recent"></div>
+  </div>
+
+  <details class="panel">
+    <summary>RAW JSON (for sharing)</summary>
+    <pre id="json" class="json"></pre>
+  </details>
+
+  <div id="toast" class="toast">COPIED</div>
+
+  <script>
+    const KEY = 'astrohold:battle-stats:v1'
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(KEY)
+        if (!raw) return []
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast')
+      t.textContent = msg
+      t.classList.add('show')
+      setTimeout(() => t.classList.remove('show'), 1100)
+    }
+
+    function statCard(lbl, val, sub) {
+      return `<div class="stat-card"><div class="lbl">${lbl}</div><div class="val">${val}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`
+    }
+
+    function tablePiece(rows, side) {
+      if (rows.length === 0) return '<div class="empty">No data yet.</div>'
+      const tdSide = side === 'attacker' ? 'txt-att' : side === 'defender' ? 'txt-def' : ''
+      const rowsHtml = rows.map(([type, n]) =>
+        `<tr><td class="${tdSide}">${type}</td><td class="num">${n}</td></tr>`
+      ).join('')
+      return `<table><thead><tr><th>${side ? side.toUpperCase() + ' PIECE' : 'PIECE'}</th><th style="text-align:right">VALUE</th></tr></thead><tbody>${rowsHtml}</tbody></table>`
+    }
+
+    function aggregate(records) {
+      const total = records.length
+      if (total === 0) return null
+      const wins  = records.filter(r => r.outcome === 'win').length
+      const defenderGames = records.filter(r => r.playerSide === 'defender').length
+      const defenderWins  = records.filter(r => r.playerSide === 'defender' && r.outcome === 'win').length
+      const attackerGames = records.filter(r => r.playerSide === 'attacker').length
+      const attackerWins  = records.filter(r => r.playerSide === 'attacker' && r.outcome === 'win').length
+      const byEnd = {
+        core_destroyed:    records.filter(r => r.endType === 'core_destroyed').length,
+        cyborgs_eliminated:records.filter(r => r.endType === 'cyborgs_eliminated').length,
+        attrition:         records.filter(r => r.endType === 'attrition').length,
+      }
+      const avgTurns = records.reduce((s, r) => s + r.turns, 0) / total
+      const avgAttDmg = records.reduce((s, r) => s + r.damageDealt.attacker, 0) / total
+      const avgDefDmg = records.reduce((s, r) => s + r.damageDealt.defender, 0) / total
+
+      // Per-piece totals across all games
+      const piecesBuilt = { attacker: {}, defender: {} }
+      const dmgByPiece = {}
+      const killsByPiece = {}
+      const actions = {}
+      for (const r of records) {
+        if (r.piecesByType) {
+          for (const [t, n] of Object.entries(r.piecesByType.attacker || {})) piecesBuilt.attacker[t] = (piecesBuilt.attacker[t] || 0) + n
+          for (const [t, n] of Object.entries(r.piecesByType.defender || {})) piecesBuilt.defender[t] = (piecesBuilt.defender[t] || 0) + n
+        }
+        if (r.damageByPieceType) for (const [t, n] of Object.entries(r.damageByPieceType)) dmgByPiece[t] = (dmgByPiece[t] || 0) + n
+        if (r.killsByPieceType)  for (const [t, n] of Object.entries(r.killsByPieceType))  killsByPiece[t] = (killsByPiece[t] || 0) + n
+        if (r.actionCounts)      for (const [t, n] of Object.entries(r.actionCounts))      actions[t]      = (actions[t] || 0) + n
+      }
+      // Convert raw totals → per-game averages where useful
+      const avgPiecesBuilt = {
+        attacker: Object.fromEntries(Object.entries(piecesBuilt.attacker).map(([t, n]) => [t, (n / total).toFixed(1)])),
+        defender: Object.fromEntries(Object.entries(piecesBuilt.defender).map(([t, n]) => [t, (n / total).toFixed(1)])),
+      }
+
+      return {
+        total, wins, losses: total - wins,
+        defenderGames, defenderWins, attackerGames, attackerWins,
+        byEnd, avgTurns, avgAttDmg, avgDefDmg,
+        avgPiecesBuilt, dmgByPiece, killsByPiece, actions,
+      }
+    }
+
+    function render() {
+      const records = load()
+      document.getElementById('json').textContent = JSON.stringify(records, null, 2)
+
+      const summary = document.getElementById('summary')
+      if (records.length === 0) {
+        summary.innerHTML = '<div class="empty">No battles recorded yet — play some games and come back.</div>'
+        document.getElementById('pieces-built').innerHTML = ''
+        document.getElementById('damage-by-piece').innerHTML = ''
+        document.getElementById('kills-by-piece').innerHTML = ''
+        document.getElementById('action-counts').innerHTML = ''
+        document.getElementById('recent').innerHTML = ''
+        return
+      }
+      const a = aggregate(records)
+      const defRate = a.defenderGames ? (a.defenderWins / a.defenderGames * 100).toFixed(0) : '—'
+      const attRate = a.attackerGames ? (a.attackerWins / a.attackerGames * 100).toFixed(0) : '—'
+      summary.innerHTML = [
+        statCard('GAMES',            a.total),
+        statCard('PLAYER WIN RATE',  `${(a.wins / a.total * 100).toFixed(0)}%`, `${a.wins}/${a.total}`),
+        statCard('DEFENDER WIN RATE', `${defRate}%`, `${a.defenderWins}/${a.defenderGames}`),
+        statCard('ATTACKER WIN RATE', `${attRate}%`, `${a.attackerWins}/${a.attackerGames}`),
+        statCard('AVG TURNS',        a.avgTurns.toFixed(1)),
+        statCard('CORE DESTROYED',   a.byEnd.core_destroyed,    'attacker wins by core kill'),
+        statCard('CYBORGS WIPED',    a.byEnd.cyborgs_eliminated,'defender wins by elimination'),
+        statCard('ATTRITION END',    a.byEnd.attrition,         'no cyborg can damage core'),
+        statCard('AVG ATT DMG',      a.avgAttDmg.toFixed(0)),
+        statCard('AVG DEF DMG',      a.avgDefDmg.toFixed(0)),
+      ].join('')
+
+      // Pieces built per game (average)
+      const att = Object.entries(a.avgPiecesBuilt.attacker).sort((x, y) => parseFloat(y[1]) - parseFloat(x[1]))
+      const def = Object.entries(a.avgPiecesBuilt.defender).sort((x, y) => parseFloat(y[1]) - parseFloat(x[1]))
+      document.getElementById('pieces-built').innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">' +
+          '<div>' + tablePiece(att, 'attacker') + '</div>' +
+          '<div>' + tablePiece(def, 'defender') + '</div>' +
+        '</div>'
+
+      // Damage by piece (sorted desc)
+      const dmgRows = Object.entries(a.dmgByPiece).sort((x, y) => y[1] - x[1])
+      document.getElementById('damage-by-piece').innerHTML = tablePiece(dmgRows)
+
+      // Kills by piece
+      const killRows = Object.entries(a.killsByPiece).sort((x, y) => y[1] - x[1])
+      document.getElementById('kills-by-piece').innerHTML = tablePiece(killRows)
+
+      // Action counts
+      const actionRows = Object.entries(a.actions).sort((x, y) => y[1] - x[1])
+      document.getElementById('action-counts').innerHTML = tablePiece(actionRows)
+
+      // Recent battles (latest first)
+      const recent = [...records].reverse().slice(0, 20)
+      const recentRows = recent.map(r => {
+        const time = (r.endedAt || '').slice(11, 19)
+        const outcomeColor = r.outcome === 'win' ? '#d4ff7a' : '#ff7a9a'
+        return `<tr>
+          <td>${time}</td>
+          <td>${r.playerSide}</td>
+          <td style="color:${outcomeColor}">${r.outcome}</td>
+          <td>${r.endType}</td>
+          <td class="num">${r.turns}</td>
+          <td class="num">${r.damageDealt.attacker}</td>
+          <td class="num">${r.damageDealt.defender}</td>
+          <td>${r.coreHpEnd}/${r.coreMaxHp}</td>
+        </tr>`
+      }).join('')
+      document.getElementById('recent').innerHTML = `<table>
+        <thead><tr>
+          <th>TIME</th><th>PLAYER</th><th>OUTCOME</th><th>END</th>
+          <th style="text-align:right">TURNS</th>
+          <th style="text-align:right">ATT DMG</th>
+          <th style="text-align:right">DEF DMG</th>
+          <th>CORE</th>
+        </tr></thead>
+        <tbody>${recentRows}</tbody>
+      </table>`
+    }
+
+    document.getElementById('refresh').addEventListener('click', render)
+    document.getElementById('copy').addEventListener('click', async () => {
+      const text = JSON.stringify(load(), null, 2)
+      try {
+        await navigator.clipboard.writeText(text)
+        toast(`COPIED ${load().length} GAMES`)
+      } catch {
+        // Fallback — select & open in new tab if clipboard API blocked
+        const w = window.open('', '_blank')
+        if (w) {
+          w.document.write('<pre style="white-space:pre-wrap;font:12px monospace;padding:20px">' + text.replace(/</g,'&lt;') + '</pre>')
+          w.document.close()
+        }
+      }
+    })
+    document.getElementById('clear').addEventListener('click', () => {
+      if (!confirm('Wipe all recorded battles? Cannot be undone.')) return
+      localStorage.removeItem(KEY)
+      render()
+      toast('CLEARED')
+    })
+
+    render()
+  </script>
+</body>
+</html>

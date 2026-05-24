@@ -33,6 +33,21 @@ export interface BattleRecord {
   /** Power core HP at end (0 if destroyed). */
   coreHpEnd: number
   coreMaxHp: number
+
+  // ── S17.3 additions: per-piece + per-action breakdowns ──────────────
+  // All optional so older records loaded from localStorage still parse.
+
+  /** Counts of each piece type spawned during BUILD, per side. */
+  piecesByType?: {
+    attacker: Record<string, number>
+    defender: Record<string, number>
+  }
+  /** Total damage dealt by each piece TYPE across all instances. */
+  damageByPieceType?: Record<string, number>
+  /** Kills caused by each piece type. */
+  killsByPieceType?: Record<string, number>
+  /** Notable action counts across the whole battle. */
+  actionCounts?: Record<string, number>
 }
 
 const KEY = 'astrohold:battle-stats:v1'

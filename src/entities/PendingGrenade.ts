@@ -50,6 +50,10 @@ export class PendingGrenade {
     public ownerId: string,
     public triggerMode: GrenadeTriggerMode = 'proximity',
     baseSize = 16,
+    // ownerType used by BattleStats so per-piece damage attribution
+    // survives the thrower's death. Optional — default 'unknown' keeps
+    // back-compat with any other constructor callers.
+    public ownerType: string = 'unknown',
   ) {
     this.timerTurns = triggerMode === 'timed' ? 1 : 3
     this.id = nextActorId('bomb')
