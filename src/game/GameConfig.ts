@@ -130,7 +130,7 @@ export const Config = {
     // tile forward. Lower per-target damage than a punch (40 vs 55) but
     // can hit up to 3 enemies at once. `slamAmmo` is a separate counter
     // from punch ammo — the Hulk picks his moments.
-    hulk:      { cost: 100, hp: 280, speed: 35, damage: 55, range: 70,  sightRange: 220, aoeRadius: 0, apBudget: 2, ammo: 5, slamDamage: 40, slamAmmo: 3, label: 'Hulk',       color: 0x886622 },
+    hulk:      { cost: 100, hp: 280, speed: 45, damage: 55, range: 70,  sightRange: 220, aoeRadius: 0, apBudget: 2, ammo: 5, slamDamage: 40, slamAmmo: 3, label: 'Hulk',       color: 0x886622 },
     // Cyborg Medic — support unit with three heal modes (med-pack throw,
     // deployable medic-pad, tether). Fragile (HP 50) so positioning matters.
     // `damage` repurposed as heal amount per tick; `range` is throw range

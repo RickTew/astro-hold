@@ -643,7 +643,11 @@ export class RevealPhase {
       const cell = this.pickWanderStep(unit)
       if (cell) return { kind: 'move', cell }
     }
-    return null
+    // Fully boxed in (no step + no wander). Return 'hold' instead of null
+    // so the unit stays in the step list — null caused them to be OMITTED
+    // entirely, which read as "taking breaks." Hold gets the 80ms skip
+    // duration so it's still fast, just visible.
+    return { kind: 'hold' }
   }
 
   // Cyborg Medic three-mode priority. Tethers a high-value damaged ally
@@ -1132,7 +1136,11 @@ export class RevealPhase {
     const score = (c: Cand) => c.d + c.danger * 2 + c.spacing + (c.isBacktrack ? 1000 : 0)
     const pickFrom = (pool: Cand[]): Cand | null => {
       if (pool.length === 0) return null
-      pool.sort((a, b) => score(a) - score(b))
+      // Random tiebreaker — with stable sort, ties resolve in CARDINAL_STEPS
+      // order (E, W, N, S) so cyborgs blocked west always sidestep NORTH.
+      // User observation S17.3: "walk up but not down." Randomize tied
+      // scores so N/S sideways are equally likely.
+      pool.sort((a, b) => score(a) - score(b) || Math.random() - 0.5)
       return pool[0]
     }
     // Try tier 1 first; if empty, tier 2. If both empty (fully boxed in),
