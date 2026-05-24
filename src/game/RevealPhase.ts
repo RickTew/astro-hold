@@ -27,6 +27,13 @@ type AnyTarget = Actor | PixelPowerCore
 interface PlannedStep {
   actor: Actor
   action: QueuedAction
+  // True if `action` is a placeholder and the REAL action should be
+  // computed fresh at execute time by calling defaultMobileUnitAction(actor).
+  // Without this, slow units (Hulk = lowest initiative) plan their step
+  // based on the start-of-reveal state — where faster cyborgs are still
+  // blocking their west cell — and end up locked into N/S sidesteps even
+  // after the blockers have moved out of the way by execute time.
+  isDefault?: boolean
 }
 
 // One line in the D&D-style turn log. Side drives the row colour in the HUD
@@ -366,24 +373,29 @@ export class RevealPhase {
 
     // Cyborgs: use queued actions, OR auto-default to advance/fire if the
     // player didn't queue anything (otherwise BATTLE looks like a no-op).
+    // Default actions are PLACEHOLDERS — the real action is computed at
+    // execute time so each unit's pathing sees the up-to-date field state
+    // (faster cyborgs that have already moved out of the way no longer
+    // block slower cyborgs' west steps). Fixes the Hulk-lag bug where
+    // lowest-initiative units always planned around blockers that
+    // executed-and-moved-away before the Hulk's turn arrived.
     for (const u of this.units) {
       if (u.isDead) continue
       if (u.queuedActions.length > 0) {
         for (const a of u.queuedActions) list.push({ actor: u, action: a })
       } else {
-        const def = this.defaultMobileUnitAction(u)
-        if (def) list.push({ actor: u, action: def })
+        list.push({ actor: u, action: { kind: 'hold' }, isDefault: true })
       }
     }
-    // Defender mobile units (combat dogs): same default-action logic but
-    // hunting cyborgs rather than defender pieces.
+    // Defender mobile units (combat dogs, repair bots): same default-action
+    // logic but hunting cyborgs / repairing damaged pieces. Same isDefault
+    // replan-at-execute pattern as cyborgs above.
     for (const u of this.defenderUnits) {
       if (u.isDead) continue
       if (u.queuedActions.length > 0) {
         for (const a of u.queuedActions) list.push({ actor: u, action: a })
       } else {
-        const def = this.defaultMobileUnitAction(u)
-        if (def) list.push({ actor: u, action: def })
+        list.push({ actor: u, action: { kind: 'hold' }, isDefault: true })
       }
     }
     // Spheres: queued shots first, otherwise auto-fire at nearest cyborg.
@@ -1758,8 +1770,16 @@ export class RevealPhase {
   // ── Per-action execution ─────────────────────────────────────────────────
 
   private executeStep(step: PlannedStep) {
-    const { actor, action } = step
+    const { actor } = step
     if (actor.isDead) return   // strict skip — actor died earlier in the reveal
+    // isDefault placeholder → compute the real action NOW so the unit's
+    // pathing sees the current field state (e.g. faster cyborgs that
+    // have already moved out of the way no longer block this unit's
+    // west step). Falls back to 'hold' if no action is available.
+    let action = step.action
+    if (step.isDefault && actor instanceof SpriteUnit) {
+      action = this.defaultMobileUnitAction(actor) ?? { kind: 'hold' }
+    }
 
     if (action.kind === 'hold') return
 
