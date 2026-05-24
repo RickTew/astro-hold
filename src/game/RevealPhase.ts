@@ -477,6 +477,33 @@ export class RevealPhase {
       }
       return { kind: 'hold' }
     }
+    // Stalker front-line rush. Like the Hulk, single-minded — bypasses
+    // the generic sight-gated advance so he doesn't pause to scope out.
+    // Decision order:
+    //   1. Punch anything in melee range (his unlimited fists). The
+    //      cloak drops automatically on this attack (executeAttack).
+    //   2. Otherwise march straight at the NEAREST defender piece
+    //      (any type — sphere / structure / dog / repair / core),
+    //      ignoring sight range entirely. The whole point of the
+    //      cloak is to close distance without being shot, so we
+    //      don't want him hanging back.
+    if (unit.type === 'stalker') {
+      const meleeRange = Config.UNITS.stalker.range
+      const melee = this.nearestEnemy(unit, meleeRange)
+      if (melee) {
+        return { kind: 'fire', target: { kind: melee.kind, id: melee.id } }
+      }
+      // No range gate — find the closest defender piece on the entire map.
+      // Falls back to core if every defender is dead and core somehow lives.
+      const frontLine = this.nearestEnemy(unit, Infinity)
+      if (frontLine) {
+        const cell = this.pickStepTowardPoint(unit, frontLine.x, frontLine.y)
+        if (cell) return { kind: 'move', cell }
+        const wander = this.pickWanderStep(unit)
+        if (wander) return { kind: 'move', cell: wander }
+      }
+      return { kind: 'hold' }
+    }
     // Sniper find-a-spot-and-shoot. Loop:
     //   1. With ammo + target in range:
     //        a. Not yet crouched → spend this turn settling in (aim pose,

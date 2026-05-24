@@ -22,7 +22,11 @@ const SPRITE_SIZE = 60
 // Per-type size overrides. Hulk is a bruiser — visually larger than a
 // rank-and-file cyborg so his presence on the field is unmistakable.
 const SPRITE_SIZE_OVERRIDE: Partial<Record<UnitType, number>> = {
-  hulk: 84,
+  hulk:    84,
+  // Stalker is a heavy bruiser too — bigger than rank-and-file cyborgs
+  // (60) but visibly smaller than the Hulk so silhouette difference is
+  // still readable on the field.
+  stalker: 76,
 }
 function spriteSizeFor(type: UnitType): number {
   return SPRITE_SIZE_OVERRIDE[type] ?? SPRITE_SIZE
