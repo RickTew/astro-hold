@@ -546,6 +546,14 @@ export class SpriteUnit {
   announceOnce(trigger: SpeechTrigger) {
     this.maybeSpeak(trigger)
   }
+  // Always-announce (no dedupe). Used for callouts that should fire
+  // each time the event happens — ammo crate spotted / picked up, etc.
+  announce(trigger: SpeechTrigger) {
+    const scene = this.mesh.parent
+    if (!(scene instanceof THREE.Scene)) return
+    const voice: SpeechVoice = this._side === 'attacker' ? 'cyborg' : 'robot'
+    spawnSpeechBubble(scene, this.logicalX, this.logicalY, voice, trigger)
+  }
   private maybeSpeak(trigger: SpeechTrigger, context?: { n?: number }) {
     // Each (trigger + n value) is gated independently so we can say
     // "3 shots left" then later "1 shot left" — same trigger, different
@@ -805,13 +813,16 @@ export class SpriteUnit {
     let dx = 0
     if (this.type === 'sniper' && this.currentState === 'aim') {
       // Body sits ~30% of sprite width opposite to facing in the
-      // crouched-aim pose. Shift the sprite along facing so the BODY
-      // lands on the cell center; rifle extends past the cell edge.
-      // Bumped from 0.22 → 0.30 in S17.2 — user reported body still
-      // visibly off-center at 0.22.
+      // crouched-aim pose. Shift the sprite along the facing direction
+      // (toward the rifle) so the BODY lands on cell center while the
+      // rifle extends past. User reported earlier shifts were going
+      // the OPPOSITE direction — flipped the sign (S17.3+): east-facing
+      // shifts WEST (body on right of texture, rifle on left? — guessing
+      // until we look). If this still reads wrong, the texture body
+      // position is the issue, not the shift sign.
       const size = spriteSizeFor(this.type)
-      if (this.currentDir === 'east') dx = +size * 0.30
-      else if (this.currentDir === 'west') dx = -size * 0.30
+      if (this.currentDir === 'east') dx = -size * 0.30
+      else if (this.currentDir === 'west') dx = +size * 0.30
     }
     this.sprite.position.set(dx, 0, 5)
   }

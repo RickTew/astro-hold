@@ -13,6 +13,7 @@ export type SpeechVoice = 'cyborg' | 'robot'
 export type SpeechTrigger =
   | 'low_hp' | 'low_ammo' | 'out_of_ammo'
   | 'sniper_shot' | 'medic_low_packs'
+  | 'crate_spotted' | 'rearmed'
 
 // Lines may include {n} (count) and {s} (auto-pluralizer: '' if n==1
 // else 's') so "{n} shot{s} left!" renders "1 shot left!" / "3 shots left!"
@@ -24,6 +25,8 @@ const LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> = {
     out_of_ammo:      ["I'm out!", "Down to fists!", "Need ammo!", "Pistol's dry!"],
     sniper_shot:      ["Lining one up... shot.", "Target acquired... gone.", "One shot, one kill.", "Eagle eye."],
     medic_low_packs:  ["{n} pack{s} left!", "Running low on supplies!", "Down to {n} kit{s}!"],
+    crate_spotted:    ["Crate spotted!", "Resupply incoming!", "Going for the crate!", "Ammo drop, on me!"],
+    rearmed:          ["Reloaded!", "Locked and loaded!", "Got it!", "Fresh clip!"],
   },
   robot: {
     low_hp:           ["SYSTEMS CRITICAL", "INTEGRITY: LOW", "DAMAGE: SEVERE", "ARMOR FAILING"],
@@ -31,6 +34,8 @@ const LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> = {
     out_of_ammo:      ["AMMUNITION DEPLETED", "WEAPON OFFLINE", "RELOAD UNAVAILABLE"],
     sniper_shot:      ["TARGET ELIMINATED", "MARK STRUCK", "ONE SHOT CONFIRMED"],
     medic_low_packs:  ["REPAIR CHARGES: {n}", "{n} CHARGE{S} LEFT", "SUPPLIES DEPLETING"],
+    crate_spotted:    ["RESUPPLY DETECTED", "CRATE ON MAP", "TARGETING SUPPLY"],
+    rearmed:          ["AMMUNITION RESTORED", "RELOAD COMPLETE", "RESUPPLIED"],
   },
 }
 

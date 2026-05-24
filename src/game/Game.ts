@@ -14,7 +14,7 @@ import { MedicPad } from '../entities/MedicPad'
 import { Tether } from '../entities/Tether'
 import { RepairPad } from '../entities/RepairPad'
 import { RepairTether } from '../entities/RepairTether'
-import { AmmoBox, AmmoKitType } from '../entities/AmmoBox'
+import { AmmoBox, AmmoKitType, kitForUnit } from '../entities/AmmoBox'
 import { FireArcPreview } from '../entities/FireArcPreview'
 import { OpponentAI, OpponentSide } from '../ai/OpponentAI'
 import { recordBattle, BattleRecord } from './BattleStats'
@@ -857,6 +857,18 @@ private enterBuildPhase() {
         roll < 0.90 ? 'medkit' :
         'repair_kit'
       this.ammoBoxes.push(new AmmoBox(this.scene, col, row, type))
+      // Callout: closest cyborg that CAN use this crate type announces
+      // it so the player can track who's going for it. Defenders don't
+      // pursue crates so we only check the attacker side.
+      let nearest: SpriteUnit | null = null
+      let nearestD = Infinity
+      for (const u of this.attackerUnits) {
+        if (u.isDead) continue
+        if (kitForUnit(u.type) !== type) continue
+        const d = Math.hypot(u.worldX - x, u.worldY - y)
+        if (d < nearestD) { nearest = u; nearestD = d }
+      }
+      nearest?.announce('crate_spotted')
       return
     }
   }

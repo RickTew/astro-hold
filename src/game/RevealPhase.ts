@@ -2107,6 +2107,7 @@ export class RevealPhase {
         : box.type === 'grenade' ? 'grenade box'
         : 'ammo box'
       this.log(unit.side, `${this.actorLabel(unit)} grabs a ${kitLabel} (+${gained})`)
+      unit.announce('rearmed')
       return  // only one pickup per move
     }
   }
