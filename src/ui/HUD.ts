@@ -66,26 +66,46 @@ export class HUD {
     type Tile = {
       label: string; cost: number; icon: string;
       action?: 'sphere' | 'dog' | 'repair'; dataType?: string; preview?: boolean
+      // empty: invisible-but-grid-present upgrade slot. Renders as an
+      // empty .hud-tile div (no content, no click). Same shape as a real
+      // tile so the 4×2 grid stays aligned when fewer than 8 active
+      // tiles are present.
+      empty?: boolean
     }
-    // 8 robot tiles laid out 4×2. The Cannon / Mine / Laser / Signal pieces
-    // are wired into game code + AI build pool (see OpponentAI), but they
-    // are NOT exposed as player tiles yet — the HUD redesign for those
-    // belongs in public/build-test.html first (per the test-page workflow).
-    // Reverted from a 4×3 / 6×2 experiment that shipped without sandbox
-    // validation and broke the panel proportions.
-    const robotTiles: Tile[] = [
-      { label: 'SPHERE',  cost: 100, icon: '/sprites/sphere/south.png', action: 'sphere' },
-      { label: 'TOWER',   cost:  30, icon: '/sprites/tower/south.png',  dataType: 'turret' },
-      { label: 'BOMBER',  cost:  70, icon: '/sprites/bomber/south.png', dataType: 'bomber' },
-      { label: 'SENTRY',  cost:  60, icon: '/sprites/sentry/south.png', dataType: 'sentry' },
-      { label: 'DOG',     cost:  40, icon: '/sprites/dog/south.png',    action: 'dog' },
-      { label: 'WALL',    cost:  20, icon: 'wall',                       dataType: 'wall' },
-      { label: 'LASER',   cost:  40, icon: '/sprites/laser/south.png',   dataType: 'laser',   preview: true },
-      { label: 'REPAIR',  cost:  70, icon: '/sprites/repair/south.png',  action: 'repair' },
+    // Robot HUD — ported from /build-test.html AFTER (approved S17.3).
+    // LEFT panel: 8 unique build pieces. RIGHT panel: 4 active + 4 empty
+    // upgrade slots. Total 16 unique slots across the two panels (no
+    // tile is duplicated). Cannon visual reuses the 'gun' twin-barrel
+    // sprite as a stand-in; marked preview so the .preview CSS rule
+    // shrinks the oversized sprite to scale 0.78 (no new style introduced,
+    // uses the existing class). Same applies to Mine/Signal/Shield
+    // sprites that ship at larger native sizes.
+    const robotLeftTiles: Tile[] = [
+      { label: 'CANNON', cost:  60, icon: '/sprites/gun/south.png',     dataType: 'cannon', preview: true },
+      { label: 'TOWER',  cost:  30, icon: '/sprites/tower/south.png',   dataType: 'turret' },
+      { label: 'BOMBER', cost:  70, icon: '/sprites/bomber/south.png',  dataType: 'bomber' },
+      { label: 'LASER',  cost:  40, icon: '/sprites/laser/south.png',   dataType: 'laser', preview: true },
+      { label: 'SPHERE', cost: 100, icon: '/sprites/sphere/south.png',  action: 'sphere'   },
+      { label: 'SENTRY', cost:  60, icon: '/sprites/sentry/south.png',  dataType: 'sentry' },
+      { label: 'DOG',    cost:  40, icon: '/sprites/dog/south.png',     action: 'dog'      },
+      { label: 'REPAIR', cost:  70, icon: '/sprites/repair/south.png',  action: 'repair'   },
     ]
-    // Cyborg roster has only 5 distinct pieces today. We pad with 3 duplicates
-    // to fill the 4×2 grid until new cyborg art is generated. (Was 5 duplicates
-    // in the 5×2 grid; trimmed when we reduced to 8 tiles per side.)
+    const robotRightTiles: Tile[] = [
+      { label: 'MINE',   cost: 20, icon: '/sprites/robot_mine/south.png', dataType: 'mine',    preview: true },
+      { label: 'WALL',   cost: 20, icon: 'wall',                           dataType: 'wall' },
+      { label: 'SIGNAL', cost: 70, icon: '/sprites/signal/south.png',     dataType: 'signal',  preview: true },
+      { label: 'SHIELD', cost: 50, icon: '/sprites/defense/south.png',    dataType: 'defense', preview: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+    ]
+    // Cyborg HUD — drop the Grenadier/Hulk duplicates from the old 4×2
+    // layout, leave those slots empty as visible "upgrade" placeholders
+    // for future cyborg pieces. 6 active functional units + 2 empty.
+    // CYBORG_MINE art is NOT wired here yet — no cyborg-side mine
+    // mechanic exists, so a clickable tile would route to a missing
+    // unit type. Add when the mechanic ships.
     const cyborgTiles: Tile[] = [
       { label: 'CANNON',   cost:  70, icon: '/sprites/cannon/south.png',    dataType: 'cannon' },
       { label: 'GRENADIER',cost:  50, icon: '/sprites/grenadier/south.png', dataType: 'grenadier' },
@@ -93,10 +113,15 @@ export class HUD {
       { label: 'HULK',     cost: 100, icon: '/sprites/hulk/south.png',      dataType: 'hulk' },
       { label: 'SNIPER',   cost:  90, icon: '/sprites/sniper/south.png',    dataType: 'sniper' },
       { label: 'MEDIC',    cost:  70, icon: '/sprites/medic/south.png',     dataType: 'medic' },
-      { label: 'GRENADIER',cost:  50, icon: '/sprites/grenadier/south.png', dataType: 'grenadier' },
-      { label: 'HULK',     cost: 100, icon: '/sprites/hulk/south.png',      dataType: 'hulk' },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
     ]
     const tileHtml = (t: Tile, sideTag: 'def' | 'att') => {
+      if (t.empty) {
+        // Empty upgrade slot. Same .hud-tile shape so the grid stays
+        // aligned; no content, no click. Inherits default tile styling.
+        return `<div class="hud-tile ${sideTag}" aria-hidden="true"></div>`
+      }
       const classes = ['hud-tile', sideTag]
       if (t.preview) classes.push('preview')
       const data = t.action ? `data-action="${t.action}"`
@@ -164,7 +189,7 @@ export class HUD {
           ${sidePanelSvg('def', false)}
           <div class="panel-content">
             <div class="tile-grid">
-              ${robotTiles.map(t => tileHtml(t, 'def')).join('')}
+              ${robotLeftTiles.map(t => tileHtml(t, 'def')).join('')}
             </div>
           </div>
         </div>
@@ -198,7 +223,7 @@ export class HUD {
           ${sidePanelSvg('def', true)}
           <div class="panel-content">
             <div class="tile-grid">
-              ${robotTiles.map(t => tileHtml(t, 'def')).join('')}
+              ${robotRightTiles.map(t => tileHtml(t, 'def')).join('')}
             </div>
           </div>
         </div>
