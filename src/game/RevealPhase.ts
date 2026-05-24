@@ -2179,9 +2179,16 @@ export class RevealPhase {
       actor.setSingleFacing(aimAngle)
     }
 
-    const isAoe = action.kind === 'throw'
+    // Melee fallback is always a single-target punch — never AoE, even
+    // for actor types that normally have aoeRadius > 0 (grenadier, cyborg
+    // bomber). Without this gate, an out-of-ammo grenadier punching an
+    // adjacent enemy would fall into the lobbed branch and crash trying
+    // to read action.cell (their melee action is kind:'fire', not 'throw').
+    const isAoe = !isMeleeFallback && (
+      action.kind === 'throw'
       || (actor instanceof SpriteUnit && Config.UNITS[actor.type].aoeRadius > 0)
       || (actor instanceof Structure && (Config.STRUCTURES[actor.type].aoeRadius ?? 0) > 0)
+    )
     const aoeRadius = !isAoe ? 0
       : actor instanceof SpriteUnit ? Config.UNITS[actor.type].aoeRadius
       : actor instanceof Structure  ? (Config.STRUCTURES[actor.type].aoeRadius ?? 0)
@@ -2238,12 +2245,14 @@ export class RevealPhase {
           this.log(actor.side, `${this.actorLabel(actor)} fires (target lost)`)
         }
       }
-    } else if (isLobbed) {
+    } else if (isLobbed && action.kind === 'throw') {
       // Lobbed AoE — two mechanics on the same projectile pipeline:
       //   Bomber → 'proximity' (lands as a trap, waits for enemies)
       //   Grenadier → 'timed' (cooked grenade, explodes on its own timer)
       // Both arm at end-of-reveal; the difference is what triggers
       // detonation. Grenadiers throw TIMED GRENADES, not mines.
+      // GUARD: only run this branch on actual 'throw' actions. Grenadier
+      // melee fallback uses kind:'fire' which has no .cell field.
       proj.silentLanding = true
       const side = actor.side
       const ownerId = actor.id
