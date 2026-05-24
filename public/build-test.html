@@ -148,6 +148,11 @@
       width: 100%;
       height: 100%;
     }
+    /* AFTER-only grid: one extra column per row so a new tile lands
+       beside the existing eight without forcing a third row. Tiles are
+       content-sized (`auto`), so this just widens the cluster; tile
+       style is untouched. */
+    .tile-grid.tg-5col { grid-template-columns: repeat(5, auto); }
     .hud-tile {
       position: relative;
       display: flex;
@@ -416,6 +421,15 @@
       { label: 'REPAIR', cost:  70, icon: './sprites/repair/south.png' },
     ]
 
+    // AFTER row: production tiles + Cannon (first of the new pieces).
+    // Cannon's structure-sprite stand-in is the 'gun' twin-barrel icon
+    // (the /sprites/cannon/ folder is the cyborg unit, not the turret).
+    // Adding one at a time so each addition is easy to review.
+    const robotTilesAfter = [
+      ...robotTilesProduction,
+      { label: 'CANNON', cost: 60, icon: './sprites/gun/south.png' },
+    ]
+
     function tileHtml(t) {
       const classes = ['hud-tile']
       if (t.preview) classes.push('preview')
@@ -451,13 +465,14 @@
       </svg>`
     }
 
-    function renderHud(target, tiles) {
+    function renderHud(target, tiles, opts) {
       const tileList = tiles || robotTilesProduction
+      const gridClass = opts && opts.gridClass ? ` ${opts.gridClass}` : ''
       target.innerHTML = `
         <div class="hud-panel hud-left" data-side="def">
           ${panelSvg(false)}
           <div class="panel-content">
-            <div class="tile-grid">${tileList.map(tileHtml).join('')}</div>
+            <div class="tile-grid${gridClass}">${tileList.map(tileHtml).join('')}</div>
           </div>
         </div>
         <div class="hud-panel hud-center" data-side="def">
@@ -481,7 +496,7 @@
         <div class="hud-panel hud-right" data-side="def">
           ${panelSvg(true)}
           <div class="panel-content">
-            <div class="tile-grid">${tileList.map(tileHtml).join('')}</div>
+            <div class="tile-grid${gridClass}">${tileList.map(tileHtml).join('')}</div>
           </div>
         </div>
       `
@@ -495,13 +510,12 @@
       })
     }
 
-    // Initial render. AFTER is identical to BEFORE until a specific
-    // experiment is added — change `renderHud(after, customTiles)` or
-    // edit #hud-after's markup directly to mock up the proposed change.
+    // BEFORE: production 8-tile 4×2 layout, untouched.
+    // AFTER:  same tile style, one extra column (5×2), CANNON added.
     const before = document.getElementById('hud-before')
     const after  = document.getElementById('hud-after')
     renderHud(before)
-    renderHud(after)
+    renderHud(after, robotTilesAfter, { gridClass: 'tg-5col' })
   </script>
 
 </body>
