@@ -1560,8 +1560,15 @@ export class RevealPhase {
       this.firstTickOfStep = false
     }
 
+    // 'hold' actions (stunned, tether-pinned, no valid move) have nothing
+    // visible to animate, so step past them quickly. Reduces dead-time in
+    // reveals where many cyborgs are stunned / blocked and lets the
+    // visible action breathe at the normal 0.6s cadence. Was: every step
+    // waited 0.6s regardless, making a 15-cyborg turn drag for 9s even
+    // when 10 of those steps were no-ops.
+    const stepDuration = this.steps[this.idx].action.kind === 'hold' ? 0.08 : STEP_DURATION
     this.stepTime += delta
-    if (this.stepTime >= STEP_DURATION) {
+    if (this.stepTime >= stepDuration) {
       this.stepTime = 0
       this.firstTickOfStep = true
       this.idx++
