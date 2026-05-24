@@ -123,22 +123,55 @@ Mechanics tuned for D&D-style strategy:
   destructible (1 HP) — grenades destroy them, defender structures with
   no cyborg target fire on crates to deny enemy reloads. See `AmmoBox.ts`.
 
-## HUD changes — MUST go through the test page first
+## HUD changes — HARD LOCK protocol (S17.3)
 
+The HUD has cost three+ broken pushes this session. The user has
+explicitly said: **"only change the UNITS, do not touch the HUD style."**
+Treat the HUD's CSS, panel SVG silhouettes, tile padding, tile-icon
+sizes, grid gap, font clamps, hover/selected/preview classes, icon
+halos, and every other visual property as FROZEN.
+
+### What you CAN change without sandbox or approval
+- The contents of `robotLeftTiles` / `robotRightTiles` / `cyborgTiles`
+  arrays in `src/ui/HUD.ts` — the `label`, `cost`, `icon`, `dataType`,
+  `action`, and `preview` fields of existing `Tile` objects.
+
+### What requires explicit user approval EACH TIME
+- Adding a new `Tile` shape property (e.g. `iconScale`, `empty`,
+  `spacer`, `iconClass`).
+- Modifying the `tileHtml` function's rendered structure.
+- Any change inside `<style>` blocks of `index.html`.
+- Any addition or change to CSS rules that apply to `.hud-*` selectors.
+- Splitting / merging tile arrays (e.g. introducing a LEFT/RIGHT split).
+- Changing how empty/upgrade slots render — they must look IDENTICAL
+  to a filled tile's box, not collapse, not render dashed, etc.
+
+### Sandbox-first protocol
 `public/build-test.html` (live at https://astrohold3.vercel.app/build-test.html)
-is the HUD A/B sandbox. **Every HUD layout / tile / panel change is
-prototyped there first, then ported to production after the user signs
-off.** Skipping this and editing `HUD.ts` + `index.html` directly has
-broken production twice (S17.2 4×3 + 6×2 attempts). The protocol:
-1. Edit `public/build-test.html` first — copy the production HUD markup,
-   add a new EXPERIMENTAL row with the proposed change.
-2. Push + deploy. Tell the user to check the test URL.
-3. ONLY after the user approves, port the change to `HUD.ts` / `index.html`.
-4. Update `build-test.html` so its BASELINE row reflects new production.
+is the HUD A/B surface.
+1. Make the proposal in the AFTER row of the sandbox FIRST. Push + deploy.
+   Tell the user to check the test URL.
+2. The sandbox MUST copy production CSS verbatim — when index.html HUD CSS
+   changes, mirror it into the sandbox the same commit. The BEFORE row
+   must always render PIXEL-FAITHFUL to production. If you find that the
+   sandbox BEFORE row looks different from production, FIX THE SANDBOX
+   first (re-sync CSS) before anything else.
+3. ONLY port to `src/ui/HUD.ts` after the user says "go" or equivalent.
+4. After porting, update the sandbox BEFORE row to match new production.
 
-See memory `reference_build_test_sandbox` for layout + helper-function
-parity rules. Tile-count, grid dimensions, panel silhouette, font sizes,
-icon-clamp — none of it gets touched in production without a sandbox pass.
+### When in doubt
+**Ask, don't iterate.** Don't ship "a small fix" in the HUD without
+explicit user direction. The pattern that keeps burning the user is:
+small fix → unexpected side effect → another small fix → drift. Stop
+the chain by asking what the exact desired outcome is, then make
+exactly that change, then stop.
+
+Failures-to-follow this rule already burned:
+- S17.2 4×3 layout (broke world camera)
+- S17.2 6×2 layout (broke panel proportions)
+- S17.3 port that introduced `iconScale` overrides (changed icon sizes)
+- S17.3 empty-tile collapse (bottom row went thin)
+- S17.3 empty-tile-with-inner-structure (added back size but still felt off)
 
 ## HUD (session 15)
 Floating top strip with three SVG-silhouetted panels — DO NOT reserve
