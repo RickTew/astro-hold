@@ -670,10 +670,10 @@
       { label: 'GRENADIER', cost:  50, icon: './sprites/grenadier/south.png' },
       { label: 'HULK',      cost: 100, icon: './sprites/hulk/south.png'      },
     ]
-    // Cyborg AFTER LEFT: 6 unique units + CYBORG MINE + 1 empty.
-    // MINE uses preview class — sprite is 64×64 native (smaller than
-    // the other ~100px cyborg sprites) so without preview it'd render
-    // overscaled and overflow the tile, like Cannon does without preview.
+    // Cyborg AFTER LEFT: mobile/walking characters only.
+    // Sentry is treated as a mobile character (sprite ships walking
+    // anims) — it gets the invisibility-shield mechanic so it can
+    // close distance before being targeted.
     const cyborgAfterLeft = [
       { label: 'CANNON',    cost:  70, icon: './sprites/cannon/south.png'    },
       { label: 'GRENADIER', cost:  50, icon: './sprites/grenadier/south.png' },
@@ -681,20 +681,20 @@
       { label: 'HULK',      cost: 100, icon: './sprites/hulk/south.png'      },
       { label: 'SNIPER',    cost:  90, icon: './sprites/sniper/south.png'    },
       { label: 'MEDIC',     cost:  70, icon: './sprites/medic/south.png'     },
-      { label: 'MINE',      cost:  20, icon: './sprites/cyborg_mine/south.png', preview: true },
+      { label: 'STALKER',   cost:  60, icon: './sprites/cyborg_sentry/south.png' },
       { empty: true },
     ]
-    // Cyborg AFTER RIGHT: per earlier user direction — borrowed robot
-    // tower tiles as visual stand-ins until cyborgs get their own,
-    // plus the two cyborg-native towers we extracted (Gatling/Sentry),
-    // plus 2 upgrade placeholders. Same 8-per-panel rule as Robot AFTER.
+    // Cyborg AFTER RIGHT: stationary structures + traps. Mines on the
+    // right per the side rule. Borrowed robot towers as visual stand-ins
+    // (Cannon/Tower/Bomber/Laser) plus the cyborg Gatling tower, plus
+    // the CYBORG MINE, plus 1 upgrade slot.
     const cyborgAfterRight = [
-      { label: 'CANNON',  cost:  60, icon: './sprites/gun/south.png',          preview: true },
-      { label: 'TOWER',   cost:  30, icon: './sprites/tower/south.png'       },
-      { label: 'BOMBER',  cost:  70, icon: './sprites/bomber/south.png'      },
-      { label: 'LASER',   cost:  40, icon: './sprites/laser/south.png',        preview: true },
+      { label: 'CANNON',  cost:  60, icon: './sprites/gun/south.png',           preview: true },
+      { label: 'TOWER',   cost:  30, icon: './sprites/tower/south.png'        },
+      { label: 'BOMBER',  cost:  70, icon: './sprites/bomber/south.png'       },
+      { label: 'LASER',   cost:  40, icon: './sprites/laser/south.png',         preview: true },
       { label: 'GATLING', cost:  80, icon: './sprites/cyborg_gatling/south.png' },
-      { label: 'SENTRY',  cost:  60, icon: './sprites/cyborg_sentry/south.png' },
+      { label: 'MINE',    cost:  20, icon: './sprites/cyborg_mine/south.png',   preview: true },
       { empty: true }, { empty: true },
     ]
 
