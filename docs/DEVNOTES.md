@@ -1881,3 +1881,257 @@ Console API installed at boot (`window.astrohold`):
 - Ammo crate AI: cyborgs go to compatible crates but they don't
   COORDINATE — multiple cyborgs might race for the same crate when
   one would suffice.
+
+---
+
+## Session 17 (2026-05-24/25) — STALKER + core defense + replan-at-execute + massive data layer
+
+The big session: shipped a new cyborg unit with novel cloak mechanic,
+power core electric defense, fixed the Hulk-lag bug at the root
+(plan-time vs execute-time), got the HUD lock protocol in writing
+(after burning it twice), and rebuilt the stats/data layer for
+balance analysis.
+
+### Sniper crouch-before-shoot rule
+- Can NOT crouch and shoot the same turn. First turn in range plays
+  the aim pose (no fire); next turn fires. Stays crouched after the
+  shot so consecutive shots from the same spot are free; movement
+  breaks the crouch via `moveTo`.
+- Implementation: `SpriteUnit._crouched` flag, reset on `moveTo` and
+  `standUpFromAim()`. Default action gates fire on crouched state.
+- Sniper sprite-centering bug FINALLY fixed via empirical measurement:
+  PNG bbox script revealed the visible content sits +10px east of
+  canvas center (rifle pulls mass east). Correct offset is
+  `−0.10 × size`, not the −0.30 I'd guessed. Every prior guess
+  overshot by 2-3×, which is why each adjustment looked worse.
+
+### Cannon / Mine / Laser / Signal wired up (from orphan-config to functional)
+- `defense` / `mine` / `laser` / `signal` / `cannon` (structure)
+  existed in Config but weren't in HUD or AI pool. Wired all of them.
+- Cannon structure reuses the `gun` twin-barrel sprite as visual
+  stand-in (no dedicated cannon-structure art yet).
+- Signal is the EMP emitter — 70cr / 80hp / 500 range / 2 ammo.
+  Auto-targets the FURTHEST cyborg currently inside the middle map
+  (closest to attacker spawn), stuns for 2 turns. Strategic counter
+  to back-line snipers/hulks before they engage where defender DPS
+  can't reach. New `'emp'` action kind in QueuedAction; stun field
+  on SpriteUnit (`stunnedTurns`); blue burst visual via Explosion
+  with optional color parameter.
+- `defense` became SHIELD (50cr / 120hp). Mechanic NOT yet wired
+  (proposed: 30% DR aura, dies first to focused fire, one per game) —
+  user said "no balance changes until data justifies it."
+- Mines now drop in the MIDDLE no-build zone (cyborg corridor), not
+  defender's backyard. Both phase-1 placement and phase-2 random
+  fill respect this. Local→global col offset at the spawnStructure
+  call site.
+
+### Cyborg STALKER unit + invisibility cloak mechanic
+- New cyborg unit: 70cr / 130hp / speed 60 / damage 40 / range 70
+  (melee, unlimited fists like Hulk via ammo=99). Sprite size 76
+  (just under Hulk's 84).
+- Cloak: spawns invisible, 35% opacity sprite, defender targeting AI
+  skips cloaked units. Drops PERMANENTLY on first damage-dealing
+  action (executeAttack hook) OR on first incoming AoE damage
+  (takeDamage override). Direct fire never hits cloaked Stalkers
+  (targeting skip), so any takeDamage means AoE/mine/splash → cloak
+  drops naturally.
+- Stalker default action: melee if in range, else nearestEnemy(Infinity)
+  + step toward — single-minded front-line charge like Hulk.
+- Sprite art: `cyborg_stalker/` with 8 rotations + 8-direction walking
+  + east/west strike animations.
+- Initial assets imported via the same `unzip → flatten` pattern as
+  cyborg_gatling/cyborg_sentry.
+- MANIFEST gotcha: keyed by FOLDER name, not unit type. Used `stalker`
+  instead of `cyborg_stalker` → preload threw, loading screen hung.
+  One-character key rename was the fix.
+
+### Grenadier rules
+- Extra explosive shielding: AoE damage halved on grenadiers
+  (heavy blast plating from the bomb-vest role).
+- Throws now MUST land BEHIND or to the SIDE of the nearest enemy.
+  Never in front (where advancing cyborgs cluster). Zero ally hits
+  required. Geometric classification via cos of angle between
+  (thrower→enemy) and (enemy→cell). >+0.5 = behind, -0.5..0.5 = side,
+  <-0.5 = front (rejected).
+
+### AI build rework
+- 1-of-each-then-random. Phase 1 guarantees one of every type;
+  phase 2 random-fills until broke or no slots.
+- Removed the 55% per-turn budget cap — there's no PLAN phase + no
+  second BUILD, so the reserve made no sense. AI spends every credit.
+- Sentry added to defender phase 1.
+
+### HUD: ported AFTER layout (after burning it twice)
+- Approved AFTER layout: LEFT 8 unique active + RIGHT 4 active + 4
+  empty placeholders = 16 slots per side, 4×2 per panel.
+  - Robots: Cannon/Tower/Bomber/Laser / Sphere/Sentry/Dog/Repair on
+    LEFT; Mine/Wall/Signal/Shield + 4 empties on RIGHT.
+  - Cyborgs: 6 unique + Mine + spacer on LEFT; borrowed robot towers
+    + Gatling + Sentry on RIGHT (placeholder until cyborg-side
+    structure-placement infra exists; clicks currently no-op).
+- Empty tiles render with the full internal structure (icon + label +
+  cost rows all empty/&nbsp;) so they don't collapse to thin bars.
+- TWO bad pushes before getting this right: 4×3 layout made the panel
+  1.5× taller and pushed the world view down; 6×2 stretched panel
+  proportions sideways. Both reverted. The pattern that burned: every
+  "small fix" introduced unrelated CSS or new tile-shape props.
+
+### HUD HARD LOCK protocol (CLAUDE.md addition)
+- The only thing freely editable is the contents of existing Tile
+  objects (label/cost/icon/dataType/action/preview/empty).
+- Anything CSS, panel SVG, tile-shape schema needs explicit user
+  approval each time.
+- Sandbox MUST stay pixel-faithful to production. If BEFORE row
+  drifts, fix the sandbox first.
+- "Ask, don't iterate" — explicit list of past burns documented.
+
+### Test page (/build-test.html) rewrite
+- Stripped to BEFORE + AFTER per side (robots + cyborgs). No more
+  third row, no more toggle aside.
+- BEFORE row CSS copied VERBATIM from index.html so it's pixel-
+  faithful to production (was missing the icon-glow + hover-pop
+  layers, which is why earlier ports drifted).
+- Helper functions (`tileHtml`, `panelSvg`, `centerSvg`, `renderHud`)
+  mirror production HUD code.
+
+### Stalker damage reveal + sniper range tweak + repair idle callout
+- Stalker cloak drops on any incoming damage (AoE/mine/splash) since
+  direct fire skips cloaked targets — any takeDamage call on a cloaked
+  Stalker means AoE noise revealed them.
+- Sniper range 400 → 350 (one cell closer per user). Sight 450 → 400.
+- Repair bot idle callout: when bot has charges but no damaged ally
+  to repair, says "ALL SYSTEMS NOMINAL" / "NO REPAIRS NEEDED" once
+  per match (announceOnce 'no_repairs_needed') instead of silently
+  holding (which read as bugged).
+
+### Crate spotted/rearmed callouts
+- 'crate_spotted' — fires when a crate spawns; the closest cyborg
+  that can USE that kit type announces it.
+- 'rearmed' — fires when any unit picks up a crate.
+- New `SpriteUnit.announce(trigger)` method that always fires (no
+  spokenSet dedupe).
+
+### Movement / behavior fixes (multiple iterations)
+- Cyborg "march to core, no chase" — removed the chase-sighted-enemy
+  step for attackers. Cyborgs now fire if in range, otherwise march
+  straight at the core. Defender mobile units (Dog) still chase
+  sighted enemies.
+- Wander biased toward the target axis (core for attackers, cyborg
+  edge for defenders) — was pure random pick which read as "no logic."
+- Wander generalized to use the actual core position via
+  `this.core.cellCenters()[0]` instead of hardcoded WORLD.LEFT, so
+  future maps where attackers approach from any direction will work.
+- North bias fixed in `pickStepTowardPoint` — tied sideways
+  candidates were resolved by sort-stable order (CARDINAL_STEPS lists
+  N before S, so blocked units always sidestepped NORTH). Random
+  tiebreaker added.
+- `defaultMobileUnitAction` returns 'hold' instead of null when fully
+  boxed in. Null caused units to be OMITTED from the planned-steps
+  list, reading as "taking breaks."
+- Hulk speed bump 35 → 45 (small).
+
+### Plan-at-execute fix (the big one)
+- Root cause of Hulk lag: `buildSteps()` pre-computed every cyborg's
+  default action ONCE at reveal start. Hulk has lowest initiative
+  (speed 45 = slowest) so executes LAST. When Hulk's plan was
+  computed, faster cyborgs were still blocking their west cell.
+  Hulk locked in to N/S sidestep. By the time Hulk's turn executed,
+  blockers had moved out of the way — but Hulk's plan was already
+  committed.
+- Fix: `PlannedStep.isDefault` flag marks placeholder actions.
+  `buildSteps()` pushes isDefault:true for any cyborg/dog/repair-bot
+  without a queued action. `executeStep()` checks isDefault and
+  calls `defaultMobileUnitAction(actor)` FRESH at execute time —
+  pathing now sees the current state.
+- Same fix incidentally addresses "grenadier throws at empty space"
+  (plan made when target was alive, by execute time target was dead).
+
+### Hold-skip optimization
+- Hold actions now flush in 80ms instead of STEP_DURATION=600ms.
+  When 2/3 of cyborgs are stunned/blocked, reveal flows fast through
+  the dead time while normal actions keep the 0.6s cadence.
+
+### Grenadier melee-fallback crash (3679 console errors)
+- Out-of-ammo grenadier next to an enemy returned `{ kind: 'fire' }`
+  melee fallback. `isAoe` was true (grenadier config has aoeRadius
+  > 0) so it skipped the direct-fire branch (gated on !isAoe), fell
+  into the lobbed branch (gated on isLobbed which is type-based),
+  and crashed reading `action.cell` (only exists on 'throw').
+- Two-part fix: melee fallback forces `isAoe = false` (single-target
+  punch), AND lobbed branch now requires `action.kind === 'throw'`
+  as a safety net.
+
+### Reveal yield (setTimeout between reveals)
+- `enterRevealPhase()` was called SYNCHRONOUSLY from within
+  `onComplete`, inside `RevealPhase.update`, inside the RAF tick.
+  With many entities + pending grenades + tethers, several reveals
+  could chain in a single frame and freeze the tab.
+- Fix: `setTimeout(() => enterRevealPhase(), 0)` defers the next
+  reveal to the next macrotask. Browser repaints between reveals,
+  call stack resets. Visible cadence unchanged.
+
+### Power Core electric defense
+- 4×4 cell zone centered on the 2×2 core (12 outer-ring cells
+  visible; off-map cells clipped). `PixelPowerCore.defenseZoneCells()`
+  returns the kill-zone tile centers.
+- Persistent overlay (`Game.makeCoreDefenseOverlay`) shows the
+  danger area at all times — translucent blue tiles + electric-blue
+  outline ring. Visible during BUILD and BATTLE.
+- `RevealPhase.tickCoreDefense` fires at the start of every reveal.
+  Any live cyborg in zone takes 20 damage + two-layered Explosion
+  (cyan halo + white core flash). AoE-based — cloak doesn't help.
+- Damage attribution: `actorType: 'core'`, so the new BattleStats
+  per-piece tables surface core damage/kills.
+
+### Data layer expansion (S17.4)
+- New BattleRecord fields (all optional, back-compat):
+  - `assistsByPieceType` — damage to targets killed by someone else
+  - `cellsWalkedByPieceType` — total move steps per type
+  - `attacksByPieceType` — total fire/throw/slam actions per type
+  - `creditsSpentByPieceType` — derived from piecesByType × Config
+  - `enemyEliminatedAtTurn` — turn enemy side hit 0 alive units
+- RevealPhase `damageHistory` Map + new `attribute()` helper emits
+  damage/kill/assist atomically. Threaded through every damage site
+  (direct fire, AoE, slam, mine, core defense). New PieceEvent kinds:
+  'assist', 'move', 'attack'.
+- /stats.html new sections: ASSISTS, ATTACKS / CELLS WALKED side-by-
+  side, COST EFFECTIVENESS (damage/credit + kills/100cr), and
+  ENEMY-ELIMINATED TURN (with clearedAt/totalTurns/gap/outcome).
+
+### What we observed in playtest (data, no conclusions)
+- Defender lost 8/8 games with full per-piece data. All by
+  core_destroyed.
+- Doublegun dealt the most cyborg damage on average (~778); grenadier
+  the least (~113) — they throw a lot but rarely hit.
+- AI build pool wonkiness in some games (25 dogs, 14 bombers) was
+  user manually testing single-tower-type viability, NOT an AI bug.
+- Per-piece data only started populating after S17.3 mid-session;
+  earlier games show empty `damageByPieceType` etc.
+
+### Open questions for next session
+- SHIELD mechanic — proposed 50cr/120hp/30% DR aura, dies first.
+  Not yet wired. Waiting on game-test data to justify the numbers.
+- Grenadier damage/kill ratio is low. With new `assistsByPieceType`
+  we can finally see if they're wounding-but-not-killing or just
+  whiffing. Don't tune until we have data.
+- Defender win rate is 0% in measured games. Could be defender
+  underpowered OR cyborgs overtuned OR map layout issue. New data
+  layer should clarify.
+- HUD: Cannon/Mine/Signal/Shield use the `.preview` class for
+  scale(0.78) since their source PNGs overflow at the default 1.55×.
+  Long-term fix is to pad the asset PNGs with transparent space so
+  they render correctly at full scale. Asset work, not code.
+- Cyborg right-panel structure tiles (borrowed robot towers + Gatling
+  + cyborg Sentry) are visual placeholders — cyborgs have no
+  structure-placement infrastructure. Clicks no-op. Wire when needed.
+- Movement system planning lock was patched (replan-at-execute) but
+  the underlying architecture is sequential. Future map with multi-
+  directional approaches might surface other plan-staleness issues.
+- Damage types / per-side resistance (gas vs humans, explosive vs
+  robots) — design discussion was queued but not implemented. Big
+  scope; user wanted to verify the basic mechanics first.
+- Tower variants picker (gas/freeze/fire) — mocked in test page,
+  no code.
+- Cyborg-side mine mechanic — CYBORG_MINE art exists (cyborg_mine
+  sprite), tile is in cyborg AFTER LEFT panel of test page, but no
+  game logic for cyborg-placed mines yet.

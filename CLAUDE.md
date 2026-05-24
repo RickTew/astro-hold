@@ -1,6 +1,6 @@
 # AstroHold — Project Rules for Claude
 
-## Status: Single-player D&D-style strategy LIVE (session 16)
+## Status: Single-player D&D-style strategy LIVE (session 17)
 Turn-based grid strategy. **BUILD → REVEAL** is the live flow (PLAN code
 exists but is skipped — see Phase flow). After the first BATTLE click,
 reveals **auto-chain** until win / lose. **NO stalemate rule** — the
@@ -111,6 +111,30 @@ Mechanics tuned for D&D-style strategy:
   compatible ammo crate if sighted, else retreat east;
   `standUpFromAim()` swaps to upright static rotation at the retreat
   edge ("rifle empty"). AI build enforces 3-cell sniper spacing.
+  Range trimmed 400 → 350 in S17 (sight 450 → 400).
+  Sprite aim-pose offset is `dx = ±0.10 × size` (measured from the
+  source PNG bbox — visible content sits +10px east of canvas center
+  because the rifle pulls mass east; shift west to recenter the body).
+- **Cyborg STALKER** (session 17) — cloaked melee bruiser.
+  70cr / 130hp / speed 60 / damage 40 / range 70 (melee, unlimited
+  fists via ammo=99). Sprite size 76 (just under Hulk's 84). Spawns
+  CLOAKED — sprite at 35% opacity, defender targeting AI skips
+  cloaked units (`isCellOccupiedAtBattle` still treats them as
+  solid, AoE/splash still hits — geometry-based). Cloak drops
+  PERMANENTLY on first damage-dealing action (executeAttack hook)
+  OR on any incoming damage via `takeDamage` (direct fire never
+  reaches cloaked targets, so any takeDamage means AoE noise
+  revealed them). Default action: melee if adjacent, else march
+  straight at nearest defender (no sight gate). Sprite:
+  `cyborg_stalker/` with 8 rotations + 8-dir walking + E/W strike.
+  MANIFEST gotcha: keyed by FOLDER name, not unit type.
+- **Power Core electric defense** (session 17) — 4×4 zone centered
+  on the 2×2 core (12 outer-ring cells, off-map cells clipped).
+  Persistent translucent-blue overlay + bordering ring shows the
+  danger area at all times. `RevealPhase.tickCoreDefense` fires
+  every reveal start: any live cyborg in zone takes 20 damage +
+  two-layered Explosion (cyan halo + white flash). AoE-based, cloak
+  doesn't help. Damage attributed to `actorType: 'core'` for stats.
 - **Universal melee fallback.** When a SpriteUnit hits `ammoRemaining=0`
   AND an enemy is within ~1.4 cells, swings for `MELEE_FALLBACK_DAMAGE`
   (10) at no ammo cost. Excludes hulk (already unlimited at 55), sniper
@@ -369,12 +393,31 @@ session 8 in DEVNOTES.
   sides (no AI plan generator).
 - `RevealPhase.ts` — initiative-sorted sequencer. Collects queued
   actions + auto-fire for structures + default fallback actions for
-  unplanned mobile units. Steps through at ~600ms per action with
-  strict-skip on invalid. Auto-loops via `Game.enterRevealPhase` until
-  win/lose (no stalemate — see Status). Streams combat log lines via
-  `onLogEntry` callback so the HUD panel updates in step with the
-  visible action. Holds: AmmoBox array, medic/repair pads + tethers,
-  pendingGrenades, projectiles, explosions.
+  unplanned mobile units. Steps through at ~600ms per action (80ms
+  for `hold` actions) with strict-skip on invalid. Auto-loops via
+  `Game.enterRevealPhase` until win/lose (no stalemate — see Status).
+  Auto-loop YIELDS via `setTimeout(0)` between reveals so the browser
+  can repaint and the call stack resets — without this, many reveals
+  could chain synchronously in one RAF frame and freeze the tab.
+  Streams combat log lines via `onLogEntry` callback so the HUD panel
+  updates in step with the visible action. Holds: AmmoBox array,
+  medic/repair pads + tethers, pendingGrenades, projectiles, explosions.
+  - **Replan at execute time (S17)** — default actions for mobile
+    units (`isDefault: true` on PlannedStep) are PLACEHOLDERS pushed
+    by `buildSteps()`. `executeStep()` calls
+    `defaultMobileUnitAction(actor)` fresh when the unit's turn
+    arrives. Critical for slow units (Hulk = lowest initiative):
+    without this, their plan was based on the start-of-reveal field
+    state where faster cyborgs were still blocking their west cell,
+    and they'd lock in to N/S sidesteps that were obsolete by execute
+    time. Structures keep pre-computed actions — they don't move so
+    plan staleness doesn't matter.
+  - **Per-piece telemetry (S17.4)** — `onPieceEvent` callback fires
+    'damage' / 'kill' / 'assist' / 'attack' / 'move' / 'action'
+    events. Game accumulates into BattleStats for `/stats.html` analysis.
+    `attribute(target, attackerType, side, amount, killed)` helper
+    atomically emits damage + kill + assist events using the
+    `damageHistory` Map (per-target attacker set).
 - `PendingGrenade.ts` — lobbed AoE bomb with two `triggerMode` flavors:
   - `'proximity'` (Bomber): waits for enemies, 3-reveal safety fuse.
   - `'timed'` (Grenadier): cooked grenade, detonates at 1 armed reveal.
