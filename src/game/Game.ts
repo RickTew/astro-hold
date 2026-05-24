@@ -320,17 +320,36 @@ export class Game {
     const group = new THREE.Group()
     const cs = Config.GRID_CELL
     const cells = this.powerCore.defenseZoneCells()
-    const geo = new THREE.PlaneGeometry(cs - 4, cs - 4)
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffd24a,         // electric-yellow
+    // Bumped opacity 0.18 → 0.35 + electric-blue outline so the danger
+    // zone reads at a glance during BUILD and BATTLE. Was too subtle.
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: 0x66ccff,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.22,
       depthWrite: false,
     })
+    const tileGeo = new THREE.PlaneGeometry(cs - 4, cs - 4)
+    // Outline geometry — square ring at cell edge for crisp boundary.
+    const outlineGeo = new THREE.BufferGeometry()
+    const w = (cs - 4) / 2
+    outlineGeo.setAttribute('position', new THREE.Float32BufferAttribute([
+      -w, -w, 0,  w, -w, 0,
+       w, -w, 0,  w,  w, 0,
+       w,  w, 0, -w,  w, 0,
+      -w,  w, 0, -w, -w, 0,
+    ], 3))
+    const outlineMat = new THREE.LineBasicMaterial({
+      color: 0x66ddff,
+      transparent: true,
+      opacity: 0.85,
+    })
     for (const c of cells) {
-      const tile = new THREE.Mesh(geo, mat)
-      tile.position.set(c.x, c.y, 0.35)  // just above ground (0.3 grid)
+      const tile = new THREE.Mesh(tileGeo, fillMat)
+      tile.position.set(c.x, c.y, 0.35)
       group.add(tile)
+      const outline = new THREE.LineSegments(outlineGeo, outlineMat)
+      outline.position.set(c.x, c.y, 0.36)
+      group.add(outline)
     }
     return group
   }

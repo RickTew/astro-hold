@@ -210,8 +210,11 @@ export class RevealPhase {
       u.takeDamage(CORE_DEFENSE_DAMAGE)
       hits++
       if (u.isDead) kills++
-      // Blue lightning burst on each zapped cyborg.
-      this.explosions.push(new Explosion(this.scene, u.worldX, u.worldY, 28, 0.4, 0x66ccff))
+      // Blue lightning burst on each zapped cyborg + a wider halo ring
+      // so the pulse reads clearly through chaos. Two layered explosions:
+      // the inner one is the hit flash, the outer ring is the discharge.
+      this.explosions.push(new Explosion(this.scene, u.worldX, u.worldY, 60, 0.55, 0x88ddff))
+      this.explosions.push(new Explosion(this.scene, u.worldX, u.worldY, 30, 0.35, 0xffffff))
       this.emit({ kind: 'damage', actorType: 'core', side: 'defender', amount: CORE_DEFENSE_DAMAGE })
       if (u.isDead) this.emit({ kind: 'kill', actorType: 'core', side: 'defender' })
     }
