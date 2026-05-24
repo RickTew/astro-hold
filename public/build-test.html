@@ -73,6 +73,146 @@
       vertical-align: middle;
     }
     .preview-section h2 .tag.after { color: #ffc8a0; border-color: rgba(255, 200, 160, 0.35); background: rgba(255, 200, 160, 0.08); }
+    .preview-section h2 .tag.wip   { color: #c8e8a0; border-color: rgba(200, 232, 160, 0.35); background: rgba(200, 232, 160, 0.08); }
+
+    /* WIP gallery — sprites + ideas that aren't wired into gameplay yet.
+       Stays in the test page as a visible reminder list. */
+    .wip-section {
+      max-width: 1600px;
+      margin: 0 auto 28px;
+    }
+    .wip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+      padding: 16px;
+      background: rgba(8, 18, 32, 0.45);
+      border: 1px solid rgba(200, 232, 160, 0.20);
+    }
+    .wip-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px;
+      background: linear-gradient(180deg, #0d1c2e 0%, #061320 100%);
+      border: 1px solid #2a5577;
+    }
+    .wip-card .wip-icon {
+      width: 72px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse at 50% 45%, rgba(40, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%);
+      border: 1px solid rgba(106, 196, 255, 0.30);
+      overflow: hidden;
+    }
+    .wip-card .wip-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .wip-card .wip-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #c8e8a0;
+    }
+    .wip-card .wip-note {
+      font-size: 10px;
+      color: #99aabb;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .wip-card.idea {
+      background: rgba(60, 40, 20, 0.35);
+      border-color: rgba(200, 180, 130, 0.30);
+    }
+    .wip-card.idea .wip-icon {
+      background: rgba(40, 30, 15, 0.6);
+      border-color: rgba(200, 180, 130, 0.30);
+      font-family: 'Orbitron', monospace;
+      font-size: 22px;
+      color: rgba(200, 180, 130, 0.6);
+    }
+    .wip-card.idea .wip-label { color: #d8ccaa; }
+
+    /* Variant picker mockup — proposed UI for "pick a sub-type" when
+       placing a Bomber/Grenadier. Click a base tile → strip of variants
+       appears underneath, player taps one to commit. Pure mockup, no
+       behaviour wired. */
+    .variant-mockup {
+      max-width: 1600px;
+      margin: 0 auto 28px;
+      padding: 16px;
+      background: rgba(8, 18, 32, 0.45);
+      border: 1px solid rgba(106, 196, 255, 0.18);
+    }
+    .variant-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+    .variant-row + .variant-row { border-top: 1px dashed rgba(106, 196, 255, 0.12); }
+    .variant-row .base-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: linear-gradient(180deg, #0d1c2e 0%, #061320 100%);
+      border: 2px solid #6ac4ff;
+      box-shadow: 0 0 10px rgba(106, 196, 255, 0.45);
+      min-width: 72px;
+    }
+    .variant-row .base-tile .ti {
+      width: 48px; height: 48px;
+      background: radial-gradient(ellipse at 50% 45%, rgba(40, 70, 100, 0.30) 0%, rgba(0, 0, 0, 0.85) 75%);
+      border: 1px solid rgba(106, 196, 255, 0.30);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .variant-row .base-tile .ti img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+    .variant-row .base-tile .lbl { font-family: 'Orbitron', monospace; font-size: 10px; letter-spacing: 2px; color: #d8ecff; }
+    .variant-row .arrow {
+      font-size: 18px;
+      color: #6ac4ff;
+      padding: 0 4px;
+    }
+    .variant-row .variants {
+      display: flex;
+      gap: 8px;
+    }
+    .variant-row .variant {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      background: linear-gradient(180deg, #0a1424 0%, #050b15 100%);
+      border: 1px solid #2a5577;
+      min-width: 64px;
+    }
+    .variant-row .variant.active {
+      border-color: #c8ff7a;
+      box-shadow: 0 0 8px rgba(200, 255, 122, 0.4);
+    }
+    .variant-row .variant .ti {
+      width: 40px; height: 40px;
+      background: radial-gradient(ellipse at 50% 45%, rgba(40, 70, 100, 0.20) 0%, rgba(0, 0, 0, 0.8) 75%);
+      border: 1px solid rgba(106, 196, 255, 0.18);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .variant-row .variant .ti img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+    .variant-row .variant .type {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: #88c5e0;
+    }
+    .variant-row .variant.active .type { color: #c8ff7a; }
 
     .preview-frame {
       position: relative;
@@ -435,6 +575,109 @@
     </div>
   </div>
 
+  <!-- VARIANT PICKER MOCKUP — proposed UI for sub-type selection on
+       Bomber tower (defender structure) and Grenadier (cyborg unit).
+       Click base → variant strip appears → tap one to commit.
+       MOCK ONLY: no behaviour wired. Goal: show how it could look. -->
+  <div class="preview-section">
+    <h2>VARIANT PICKERS <span class="tag wip">MOCKUP — NOT WIRED</span></h2>
+    <div class="variant-mockup">
+      <div class="variant-row">
+        <div class="base-tile">
+          <div class="ti"><img src="./sprites/bomber/south.png" alt=""/></div>
+          <div class="lbl">BOMBER</div>
+        </div>
+        <div class="arrow">▶</div>
+        <div class="variants">
+          <div class="variant active"><div class="ti"><img src="./sprites/mine_bomb/south.png" alt=""/></div><div class="type">BOMB</div></div>
+          <div class="variant"><div class="ti"><img src="./sprites/mine_explosive/south.png" alt=""/></div><div class="type">EXPLOSIVE</div></div>
+          <div class="variant"><div class="ti"><img src="./sprites/mine_freezing/south.png" alt=""/></div><div class="type">FREEZE</div></div>
+          <div class="variant"><div class="ti">🔥</div><div class="type">FIRE</div></div>
+          <div class="variant"><div class="ti">☁︎</div><div class="type">GAS</div></div>
+        </div>
+      </div>
+      <div class="variant-row">
+        <div class="base-tile">
+          <div class="ti"><img src="./sprites/grenadier/south.png" alt=""/></div>
+          <div class="lbl">GRENADIER</div>
+        </div>
+        <div class="arrow">▶</div>
+        <div class="variants">
+          <div class="variant active"><div class="ti"><img src="./sprites/grenade_bomb/south.png" alt=""/></div><div class="type">BOMB</div></div>
+          <div class="variant"><div class="ti"><img src="./sprites/grenade_fire/south.png" alt=""/></div><div class="type">FIRE</div></div>
+          <div class="variant"><div class="ti"><img src="./sprites/grenade_gas/south.png" alt=""/></div><div class="type">GAS</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIP / UNUSED ASSETS — sprites and mechanic ideas we have on hand
+       but haven't wired into the game yet. Stays here as a visible
+       reminder list so nothing gets lost. -->
+  <div class="wip-section">
+    <h2 style="font-family:'Orbitron',monospace;font-size:14px;letter-spacing:4px;color:#c8e8a0;margin:12px 4px 8px;">
+      WIP / UNUSED <span class="tag wip" style="display:inline-block;font-size:10px;letter-spacing:2px;padding:3px 9px;margin-left:12px;background:rgba(200,232,160,0.08);border:1px solid rgba(200,232,160,0.35);color:#c8e8a0;vertical-align:middle;">ASSETS + IDEAS</span>
+    </h2>
+    <div class="wip-grid">
+      <!-- Mine variants — new art that replaces / extends current procedural mine. -->
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/mine_bomb/south.png" alt=""/></div>
+        <div class="wip-label">MINE_BOMB</div>
+        <div class="wip-note">Robot mine — armored sphere. Currently wired as the default MINE icon (AFTER row).</div>
+      </div>
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/mine_explosive/south.png" alt=""/></div>
+        <div class="wip-label">MINE_EXPLOSIVE</div>
+        <div class="wip-note">Variant — explosive damage type. Anti-robot effective.</div>
+      </div>
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/mine_freezing/south.png" alt=""/></div>
+        <div class="wip-label">MINE_FREEZING</div>
+        <div class="wip-note">Variant — freeze (stun + slow). Disables movement for N turns.</div>
+      </div>
+      <!-- Grenade variants — new art for cyborg grenadier / future grenade tower. -->
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/grenade_bomb/south.png" alt=""/></div>
+        <div class="wip-label">GRENADE_BOMB</div>
+        <div class="wip-note">Standard explosive. Current grenadier behaviour.</div>
+      </div>
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/grenade_fire/south.png" alt=""/></div>
+        <div class="wip-label">GRENADE_FIRE</div>
+        <div class="wip-note">Variant — fire AoE leaves burning ground for N turns. Vs humans/aliens.</div>
+      </div>
+      <div class="wip-card">
+        <div class="wip-icon"><img src="./sprites/grenade_gas/south.png" alt=""/></div>
+        <div class="wip-label">GRENADE_GAS</div>
+        <div class="wip-note">Variant — gas cloud, DoT vs humans/aliens, ineffective vs robots.</div>
+      </div>
+      <!-- Cyborg mine art (Image #13 was provided — squat armored figure).
+           User pointed it at "cyborg mine" specifically. Sprite not yet
+           extracted (no separate zip), so this card is a placeholder. -->
+      <div class="wip-card idea">
+        <div class="wip-icon">?</div>
+        <div class="wip-label">CYBORG MINE</div>
+        <div class="wip-note">Squat armored figure (Image #13). Sprite still needs a zip + extraction.</div>
+      </div>
+      <!-- Mechanic ideas — placeholders so we don't lose them. -->
+      <div class="wip-card idea">
+        <div class="wip-icon">⚡</div>
+        <div class="wip-label">DAMAGE TYPES</div>
+        <div class="wip-note">Explosive / Fire / Gas / Freeze / EMP. Per-type resistance vs robot vs human/alien. Needs a spec session.</div>
+      </div>
+      <div class="wip-card idea">
+        <div class="wip-icon">🗼</div>
+        <div class="wip-label">TOWER VARIANTS</div>
+        <div class="wip-note">Tower / Bomber sub-types (gas, freeze, fire). Same picker pattern as the BOMBER mockup above.</div>
+      </div>
+      <div class="wip-card idea">
+        <div class="wip-icon">🛡</div>
+        <div class="wip-label">SHIELD MECHANIC</div>
+        <div class="wip-note">Defense piece — 30% DR to allies in aura, dies first to focused fire. Proposed: 50cr / 120hp / one per game. Waiting on sign-off.</div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Tile data mirrors src/ui/HUD.ts robotTiles in current production.
     // Keep these in sync — when you change HUD.ts robotTiles, update here.
@@ -474,12 +717,14 @@
       { label: 'REPAIR', cost:  70, icon: './sprites/repair/south.png' },
     ]
     const robotTilesAfterRight = [
-      { label: 'MINE',    cost: 20, icon: 'mine' },
+      // MINE — new sprite (Mine_Bomb art, the armored-sphere robot variant).
+      // Replaces the procedural yellow-disc-and-ring placeholder.
+      { label: 'MINE',    cost: 20, icon: './sprites/mine_bomb/south.png', iconScale: 1.0 },
       { label: 'WALL',    cost: 20, icon: 'wall' },
       { label: 'SIGNAL',  cost: 70, icon: './sprites/signal/south.png', iconScale: 1.0 },
       // SHIELD/DEFENSE — geodesic-dome piece. Config entry exists
       // (preview, no mechanic yet); sprite ships at /sprites/defense/.
-      { label: 'SHIELD',  cost: 20, icon: './sprites/defense/south.png', iconScale: 1.0 },
+      { label: 'SHIELD',  cost: 50, icon: './sprites/defense/south.png', iconScale: 1.0 },
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
