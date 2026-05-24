@@ -462,15 +462,69 @@
       color: #8aabc4;
     }
     .hud-center .center-matchup .vs-label { opacity: 0.55; font-size: 0.85em; }
-    .hud-center .center-matchup .vs-player {
+    /* Defender HUD (robots): player tag = blue, opponent tag = red. */
+    .hud-panel[data-side="def"] .center-matchup .vs-player {
       font-weight: bold;
       color: #6ac4ff;
       text-shadow: 0 0 6px rgba(60, 170, 230, 0.65);
     }
-    .hud-center .center-matchup .vs-team {
+    .hud-panel[data-side="def"] .center-matchup .vs-team {
       font-weight: bold;
       color: #ff7a9a;
       text-shadow: 0 0 6px rgba(230, 80, 120, 0.65);
+    }
+    /* Attacker HUD (cyborgs): player tag = red, opponent tag = blue. */
+    .hud-panel[data-side="att"] .center-matchup .vs-player {
+      font-weight: bold;
+      color: #ff7a9a;
+      text-shadow: 0 0 6px rgba(230, 80, 120, 0.65);
+    }
+    .hud-panel[data-side="att"] .center-matchup .vs-team {
+      font-weight: bold;
+      color: #6ac4ff;
+      text-shadow: 0 0 6px rgba(60, 170, 230, 0.65);
+    }
+    /* Attacker phase title + brackets — red palette. */
+    .hud-panel[data-side="att"] .center-phase {
+      text-shadow:
+        0 0 24px rgba(255, 110, 145, 0.95),
+        0 0 8px rgba(230, 90, 130, 0.7),
+        0 0 2px rgba(0, 0, 0, 0.9);
+    }
+    .hud-panel[data-side="att"] .center-phase::before,
+    .hud-panel[data-side="att"] .center-phase::after {
+      border-color: #d45a7a;
+      filter: drop-shadow(0 0 4px rgba(230, 90, 130, 0.6));
+    }
+    /* Attacker credits chip + tile border accents — pink-leaning. */
+    .hud-panel[data-side="att"] .center-credits {
+      border-color: rgba(212, 90, 122, 0.55);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 2px 4px rgba(0, 0, 0, 0.5) inset,
+        0 0 10px rgba(212, 90, 122, 0.30);
+    }
+    .hud-panel[data-side="att"] .hud-tile {
+      border-color: #5a2a3c;
+      color: #f2c8d2;
+    }
+    .hud-panel[data-side="att"] .hud-tile:hover {
+      border-color: #ff7a9a;
+      box-shadow: 0 0 12px rgba(212, 90, 122, 0.65), 0 4px 8px rgba(0,0,0,0.4);
+    }
+    .hud-panel[data-side="att"] .hud-tile .tile-icon {
+      border-color: rgba(212, 90, 122, 0.30);
+    }
+    .hud-panel[data-side="att"] .center-action-btn {
+      background: linear-gradient(180deg, #781c4a 0%, #480a28 50%, #1e0310 100%);
+      border-color: #d45a7a;
+      text-shadow: 0 0 8px rgba(255, 140, 180, 0.55), 0 1px 0 rgba(0, 0, 0, 0.7);
+      box-shadow:
+        0 0 0 1px rgba(255, 200, 220, 0.35) inset,
+        0 2px 0 rgba(255, 220, 235, 0.30) inset,
+        0 -6px 10px rgba(0, 0, 0, 0.55) inset,
+        0 3px 0 rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(255, 0, 100, 0.55);
     }
     .hud-center .center-events {
       width: 100%;
@@ -556,22 +610,31 @@
     </p>
   </div>
 
-  <!-- BEFORE — current production HUD, untouched. -->
+  <!-- ROBOT side — defender HUD. -->
   <div class="preview-section">
-    <h2>BEFORE <span class="tag">CURRENT PRODUCTION</span></h2>
+    <h2>ROBOTS — BEFORE <span class="tag">CURRENT PRODUCTION</span></h2>
     <div class="preview-frame">
-      <div id="hud-before" class="hud-top"></div>
+      <div id="hud-robot-before" class="hud-top"></div>
+    </div>
+  </div>
+  <div class="preview-section">
+    <h2>ROBOTS — AFTER <span class="tag after">PROPOSED CHANGE</span></h2>
+    <div class="preview-frame">
+      <div id="hud-robot-after" class="hud-top"></div>
     </div>
   </div>
 
-  <!-- AFTER — the change under review. Starts identical to BEFORE
-       whenever there is no active experiment. Replace the markup inside
-       this preview-frame (or pass a variant tile list to renderHud) when
-       prototyping a new visual. -->
+  <!-- CYBORG side — attacker HUD. Red theme. -->
   <div class="preview-section">
-    <h2>AFTER <span class="tag after">PROPOSED CHANGE</span></h2>
+    <h2>CYBORGS — BEFORE <span class="tag">CURRENT PRODUCTION</span></h2>
     <div class="preview-frame">
-      <div id="hud-after" class="hud-top"></div>
+      <div id="hud-cyborg-before" class="hud-top"></div>
+    </div>
+  </div>
+  <div class="preview-section">
+    <h2>CYBORGS — AFTER <span class="tag after">PROPOSED CHANGE</span></h2>
+    <div class="preview-frame">
+      <div id="hud-cyborg-after" class="hud-top"></div>
     </div>
   </div>
 
@@ -589,9 +652,8 @@
         </div>
         <div class="arrow">▶</div>
         <div class="variants">
-          <div class="variant active"><div class="ti"><img src="./sprites/mine_bomb/south.png" alt=""/></div><div class="type">BOMB</div></div>
-          <div class="variant"><div class="ti"><img src="./sprites/mine_explosive/south.png" alt=""/></div><div class="type">EXPLOSIVE</div></div>
-          <div class="variant"><div class="ti"><img src="./sprites/mine_freezing/south.png" alt=""/></div><div class="type">FREEZE</div></div>
+          <div class="variant active"><div class="ti"><img src="./sprites/robot_mine/south.png" alt=""/></div><div class="type">BOMB</div></div>
+          <div class="variant"><div class="ti"><img src="./sprites/freeze_mine/south.png" alt=""/></div><div class="type">FREEZE</div></div>
           <div class="variant"><div class="ti">🔥</div><div class="type">FIRE</div></div>
           <div class="variant"><div class="ti">☁︎</div><div class="type">GAS</div></div>
         </div>
@@ -619,45 +681,37 @@
       WIP / UNUSED <span class="tag wip" style="display:inline-block;font-size:10px;letter-spacing:2px;padding:3px 9px;margin-left:12px;background:rgba(200,232,160,0.08);border:1px solid rgba(200,232,160,0.35);color:#c8e8a0;vertical-align:middle;">ASSETS + IDEAS</span>
     </h2>
     <div class="wip-grid">
-      <!-- Mine variants — new art that replaces / extends current procedural mine. -->
+      <!-- MINES (have legs, side-specific). -->
       <div class="wip-card">
-        <div class="wip-icon"><img src="./sprites/mine_bomb/south.png" alt=""/></div>
-        <div class="wip-label">MINE_BOMB</div>
-        <div class="wip-note">Robot mine — armored sphere. Currently wired as the default MINE icon (AFTER row).</div>
+        <div class="wip-icon"><img src="./sprites/robot_mine/south.png" alt=""/></div>
+        <div class="wip-label">ROBOT MINE</div>
+        <div class="wip-note">Defender-side mine (armored sphere with legs). Wired as default MINE icon on ROBOTS AFTER row.</div>
       </div>
       <div class="wip-card">
-        <div class="wip-icon"><img src="./sprites/mine_explosive/south.png" alt=""/></div>
-        <div class="wip-label">MINE_EXPLOSIVE</div>
-        <div class="wip-note">Variant — explosive damage type. Anti-robot effective.</div>
+        <div class="wip-icon"><img src="./sprites/cyborg_mine/south.png" alt=""/></div>
+        <div class="wip-label">CYBORG MINE</div>
+        <div class="wip-note">Attacker-side mine (squat armored figure). Wired on CYBORGS AFTER row. No mechanic yet — future cyborg mine-layer piece.</div>
       </div>
       <div class="wip-card">
-        <div class="wip-icon"><img src="./sprites/mine_freezing/south.png" alt=""/></div>
-        <div class="wip-label">MINE_FREEZING</div>
-        <div class="wip-note">Variant — freeze (stun + slow). Disables movement for N turns.</div>
+        <div class="wip-icon"><img src="./sprites/freeze_mine/south.png" alt=""/></div>
+        <div class="wip-label">FREEZE MINE</div>
+        <div class="wip-note">Variant — freeze (stun + slow). Disables movement for N turns. Mine variant for either side.</div>
       </div>
-      <!-- Grenade variants — new art for cyborg grenadier / future grenade tower. -->
+      <!-- GRENADES (sphere-only — throwable, no legs). -->
       <div class="wip-card">
         <div class="wip-icon"><img src="./sprites/grenade_bomb/south.png" alt=""/></div>
         <div class="wip-label">GRENADE_BOMB</div>
-        <div class="wip-note">Standard explosive. Current grenadier behaviour.</div>
+        <div class="wip-note">Standard explosive grenade (sphere). Current grenadier behaviour.</div>
       </div>
       <div class="wip-card">
         <div class="wip-icon"><img src="./sprites/grenade_fire/south.png" alt=""/></div>
         <div class="wip-label">GRENADE_FIRE</div>
-        <div class="wip-note">Variant — fire AoE leaves burning ground for N turns. Vs humans/aliens.</div>
+        <div class="wip-note">Variant — fire AoE leaves burning ground for N turns. Effective vs humans/aliens.</div>
       </div>
       <div class="wip-card">
         <div class="wip-icon"><img src="./sprites/grenade_gas/south.png" alt=""/></div>
         <div class="wip-label">GRENADE_GAS</div>
         <div class="wip-note">Variant — gas cloud, DoT vs humans/aliens, ineffective vs robots.</div>
-      </div>
-      <!-- Cyborg mine art (Image #13 was provided — squat armored figure).
-           User pointed it at "cyborg mine" specifically. Sprite not yet
-           extracted (no separate zip), so this card is a placeholder. -->
-      <div class="wip-card idea">
-        <div class="wip-icon">?</div>
-        <div class="wip-label">CYBORG MINE</div>
-        <div class="wip-note">Squat armored figure (Image #13). Sprite still needs a zip + extraction.</div>
       </div>
       <!-- Mechanic ideas — placeholders so we don't lose them. -->
       <div class="wip-card idea">
@@ -717,9 +771,11 @@
       { label: 'REPAIR', cost:  70, icon: './sprites/repair/south.png' },
     ]
     const robotTilesAfterRight = [
-      // MINE — new sprite (Mine_Bomb art, the armored-sphere robot variant).
-      // Replaces the procedural yellow-disc-and-ring placeholder.
-      { label: 'MINE',    cost: 20, icon: './sprites/mine_bomb/south.png', iconScale: 1.0 },
+      // MINE — ROBOT mine (armored sphere). Sprite was originally
+      // zipped as Mine_Explosive; renamed to robot_mine to match
+      // what the art actually shows. Mines have LEGS, grenades are
+      // spheres — that's the side-style convention.
+      { label: 'MINE',    cost: 20, icon: './sprites/robot_mine/south.png', iconScale: 1.0 },
       { label: 'WALL',    cost: 20, icon: 'wall' },
       { label: 'SIGNAL',  cost: 70, icon: './sprites/signal/south.png', iconScale: 1.0 },
       // SHIELD/DEFENSE — geodesic-dome piece. Config entry exists
@@ -729,6 +785,47 @@
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
       { label: 'UPGRADE', cost:  0, empty: true },
+    ]
+
+    // Cyborg HUD tile data — mirrors src/ui/HUD.ts cyborgTiles in
+    // current production (6 unique units + Grenadier/Hulk duplicated
+    // to fill the 4×2 layout). Cyborgs are ATTACKERS — pink/red theme.
+    const cyborgTilesProduction = [
+      { label: 'CANNON',    cost:  70, icon: './sprites/cannon/south.png'    },
+      { label: 'GRENADIER', cost:  50, icon: './sprites/grenadier/south.png' },
+      { label: 'DOUBLEGUN', cost:  90, icon: './sprites/doublegun/south.png' },
+      { label: 'HULK',      cost: 100, icon: './sprites/hulk/south.png'      },
+      { label: 'SNIPER',    cost:  90, icon: './sprites/sniper/south.png'    },
+      { label: 'MEDIC',     cost:  70, icon: './sprites/medic/south.png'     },
+      { label: 'GRENADIER', cost:  50, icon: './sprites/grenadier/south.png' },
+      { label: 'HULK',      cost: 100, icon: './sprites/hulk/south.png'      },
+    ]
+
+    // Cyborg AFTER: 16-slot proposal — LEFT and RIGHT carry DIFFERENT
+    // items (no duplicates). 6 existing units + CYBORG_MINE (new art)
+    // + upgrade placeholders for future cyborg pieces (scout/tank/drone/
+    // cyborg-bomber type slots exist in Config but ship no art).
+    const cyborgTilesAfterLeft = [
+      { label: 'CANNON',    cost:  70, icon: './sprites/cannon/south.png'    },
+      { label: 'GRENADIER', cost:  50, icon: './sprites/grenadier/south.png' },
+      { label: 'DOUBLEGUN', cost:  90, icon: './sprites/doublegun/south.png' },
+      { label: 'HULK',      cost: 100, icon: './sprites/hulk/south.png'      },
+      { label: 'SNIPER',    cost:  90, icon: './sprites/sniper/south.png'    },
+      { label: 'MEDIC',     cost:  70, icon: './sprites/medic/south.png'     },
+      // CYBORG_MINE — squat legged figure (the "Mine_Bomb" zip art).
+      // No mechanic yet — cyborg-side mine layer is a future piece.
+      { label: 'MINE',      cost:  20, icon: './sprites/cyborg_mine/south.png', iconScale: 1.0 },
+      { label: 'UPGRADE',   cost:   0, empty: true },
+    ]
+    const cyborgTilesAfterRight = [
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
+      { label: 'UPGRADE', cost: 0, empty: true },
     ]
 
     function tileHtml(t) {
@@ -746,53 +843,61 @@
       return `<div class="${classes.join(' ')}">${iconEl}<div class="tile-label">${t.label}</div><div class="tile-cost">${t.cost}cr</div></div>`
     }
 
-    function panelSvg(flip) {
+    function panelSvg(flip, side) {
       const path = 'M 12,4 L 188,4 L 196,12 L 196,198 L 188,206 L 12,206 L 4,198 L 4,12 Z'
+      const stroke = side === 'att' ? '#d45a7a' : '#5aa7d4'
       const xform = flip ? ' style="transform:scaleX(-1)"' : ''
       return `<svg class="panel-frame" viewBox="0 0 200 210" preserveAspectRatio="none" aria-hidden="true"${xform}>
-        <path d="${path}" fill="rgba(8, 18, 32, 0.55)" stroke="#5aa7d4"
+        <path d="${path}" fill="rgba(8, 18, 32, 0.55)" stroke="${stroke}"
               stroke-width="2.8" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/>
       </svg>`
     }
 
-    function centerSvg() {
+    function centerSvg(side) {
       const path = 'M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z'
+      const stroke = side === 'att' ? '#d45a7a' : '#5aa7d4'
+      const dot    = side === 'att' ? '#f28fa6' : '#8fd0f2'
+      const trace  = side === 'att' ? '#ffc8d2' : '#b8e8ff'
       return `<svg class="panel-frame" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
-        <path d="${path}" fill="rgba(8, 18, 32, 0.58)" stroke="#5aa7d4"
+        <path d="${path}" fill="rgba(8, 18, 32, 0.58)" stroke="${stroke}"
               stroke-width="2.8" stroke-linejoin="miter" vector-effect="non-scaling-stroke"/>
-        <circle cx="14" cy="14" r="1.6" fill="#8fd0f2" fill-opacity="0.65"/>
-        <circle cx="306" cy="14" r="1.6" fill="#8fd0f2" fill-opacity="0.65"/>
-        <circle cx="14" cy="196" r="1.6" fill="#8fd0f2" fill-opacity="0.65"/>
-        <circle cx="306" cy="196" r="1.6" fill="#8fd0f2" fill-opacity="0.65"/>
+        <circle cx="14" cy="14" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="306" cy="14" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="14" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
+        <circle cx="306" cy="196" r="1.6" fill="${dot}" fill-opacity="0.65"/>
       </svg>
       <svg class="edge-trace" viewBox="0 0 320 210" preserveAspectRatio="none" aria-hidden="true">
-        <circle r="3.5" fill="#b8e8ff">
+        <circle r="3.5" fill="${trace}">
           <animateMotion dur="6s" repeatCount="indefinite" rotate="auto" path="${path}"/>
         </circle>
       </svg>`
     }
 
-    function renderHud(target, leftTiles, rightTiles) {
+    // side = 'def' (robots, blue) or 'att' (cyborgs, red).
+    function renderHud(target, leftTiles, rightTiles, side) {
+      const s = side || 'def'
       const left  = leftTiles  || robotTilesProduction
       const right = rightTiles || leftTiles || robotTilesProduction
+      const vsPlayer = s === 'att' ? 'CYBORGS' : 'ROBOTS'
+      const vsTeam   = s === 'att' ? 'ROBOTS'  : 'CYBORGS'
       target.innerHTML = `
-        <div class="hud-panel hud-left" data-side="def">
-          ${panelSvg(false)}
+        <div class="hud-panel hud-left" data-side="${s}">
+          ${panelSvg(false, s)}
           <div class="panel-content">
             <div class="tile-grid">${left.map(tileHtml).join('')}</div>
           </div>
         </div>
-        <div class="hud-panel hud-center" data-side="def">
-          ${centerSvg()}
+        <div class="hud-panel hud-center" data-side="${s}">
+          ${centerSvg(s)}
           <div class="panel-content">
             <div class="center-build-info">
               <div class="cc-title"><div class="center-phase">BUILD PHASE</div></div>
               <div class="cc-body">
                 <div class="center-credits">CR<span class="cr-num">1000</span></div>
                 <div class="center-matchup">
-                  <span class="vs-player">ROBOTS</span>
+                  <span class="vs-player">${vsPlayer}</span>
                   <span class="vs-label">VS</span>
-                  <span class="vs-team">CYBORGS</span>
+                  <span class="vs-team">${vsTeam}</span>
                 </div>
                 <div class="center-events">AI forces deployed. Hidden until BATTLE.</div>
               </div>
@@ -800,8 +905,8 @@
             </div>
           </div>
         </div>
-        <div class="hud-panel hud-right" data-side="def">
-          ${panelSvg(true)}
+        <div class="hud-panel hud-right" data-side="${s}">
+          ${panelSvg(true, s)}
           <div class="panel-content">
             <div class="tile-grid">${right.map(tileHtml).join('')}</div>
           </div>
@@ -817,16 +922,19 @@
       })
     }
 
-    // BEFORE: production 8-tile 4×2 layout (LEFT and RIGHT mirror each
-    // other — matches today's HUD.ts which renders robotTiles on both
+    // BEFORE: production layout (LEFT and RIGHT mirror each other —
+    // matches today's HUD.ts which renders the same tile list on both
     // panels). Untouched.
     // AFTER:  16-slot proposal (4×2 per panel). LEFT and RIGHT carry
-    // DIFFERENT items so no duplicates; total 11 active pieces + 5
-    // upgrade placeholders.
-    const before = document.getElementById('hud-before')
-    const after  = document.getElementById('hud-after')
-    renderHud(before)
-    renderHud(after, robotTilesAfterLeft, robotTilesAfterRight)
+    // DIFFERENT items so no duplicates.
+    const robotBefore  = document.getElementById('hud-robot-before')
+    const robotAfter   = document.getElementById('hud-robot-after')
+    const cyborgBefore = document.getElementById('hud-cyborg-before')
+    const cyborgAfter  = document.getElementById('hud-cyborg-after')
+    renderHud(robotBefore)
+    renderHud(robotAfter, robotTilesAfterLeft, robotTilesAfterRight)
+    renderHud(cyborgBefore, cyborgTilesProduction, cyborgTilesProduction, 'att')
+    renderHud(cyborgAfter,  cyborgTilesAfterLeft,  cyborgTilesAfterRight,  'att')
   </script>
 
 </body>
