@@ -14,6 +14,7 @@ export type SpeechTrigger =
   | 'low_hp' | 'low_ammo' | 'out_of_ammo'
   | 'sniper_shot' | 'medic_low_packs'
   | 'crate_spotted' | 'rearmed'
+  | 'no_repairs_needed'
 
 // Lines may include {n} (count) and {s} (auto-pluralizer: '' if n==1
 // else 's') so "{n} shot{s} left!" renders "1 shot left!" / "3 shots left!"
@@ -27,6 +28,7 @@ const LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> = {
     medic_low_packs:  ["{n} pack{s} left!", "Running low on supplies!", "Down to {n} kit{s}!"],
     crate_spotted:    ["Crate spotted!", "Resupply incoming!", "Going for the crate!", "Ammo drop, on me!"],
     rearmed:          ["Reloaded!", "Locked and loaded!", "Got it!", "Fresh clip!"],
+    no_repairs_needed: [],  // cyborg-side has no repair role; placeholder
   },
   robot: {
     low_hp:           ["SYSTEMS CRITICAL", "INTEGRITY: LOW", "DAMAGE: SEVERE", "ARMOR FAILING"],
@@ -36,6 +38,7 @@ const LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> = {
     medic_low_packs:  ["REPAIR CHARGES: {n}", "{n} CHARGE{S} LEFT", "SUPPLIES DEPLETING"],
     crate_spotted:    ["RESUPPLY DETECTED", "CRATE ON MAP", "TARGETING SUPPLY"],
     rearmed:          ["AMMUNITION RESTORED", "RELOAD COMPLETE", "RESUPPLIED"],
+    no_repairs_needed: ["ALL SYSTEMS NOMINAL", "NO REPAIRS NEEDED", "STANDING BY", "AWAITING DAMAGE REPORT"],
   },
 }
 
@@ -127,6 +130,10 @@ export function spawnSpeechBubble(
   context: SpeechContext = {},
 ) {
   const lines = LINES[voice][trigger]
+  // Some voices don't have lines for a given trigger (e.g. cyborg has no
+  // 'no_repairs_needed' lines — it's a repair-bot-only callout). Skip
+  // gracefully instead of crashing on an undefined random pick.
+  if (!lines || lines.length === 0) return
   const raw = lines[Math.floor(Math.random() * lines.length)]
   // Substitute {n} (count) and {s}/{S} (auto-pluralizer — empty when
   // n==1, else 's'/'S'). Lines without {n} pass through unchanged.

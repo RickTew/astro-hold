@@ -506,6 +506,11 @@ export class SpriteUnit {
 
   takeDamage(amount: number) {
     if (this.isDead) return
+    // Stalker cloak drop on incoming damage. Direct fire never reaches a
+    // cloaked Stalker (defender targeting skips them), so any takeDamage
+    // call on a cloaked Stalker means AoE / splash / mine — which makes
+    // a lot of noise and reveals their position. Drop the cloak.
+    if (this.cloaked) this.dropCloak()
     this.hp = Math.max(0, this.hp - amount)
     const ratio = this.hp / this.maxHp
     this.hpBarFill.scale.x = ratio

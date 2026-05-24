@@ -882,7 +882,13 @@ export class RevealPhase {
         priority: 12,   // the core is the win condition — heal it first
       })
     }
-    if (damaged.length === 0) return null
+    if (damaged.length === 0) {
+      // Nothing to repair — let the player know the bot is idle by choice,
+      // not bugged or stuck. announceOnce so the bubble doesn't repeat
+      // every reveal (it'll fire once per match per bot).
+      unit.announceOnce('no_repairs_needed')
+      return { kind: 'hold' }
+    }
 
     // Priority 1 — weld-tether the highest-priority damaged piece in range.
     // Tether is a sustained channel; the bot prefers to lock in for several
@@ -1015,16 +1021,25 @@ export class RevealPhase {
   }
 
   private pickWanderStep(unit: SpriteUnit): CellRef | null {
-    // Directional wander — attackers prefer steps west (toward core),
-    // defenders prefer east (toward incoming cyborgs). Order the cardinal
-    // candidates by how much they reduce distance to the target axis, so
-    // blocked units still make general progress instead of spinning N/S
-    // randomly. Previous behavior was pure random pick which read as "no
-    // logic" — user observation S17.3.
+    // Directional wander — bias toward the side's objective. Previously
+    // pure random pick which read as "no logic." Generalized S17.3+ to
+    // use actual entity positions rather than hardcoded world-X axes,
+    // so this works on future maps where attackers approach from any
+    // direction (not just east → west) and where the core might not
+    // be at the world's left edge.
     const cs = Config.GRID_CELL
-    // Pick a target X based on side. Attackers march west (core x), defenders
-    // march east (cyborg spawn edge).
-    const targetX = unit.side === 'attacker' ? Config.POWER_CORE.X : Config.WORLD.RIGHT
+    // Attackers bias toward the core (true objective). Defenders bias
+    // toward the nearest live attacker (true threat). Fallback: stay put.
+    let tx: number, ty: number
+    if (unit.side === 'attacker') {
+      if (this.core.isDead) return null   // no objective left, just hold
+      const cc = this.core.cellCenters()[0]
+      tx = cc.x; ty = cc.y
+    } else {
+      const t = this.nearestEnemy(unit, Infinity)
+      if (!t) return null
+      tx = t.x; ty = t.y
+    }
     const options: { cell: CellRef; dist: number }[] = []
     for (const [dx, dy] of CARDINAL_STEPS) {
       const x = unit.worldX + dx * cs
@@ -1034,13 +1049,12 @@ export class RevealPhase {
       if (this.isCellOccupiedAtBattle(x, y, unit)) continue
       const col = Math.floor((x - Config.WORLD.LEFT) / cs)
       const row = Math.floor((y - Config.WORLD.BOTTOM) / cs)
-      // Distance to target along the march axis only — N/S steps are
-      // neutral (same X), east/west steps strongly bias the score.
-      const dist = Math.abs(x - targetX)
+      // Euclidean distance to the actual objective — works on any map
+      // layout, not just east→west.
+      const dist = Math.hypot(x - tx, y - ty)
       options.push({ cell: { col, row }, dist })
     }
     if (options.length === 0) return null
-    // Lowest dist wins. Tiebreak randomly (N vs S when both are neutral).
     options.sort((a, b) => a.dist - b.dist || Math.random() - 0.5)
     return options[0].cell
   }
