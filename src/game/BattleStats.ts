@@ -151,6 +151,39 @@ export interface BattleRecord {
     defenderReported: number
     defenderDivergencePct: number
   }
+
+  // ── S17.14 additions: side-split per-piece stats ───────────────────
+  //
+  // The legacy per-piece counters above (damageByPieceType, killsByPieceType,
+  // etc.) bucket by piece type STRING only. The string `cannon` exists on
+  // BOTH sides (cyborg cannon in Config.UNITS, defender cannon in
+  // Config.STRUCTURES) and so do `bomber`. That collision made the per-piece
+  // view on /stats.html mix sides for those types and broke reconciliation.
+  //
+  // piecesStats is the side-aware replacement. Each side has its own map
+  // of actorType to counter object. /stats.html prefers piecesStats when
+  // available and falls back to the flat counters for older records.
+  piecesStats?: {
+    attacker: Record<string, PerPieceCounters>
+    defender: Record<string, PerPieceCounters>
+  }
+}
+
+/** Per-piece counters used inside BattleRecord.piecesStats. Every field
+ *  is optional so a piece that never fired (or that has zero of a
+ *  particular event) does not pollute the record with zero entries. */
+export interface PerPieceCounters {
+  damage?: number
+  kills?: number
+  attacks?: number
+  hits?: number
+  misses?: number
+  assists?: number
+  cellsWalked?: number
+  weakening?: number
+  oneShots?: number
+  friendlyFire?: number
+  friendlyFireHits?: number
 }
 
 const KEY = 'astrohold:battle-stats:v1'

@@ -17,7 +17,7 @@ import { RepairTether } from '../entities/RepairTether'
 import { AmmoBox, AmmoKitType, kitForUnit } from '../entities/AmmoBox'
 import { FireArcPreview } from '../entities/FireArcPreview'
 import { OpponentAI, OpponentSide } from '../ai/OpponentAI'
-import { recordBattle, BattleRecord } from './BattleStats'
+import { recordBattle, BattleRecord, PerPieceCounters } from './BattleStats'
 import { getRevealSpeed } from './RevealSpeed'
 import { MiniControlCenter } from '../ui/MiniControlCenter'
 import type { CombatLogEntry } from './RevealPhase'
@@ -141,6 +141,13 @@ export class Game {
   // start of the FIRST reveal so we can compare to their final X at
   // game end and surface "Hulks that never moved toward the core."
   private hulkStartByX: Record<string, number> = {}
+  // S17.14: side-split per-piece counters. Replaces the type-only
+  // flat counters above for accurate analysis. Same actorType can
+  // exist on both sides (cannon, bomber). Track both, never collide.
+  private piecesStats: {
+    attacker: Record<string, PerPieceCounters>
+    defender: Record<string, PerPieceCounters>
+  } = { attacker: {}, defender: {} }
   // Turn on which the OPPOSITE side first reached 0 alive units. Set
   // once in onComplete when the condition is first true; null if never.
   private enemyEliminatedAtTurn: number | null = null
@@ -815,42 +822,62 @@ private enterBuildPhase() {
     // structured events; we accumulate into BattleStats fields that
     // get flushed in recordBattleEnd.
     this.revealPhase.onPieceEvent = e => {
+      // S17.14: bumpPiece writes side-split per-piece counters in
+      // piecesStats. Old flat fields are kept in parallel for backward
+      // compatibility with existing /stats.html and existing records.
+      const bump = (side: 'attacker' | 'defender', actorType: string,
+                    key: keyof PerPieceCounters, by = 1) => {
+        const bucket = this.piecesStats[side]
+        const entry = bucket[actorType] ?? (bucket[actorType] = {})
+        entry[key] = (entry[key] ?? 0) + by
+      }
       switch (e.kind) {
         case 'damage':
           this.damageByPieceType[e.actorType] = (this.damageByPieceType[e.actorType] ?? 0) + e.amount
+          bump(e.side, e.actorType, 'damage', e.amount)
           break
         case 'kill':
           this.killsByPieceType[e.actorType] = (this.killsByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'kills')
           break
         case 'action':
           this.actionCounts[e.action] = (this.actionCounts[e.action] ?? 0) + 1
           break
         case 'assist':
           this.assistsByPieceType[e.actorType] = (this.assistsByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'assists')
           break
         case 'move':
           this.cellsWalkedByPieceType[e.actorType] = (this.cellsWalkedByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'cellsWalked')
           break
         case 'attack':
           this.attacksByPieceType[e.actorType] = (this.attacksByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'attacks')
           break
         // S17.10 additions
         case 'hit':
           this.hitsByPieceType[e.actorType] = (this.hitsByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'hits')
           break
         case 'miss':
           this.missesByPieceType[e.actorType] = (this.missesByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'misses')
           break
         case 'friendly_fire':
           this.friendlyFireByPieceType[e.actorType] = (this.friendlyFireByPieceType[e.actorType] ?? 0) + 1
           this.friendlyFireHits[e.actorType] = (this.friendlyFireHits[e.actorType] ?? 0) + e.count
+          bump(e.side, e.actorType, 'friendlyFire')
+          bump(e.side, e.actorType, 'friendlyFireHits', e.count)
           break
         case 'weakening':
           this.weakeningByPieceType[e.actorType] = (this.weakeningByPieceType[e.actorType] ?? 0) + 1
+          bump(e.side, e.actorType, 'weakening')
           break
         case 'one_shot':
           this.oneShotsByPieceType[e.actorType] = (this.oneShotsByPieceType[e.actorType] ?? 0) + 1
           this.oneShotVictimsByType[e.targetType] = (this.oneShotVictimsByType[e.targetType] ?? 0) + 1
+          bump(e.side, e.actorType, 'oneShots')
           break
         case 'crate_pickup':
           if (e.side === 'attacker') this.resupplyCounts.attackerCratePickups++
@@ -1003,17 +1030,15 @@ private enterBuildPhase() {
       if (startX === undefined) continue
       hulkProgress.push({ id: u.id, startX, endX: u.worldX, alive: !u.isDead })
     }
-    // S17.10 damage reconciliation. Sum damageByPieceType per side and
-    // compare to the side totals collected via statsDamage. If the gap
-    // is over 5 percent, a damage path is bypassing attribute() and we
-    // want to know about it.
-    const attackerSides = new Set<string>(Object.keys(Config.UNITS))
+    // S17.14 damage reconciliation. Sum damageBy-piece-type from the
+    // SIDE-SPLIT piecesStats (avoiding the cannon/bomber collision)
+    // and compare to the statsDamage side totals collected by the
+    // log parser. If the gap is over 5 percent, a damage path is
+    // bypassing attribute() and we want to know about it.
     let attackerSum = 0
     let defenderSum = 0
-    for (const [type, dmg] of Object.entries(this.damageByPieceType)) {
-      if (attackerSides.has(type)) attackerSum += dmg
-      else defenderSum += dmg
-    }
+    for (const c of Object.values(this.piecesStats.attacker)) attackerSum += c.damage ?? 0
+    for (const c of Object.values(this.piecesStats.defender)) defenderSum += c.damage ?? 0
     const attackerReported = this.statsDamage.attacker
     const defenderReported = this.statsDamage.defender
     const pct = (a: number, b: number) => b === 0 ? (a === 0 ? 0 : 100) : Math.abs(a - b) / b * 100
@@ -1063,6 +1088,12 @@ private enterBuildPhase() {
       grenadeThrows:           [...this.grenadeThrows],
       hulkProgress,
       damageReconciliation:    reconciliation,
+      // S17.14 side-split per-piece stats. The flat counters above stay
+      // for backward compat; new analysis on /stats.html prefers this.
+      piecesStats: {
+        attacker: { ...this.piecesStats.attacker },
+        defender: { ...this.piecesStats.defender },
+      },
     })
   }
 

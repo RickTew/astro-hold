@@ -244,6 +244,17 @@
   </div>
 
   <div class="panel">
+    <h2 style="margin-top:0">PER-PIECE BY SIDE (S17.14)</h2>
+    <p class="hint" style="margin:0 0 12px">
+      Same data as ERROR-HUNTING TELEMETRY but split by side, so
+      `cannon` on the cyborg side does not collide with `cannon` on
+      the defender side. Only populated for games recorded after the
+      S17.14 telemetry expansion.
+    </p>
+    <div id="piece-by-side"></div>
+  </div>
+
+  <div class="panel">
     <h2 style="margin-top:0">PER-PIECE DETAIL</h2>
     <p class="hint" style="margin:0 0 12px">
       Pick a piece type to see every metric for it across all games.
@@ -375,6 +386,8 @@
       const grenadeThrows = []
       const hulkProgressAll = []
       const reconciliations = []
+      // S17.14 side-split per-piece accumulator
+      const pieceBySideType = { attacker: {}, defender: {} }
       for (const r of records) {
         if (r.piecesByType) {
           for (const [t, n] of Object.entries(r.piecesByType.attacker || {})) piecesBuilt.attacker[t] = (piecesBuilt.attacker[t] || 0) + n
@@ -401,6 +414,19 @@
         if (r.grenadeThrows) for (const t of r.grenadeThrows) grenadeThrows.push(t)
         if (r.hulkProgress)  for (const h of r.hulkProgress)  hulkProgressAll.push(h)
         if (r.damageReconciliation) reconciliations.push(r.damageReconciliation)
+        // S17.14: merge side-split per-piece counters from piecesStats.
+        if (r.piecesStats) {
+          for (const side of ['attacker', 'defender']) {
+            const sideMap = r.piecesStats[side] || {}
+            for (const [type, c] of Object.entries(sideMap)) {
+              const dest = pieceBySideType[side]
+              const entry = dest[type] || (dest[type] = {})
+              for (const [k, v] of Object.entries(c)) {
+                entry[k] = (entry[k] || 0) + v
+              }
+            }
+          }
+        }
         if (r.creditsSpentByPieceType) {
           for (const [t, n] of Object.entries(r.creditsSpentByPieceType.attacker || {})) creditsByPiece.attacker[t] = (creditsByPiece.attacker[t] || 0) + n
           for (const [t, n] of Object.entries(r.creditsSpentByPieceType.defender || {})) creditsByPiece.defender[t] = (creditsByPiece.defender[t] || 0) + n
@@ -446,6 +472,8 @@
         resupplyTotals, grenadeThrows, hulkProgressAll, reconciliations,
         // Raw credits-by-piece (used for per-piece detail dmg/cr math)
         creditsByPiece,
+        // S17.14 side-split per-piece counters
+        pieceBySideType,
       }
     }
 
@@ -474,6 +502,7 @@
         const td = document.getElementById('throws-detail'); if (td) td.innerHTML = ''
         const hd = document.getElementById('hulk-detail'); if (hd) hd.innerHTML = ''
         const ps = document.getElementById('piece-select'); if (ps) ps.innerHTML = ''
+        const pbs = document.getElementById('piece-by-side'); if (pbs) pbs.innerHTML = ''
         return
       }
       const a = aggregate(records)
@@ -712,6 +741,69 @@
              }).join('')
            }</tbody></table>`
       document.getElementById('reconciliation-detail').innerHTML = reconHtml
+
+      // S17.14 PER-PIECE BY SIDE. Flat list of every (side, type) seen
+      // across recorded games. Side prefix breaks the cannon/bomber
+      // collision so the user can see defender cannon vs attacker
+      // cannon as two distinct rows. Only populates from records that
+      // carry the piecesStats field.
+      const sideRows = []
+      for (const side of ['attacker', 'defender']) {
+        const sideMap = a.pieceBySideType[side] || {}
+        for (const [type, c] of Object.entries(sideMap)) {
+          const att = c.attacks || 0
+          const hits = c.hits || 0
+          const miss = c.misses || 0
+          sideRows.push({
+            side, type,
+            damage: c.damage || 0,
+            kills: c.kills || 0,
+            assists: c.assists || 0,
+            attacks: att, hits, miss,
+            acc: (hits + miss) > 0 ? (hits / (hits + miss) * 100).toFixed(0) + '%' : '—',
+            accNum: (hits + miss) > 0 ? hits / (hits + miss) : -1,
+            weakening: c.weakening || 0,
+            oneShots: c.oneShots || 0,
+            ff: c.friendlyFire || 0,
+            ffHits: c.friendlyFireHits || 0,
+            cellsWalked: c.cellsWalked || 0,
+          })
+        }
+      }
+      sideRows.sort((x, y) => y.damage - x.damage)
+      const sideTableHtml = sideRows.length === 0
+        ? '<div class="empty">No S17.14 side-split data yet. Play a game with the new build.</div>'
+        : `<table><thead><tr>
+            <th>SIDE</th>
+            <th>PIECE</th>
+            <th style="text-align:right">DAMAGE</th>
+            <th style="text-align:right">KILLS</th>
+            <th style="text-align:right">ASSISTS</th>
+            <th style="text-align:right">ATTACKS</th>
+            <th style="text-align:right">HITS</th>
+            <th style="text-align:right">MISSES</th>
+            <th style="text-align:right">ACC</th>
+            <th style="text-align:right">WEAKEN</th>
+            <th style="text-align:right">ONE-SHOT</th>
+            <th style="text-align:right">FF</th>
+            <th style="text-align:right">CELLS</th>
+          </tr></thead><tbody>${sideRows.map(r => `
+            <tr>
+              <td style="color:${r.side === 'attacker' ? '#ff7a9a' : '#88c8ff'}">${r.side.toUpperCase()}</td>
+              <td>${r.type}</td>
+              <td class="num">${r.damage}</td>
+              <td class="num">${r.kills}</td>
+              <td class="num">${r.assists}</td>
+              <td class="num">${r.attacks}</td>
+              <td class="num">${r.hits}</td>
+              <td class="num">${r.miss}</td>
+              <td class="num" style="color:${r.accNum < 0 ? '#5a7a92' : (r.accNum < 0.3 ? '#ff7a9a' : (r.accNum < 0.7 ? '#ffb96b' : '#d4ff7a'))}">${r.acc}</td>
+              <td class="num">${r.weakening}</td>
+              <td class="num" style="color:${r.oneShots > 0 ? '#ffb96b' : '#88a4b8'}">${r.oneShots}</td>
+              <td class="num" style="color:${r.ff > 0 ? '#ff7a9a' : '#88a4b8'}">${r.ff}</td>
+              <td class="num">${r.cellsWalked}</td>
+            </tr>`).join('')}</tbody></table>`
+      document.getElementById('piece-by-side').innerHTML = sideTableHtml
 
       // Per-piece detail panel. Dropdown lets the user pick one piece
       // and see every metric for it across all games.

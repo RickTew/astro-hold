@@ -3133,9 +3133,19 @@ export class RevealPhase {
     const cx = this.core.mesh.position.x
     const cy = this.core.mesh.position.y
     const BLAST_RADIUS = 180
+    // S17.14: attribute the blast kills properly. Previously each
+    // takeDamage(99999) call killed the cyborg silently. Those kills
+    // were missing from stats (no kind:'damage' / 'kill' events, no
+    // on_death speech, no telemetry buckets). Now each hit goes
+    // through attribute() with actorType 'core_blast' so the dying
+    // cyborgs are credited and on_death speech fires as a final
+    // dramatic chorus.
     for (const u of this.units) {
       if (u.isDead) continue
-      if (this.inRadius(u.worldX, u.worldY, cx, cy, BLAST_RADIUS)) u.takeDamage(99999)
+      if (!this.inRadius(u.worldX, u.worldY, cx, cy, BLAST_RADIUS)) continue
+      const dmg = u.hp   // record actual damage applied so attribute amounts make sense
+      u.takeDamage(99999)
+      this.attribute(u, 'core_blast', 'defender', dmg, u.isDead)
     }
     this.explosions.push(new Explosion(this.scene, cx, cy, BLAST_RADIUS, 1.2))
     playExplosion()
