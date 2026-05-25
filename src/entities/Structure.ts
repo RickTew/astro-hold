@@ -801,11 +801,12 @@ function makeShieldDomeSprite(): THREE.Sprite {
     opacity: 1.0,
   })
   const sprite = new THREE.Sprite(mat)
-  // Dome diameter. Aura is 1.5 grid cells = 75 world units. Render the
-  // sprite a touch larger so the rim sits at the actual aura boundary
-  // when the canvas content (which fades within the last ~5 percent of
-  // the radius) is accounted for.
-  const D = Config.GRID_CELL * 3.2   // ~160 world units across
+  // Dome diameter. Aura is 2.0 grid cells = 100 world units radius
+  // (covers the full 3x3 ring of neighbors). The sprite renders a
+  // bit larger so the visible rim sits at the actual aura boundary
+  // after the canvas-edge alpha falloff (the gradient fades within
+  // the last few percent of the bitmap).
+  const D = Config.GRID_CELL * 4.4   // ~220 world units across
   sprite.scale.set(D, D, 1)
   // Sit BENEATH the structure sprite but above the ground grid. The
   // structure renderOrder is typically 10; use 5 here.

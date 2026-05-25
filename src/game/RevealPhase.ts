@@ -363,7 +363,12 @@ export class RevealPhase {
       x = target.worldX; y = target.worldY
     }
     if (!isDefender) return amount
-    const AURA_RADIUS = Config.GRID_CELL * 1.5
+    // 2.0 grid cells = 100 world units. Covers the full 3x3 ring of
+    // cells around the shield (cardinal neighbors at 50 units,
+    // diagonal neighbors at ~71 units, both well inside 100). The
+    // dome visual is sized to match this radius so what you see is
+    // what gets protected.
+    const AURA_RADIUS = Config.GRID_CELL * 2.0
     const DR = 0.25
     for (const s of this.structures) {
       if (s.type !== 'defense' || s.isDead) continue
