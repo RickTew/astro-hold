@@ -3,10 +3,10 @@
 Living balance document. Update as we tune. Aim: "like chess but not strict" —
 for any strong ability on one side, the other side gets a comparable counter.
 
-**Status:** game is mid-transition from real-time simultaneous combat → grid-based
-turn-by-turn strategy. The numbers below are the current Config values; the
-**Proposed AP / Behavior** column captures the rule we want once the turn system
-lands.
+**Status:** Single-player D&D-style turn-based grid strategy is LIVE (session 17).
+Numbers below are the current Config values. The turn-system transition is
+complete. AP budgets still ship on every piece for future use, but the active
+flow is BUILD then REVEAL (PLAN phase is currently skipped, see Turn flow).
 
 ---
 
@@ -22,31 +22,38 @@ lands.
 - Placement snaps to cell centers automatically. Cell centers are at
   (LEFT + col*50 + 25, BOTTOM + row*50 + 25) for col/row indices.
 
-## Turn flow — plan-then-play, continuous reveal loop (LIVE)
+## Turn flow. build then reveal, continuous auto-chain (LIVE)
 
-**The cinematic model** — players make all decisions FIRST, then the
-game plays out. User framing: *"we are now watching the space battle
-take place."* Build → Plan once → click BATTLE → battles auto-chain
-until win/lose.
+**The cinematic model.** Players make placement decisions FIRST, then
+the game plays out. Build then click BATTLE then watch reveals
+auto-chain until win or lose. PLAN phase is currently skipped (code
+exists but the READY button jumps straight to REVEAL).
 
-1. **Build.** Place pieces from credits (multiples of 10 — leftover
-   credits must always be spendable by the cheapest piece). Click READY
-   when done.
-2. **Plan (first turn only).** Queue actions for any of your pieces.
-   Click a piece, click a cell to queue Move, Shift+click an enemy to
-   queue Fire, right-click clears or deselects. Each action deducts AP
-   from the piece's budget.
-3. **Battle / Reveal.** The engine sorts every queued (actor, action)
-   pair by **Initiative (descending)** and animates them one at a time
-   (~600ms per step). Pieces from either side interleave by initiative.
-4. **Auto-loop.** When the reveal finishes, the next reveal starts
+1. **Build.** Place pieces from credits (multiples of 10 so leftover
+   credits always remain spendable by the cheapest piece). Click READY
+   when done. READY calls startBattleFromBuild() which tears down
+   BuildPhase and enters REVEAL directly.
+2. **PLAN (skipped today).** The planner is still in src/game/Game.ts
+   as enterPlanningPhase() but no path reaches it. Re-enable when
+   piece-action queuing becomes useful (e.g. Hulk slam targeting that
+   wants user input).
+3. **Battle / Reveal.** The engine sorts every (actor, action) pair by
+   **Initiative (descending)** and animates them one at a time. Step
+   duration is ~0.6s per real action and ~0.08s per hold step, BOTH
+   multiplied by the player-controlled speed setting (see Speed Control
+   section below). Pieces from either side interleave by initiative.
+4. **Auto-loop.** When a reveal finishes, the next reveal starts
    immediately. Queued actions clear so DEFAULT BEHAVIOUR takes over:
-   cyborgs march toward the core (fire if anything's in range), spheres
-   + towers auto-fire at the nearest cyborg, dogs hunt the nearest
-   cyborg / wander when nothing in sight.
-5. **Stalemate guard.** If a reveal completes with zero possible actions
-   (e.g. no cyborgs placed), the loop halts instead of spinning forever.
-6. **Win/lose** flips the phase and shows the message. No restart yet.
+   cyborgs march toward the core (fire if anything is in range),
+   spheres and towers auto-fire at the nearest cyborg, dogs hunt the
+   nearest cyborg or wander when nothing is in sight.
+5. **Attrition win for defender.** If at the end of any reveal no
+   cyborg can damage the core (every shooter is out of ammo, no Hulk
+   alive to punch through), the defender wins by attrition. Replaces
+   the old stalemate guard. The game is strictly die-or-survive with
+   no draw state.
+6. **Win/lose** flips the phase and shows the message. PLAY AGAIN
+   (in the Mini Control Center) reloads the page.
 
 **Invalid actions strict-skip.** If your queued target died or your
 destination cell got taken before your action's turn comes up, your
@@ -163,13 +170,14 @@ Each piece spends Action Points (AP) per turn. Default actions:
 |---|---|
 | Cost | 100 |
 | HP | 300 |
-| Damage | **25** (was 10 — buffed for defender balance) |
+| Damage | **25** (was 10, buffed for defender balance) |
 | Attack range | 300 |
 | Sight range | 400 |
-| Speed | — (stationary) |
+| Speed | (stationary) |
 | Initiative | **100** (stationary fallback; fires before any cyborg) |
 | AP | **3 shots/turn** |
-| Behavior | Defensive / stationary; queued or auto-fires nearest cyborg in range |
+| Ammo (per game) | **8 shots** |
+| Behavior | Defensive / stationary; auto-fires at nearest cyborg in range until ammo runs out |
 
 **Special:** Spherical hero — fires in any direction. Auto-fire (no queued
 action) targets the single nearest cyborg in range; queue up to 3 fire
@@ -238,14 +246,15 @@ pad/tether actions and re-fires each tether tick). Death duplicates the
 | Fire arc | **Omnidirectional** — sprite auto-rotates to target |
 
 Heavy-armor tower on tracks. The art (originally generated as "Robot_Wall"
-but the internal zip folder was "Robot_Tank" — closer to its true nature)
-is a tracked vehicle with gun arms; reads as a tower, not a wall, so we
-renamed `gunwall` → `sentry` after the first deploy. Tankier than a tower
-(HP 200 vs 80) with the same damage but shorter range (200 vs 250) — built
+but the internal zip folder was "Robot_Tank", closer to its true nature)
+is a tracked vehicle with gun arms. Reads as a tower, not a wall, so we
+renamed `gunwall` to `sentry` after the first deploy. Tankier than a tower
+(HP 150 vs 80) with the same damage but shorter range (200 vs 250). Built
 as a hard point on the front line, eats hits and still bites back. Same
 fire-arc compass-rose mechanic as the tower (default east, pay to add more).
 8-direction static rotations, no animations. Repair-bot priority 8 (tied
-with Bomber and Sphere).
+with Bomber). Originally shipped at HP 200; nerfed to 150 because repair-bot
+healing made it effectively unkillable.
 
 ### Wall (procedural laser-wall — redesigned in session 16)
 | Stat | Value |
@@ -276,25 +285,32 @@ way as the in-game piece. **Wall is now buyable from the player's HUD**
 
 ### Structures (production)
 
-| Structure | Cost | HP | Damage | Range | AoE | apBudget | Sprite |
-|---|---|---|---|---|---|---|---|
-| Turret (Tower) | 30 | 80 | 25 | 250 | — | 1 | Robot_Tower (faces east) |
-| Bomber | 70 | 100 | 20 | 200 | 50 | 1 | Robot_Bomber. Ammo 3 bombs/game. Throws proximity traps onto empty cells. 120° east-facing wedge. |
-| Wall | 20 | 300 | 0 | 0 | — | 0 | Brown box that shrinks from the top as it takes damage (no HP bar; the body IS the HP indicator) |
-| Cannon | 60 | 120 | 40 | 280 | 45 | 1 | LEGACY — no shop button, type kept for compatibility |
-| Mine | 20 | 50 | 60 | 60 | 70 | 0 | Detonates when a cyborg moves on top |
+Ammo column is per-game shots. Fire interval (in tick units) is in
+Config but omitted here for readability. All directional structures
+default to a single east-facing 120 degree wedge; the player pays
+30cr per additional cardinal facing via the compass rose.
+
+| Structure | Cost | HP | Damage | Range | AoE | apBudget | Ammo | Sprite |
+|---|---|---|---|---|---|---|---|---|
+| Turret (Tower) | 30 | 80 | 25 | 250 | 0 | 1 | 6 | Robot_Tower (faces east) |
+| Bomber | 70 | 100 | 20 | 200 | 65 | 1 | 3 | Robot_Bomber. Throws proximity traps onto empty cells. 120 degree east-facing wedge. |
+| Sentry | 60 | 150 | 25 | 200 | 0 | 1 | 5 | Tracked-vehicle turret. Omni-fire (sprite auto-rotates to target). See Sentry section above. |
+| Wall | 20 | 300 | 0 | 0 | 0 | 0 | 0 | Procedural cyan beam between two metallic emitter plates. Body itself thins as it takes damage. |
+| Laser | 40 | 70 | 25 | 300 | 0 | 1 | 5 | Twin-laser direct-fire turret. Longest direct-fire range on the defender side. Squishier than tower (HP 70 vs 80), needs repair support to last. Promoted out of preview in S17.2. |
+| Signal | 70 | 80 | 0 | 500 | 0 | 1 | 2 | EMP emitter (satellite-dish sprite). No direct damage. Auto-targets the cyborg currently FURTHEST INSIDE the middle map and stuns them for 2 turns (no fire, no move). 2 EMP strikes per game. Designed as a strategic counter to back-line snipers and hulks before they engage. |
+| Cannon | 60 | 120 | 40 | 280 | 45 | 1 | 4 | Type wired in Config but not currently in the shop tile grid. Reserved for re-introduction if the defender side needs another AoE source. |
+| Mine | 20 | 50 | 60 | 60 | 70 | 0 | 1 | Detonates when a cyborg moves on top. |
 
 ### Structures (preview pieces, dashed border in shop)
 Single south.png each (unknown.png from Meshy export). Placeable so the
 user can preview in-game and decide which to commission full 8-direction
-renders for.
+renders for. Most preview pieces have been promoted to live (Laser,
+Signal); Defense and Gun remain preview-only.
 
 | Preview | Cost | HP | Damage | Range | Notes |
 |---|---|---|---|---|---|
-| Defense | 20 | 80 | 0 | 0 | Geodesic dome (user liked — possible Shield Generator) |
-| Gun | 30 | 80 | 15 | 200 | Twin-barrel turret (user liked) |
-| Laser | 40 | 70 | 25 | 300 | Twin-laser turret |
-| Signal | 20 | 50 | 0 | 0 | Satellite dish |
+| Defense | 20 | 80 | 0 | 0 | Geodesic dome. Possible Shield Generator if a shield mechanic ships. |
+| Gun | 30 | 80 | 15 | 200 | Twin-barrel turret. User liked the visual. |
 
 ### Power Core (objective, not buyable)
 | Stat | Value |
@@ -314,7 +330,7 @@ Defender loses if Power Core HP reaches 0.
 | Unit | Cost | HP | Speed | Damage | Atk range | Sight | AoE | AP | Behavior |
 |---|---|---|---|---|---|---|---|---|---|
 | **Cannon** | 70 | 180 | 55 | 35 | 240 | 320 | — | 3 | Aggressive — advance to attack range, hold, fire |
-| **Grenadier** | **50** | 110 | 75 | 20 | 180 | 280 | 45 | 3 | Standoff — keep distance, lob proximity grenades. Can DIFFUSE adjacent armed enemy bombs (1 AP). Green sprite tint. |
+| **Grenadier** | **50** | 110 | 75 | 20 | 180 | 280 | **60** | 3 | Standoff. Keep distance, lob proximity grenades. Can DIFFUSE adjacent armed enemy bombs (1 AP). See Grenadier (S17 rules) row below for the side/behind throw constraints and explosive-shielding rule. |
 | **Double Gun** | 90 | 160 | 65 | 45 | 230 | 300 | — | 3 | Aggressive — heavy direct fire from medium range. Warm-orange sprite tint. |
 | **Hulk** | 100 | 280 | **45** | 55 | 70 | 220 | — | 2 | Melee bruiser — heaviest HP / damage, slow speed (bumped 35 → 45 in S17). **Slam (2 AP, 40 dmg, 3 ammo)**: hits all enemies in a 3-cell-wide wedge one tile forward. **Unlimited fists** — no ammo cost for punches (regular ammo=5 is unused for the punch action; only slam consumes slamAmmo). Single-minded core-march: punches if adjacent, marches to core otherwise. |
 | **Sniper** | 90 | 80 | 50 | 150 | **350** | **400** | — | 2 | Precision strike. **Single shot** (ammo 1) at long range — 150 dmg one-shots every defender structure (max HP 120 cannon turret) and most cyborg-tier units. Range trimmed 400 → 350 in S17 (sight 450 → 400). **Crouch rule (S17): can NOT crouch and shoot the same turn** — first turn in range plays the aim pose (no fire), next turn fires. Movement breaks the crouch. After firing the sniper anchors crouched, retreats east if out of ammo. AI build enforces 3-cell sniper spacing. Sprite aim-pose offset is `dx = ±0.10 × size` (measured from PNG bbox). |
@@ -437,6 +453,141 @@ built yet.
 | Cyborgs | **Assassin** | 75 | Sneaky | High speed, low HP, short range melee. Tries to flank around the front line and hit defenders from the side or back. |
 | Cyborgs | **Berserker** | 50 | Suicide rush | Charges nearest target ignoring fire; detonates on contact for big AoE. |
 
+## S17 mechanics added since the last audit
+
+### Power Core recharge (Robot Repair docking)
+
+Robot Repair bots that run out of charges can detour to the Power Core
+to recharge. Mirrors the cyborg ammo-crate pattern. Defender-side
+advantage: a stationary energy source the repair bot can always reach
+since the core is required and lives in the defender backline.
+
+  Out-of-charge AI search order:
+    1. Compatible repair-kit crate in sight (fastest top-up).
+    2. The Power Core (within sight).
+    3. Retreat west toward the backline.
+
+  Docking trigger fires at the end of any move step. If the repair bot
+  ends within 1.5 grid cells of any of the 4 core sub-cell centers, it
+  siphons **+2 charges per turn** (capped at Config.UNITS.repair.ammo).
+  Core is unharmed by the recharge. Full bots do not farm (gate on
+  ammoRemaining < max).
+
+### Robot self-destruct AoE on death
+
+Every defender piece (sphere, structure, defender mobile unit) that
+dies triggers a small explosion at the death position. Backs the
+dramatic "DETONATION SET" and "SELF-DESTRUCT PROTOCOL ENGAGED"
+callouts with actual mechanical bite.
+
+  Radius: 60 world units (just over 1 grid cell).
+  Damage: 25 (light; will not one-shot full-HP cyborgs).
+  Friendly fire: yes (matches the rest of the AoE system).
+  VFX: two-layered Explosion (orange outer halo + bright inner flash).
+  SFX: standard playExplosion.
+
+Chain-reaction guard: if a robot dies from another robot's self-
+destruct AoE (killerType === 'self_destruct'), the dying robot still
+gets its on_death speech bubble but does NOT trigger a second
+explosion. Only the first robot in any kill chain detonates, so a
+tight defender cluster cannot infinite-cascade.
+
+### Speed control (Mini Control Center)
+
+Floating bottom-right widget owns reveal pacing, audio + speech +
+combat-log toggles, and the BATTLE / PAUSE primary action pill.
+Default toggles all start ON. All states persist in localStorage so
+choices survive Play Again (which is a full page reload).
+
+Multipliers applied on top of the RevealPhase base step duration
+(0.6s real, 0.08s hold):
+
+| Setting | Multiplier | Per real step | Per hold |
+|---|---|---|---|
+| Slow | 5.0 | 3.0 s | 0.40 s |
+| Normal | 2.5 | 1.5 s | 0.20 s |
+| Fast | 1.0 | 0.6 s | 0.08 s |
+
+Pause is implemented as a `paused` flag on RevealPhase that gates
+step advancement (visuals continue ticking so in-flight projectiles
+resolve).
+
+### Speech bubble triggers
+
+Floating callouts appear above units at significant moments. Voices:
+cyborg (red bubble, italic peach, kinetic + energy mix) and robot
+(blue bubble, monospace cyan, energy-only vocabulary).
+
+Active triggers:
+
+| Trigger | When it fires |
+|---|---|
+| `low_hp` | HP drops to 25 percent or below. |
+| `low_ammo` | Ammo down to last few shots. {n} substitutes count. |
+| `out_of_ammo` | Ammo hits zero. |
+| `rearmed` | Unit picks up an ammo/grenade/medkit/repair crate, or repair bot docks at the Power Core. |
+| `crate_spotted` | Out-of-ammo unit sights a compatible crate. |
+| `sniper_shot` | Sniper or precision strike scores a confirmed kill. |
+| `medic_low_packs` | Medic or repair bot down to last 1-2 charges. |
+| `no_repairs_needed` | Repair bot has full reserves and nothing damaged in sight (robot voice only). |
+| `on_kill` | Killer announces. SpriteUnit only; structures and spheres stay silent. |
+| `on_death` | Dying piece announces. Robots get dramatic self-destruct lines. |
+| `core_hit` | Power Core takes non-fatal damage. Spawns a paired bubble: nearest defender reports the breach, nearest cyborg gloats. Once per reveal. |
+
+Speech bubbles can be globally toggled off via the MCC. When off,
+spawnSpeechBubble bails out immediately and nothing renders.
+
+### Cross-type refund blocking
+
+When a placement is active, clicking a piece of a different type is
+a no-op instead of refunding it. Same-type clicks still refund (so
+relocating an identical piece is unchanged). Free-click refund (no
+placement active) still works on any piece type. Prevents the player
+from accidentally wiping a Laser while trying to place a Dog.
+
+### Single-player mode and AI opponent
+
+Session 13 onward. The side picker shows two cards (DEFENDER /
+Robots vs ATTACKER / Cyborgs); the player picks one, the other side
+runs on autopilot via `src/ai/OpponentAI.ts`.
+
+  Fog of war. AI-side pieces have mesh.visible=false during BUILD
+  and PLAN, revealed at REVEAL start. Opponent credits are never shown.
+  AI build rule (S17). One of each piece TYPE first, then spend all
+  remaining credits on random picks (no per-turn cap since there is
+  no PLAN phase to spend extra turns of credits in).
+
+---
+
+## Battle stats and pacing telemetry
+
+Per-game records are written to localStorage on game end and viewable
+at `/stats.html`. Each record carries:
+
+  outcome (win/lose from player POV) and endType
+    (core_destroyed, cyborgs_eliminated, attrition)
+  turns (reveal count)
+  durationMs (wall-clock from first reveal start to end)
+  speed (slow/normal/fast at time of end)
+  alive counts per side
+  damageDealt + kills per side
+  per-piece breakdowns: piecesByType, damageByPieceType,
+    killsByPieceType, assistsByPieceType, cellsWalkedByPieceType,
+    attacksByPieceType, creditsSpentByPieceType, actionCounts
+  enemyEliminatedAtTurn (when the opposite side hit zero, if ever)
+
+Console helpers installed on `window.astrohold`:
+  astrohold.statsSummary()   high-level aggregate
+  astrohold.dumpStats()      console.table of all records
+  astrohold.statsJSON()      copy-paste JSON dump
+  astrohold.clearStats()     wipe records
+
+Cap: 50 records (oldest pruned). The stats page surfaces per-piece
+damage-per-credit and kills-per-100cr tables for cost-effectiveness
+analysis.
+
+---
+
 ## Balance Principles
 
 1. **Mirror power, not abilities.** If Grenadier can hit behind cover, Robots
@@ -452,28 +603,35 @@ built yet.
 
 ## Open design questions
 
-- ~~Plan-then-play vs one-action-at-a-time?~~ **LOCKED: plan-then-play with
-  initiative-interleaved reveal, strict-skip on invalid actions.** See
-  "Turn flow" section above.
-- ~~Same-turn fire by structures?~~ **LOCKED: structures auto-fire on their
-  initiative tick. Defender doesn't queue actions for them.**
-- **Directional firing arcs (planned follow-up).** Structures should be
-  directional, with arc bought at purchase and cost scaling per direction
-  (draft: 1 dir = base cost, +10cr each additional direction; full omni =
-  base + 70cr). This narrows what counts as a "target in range" for the
-  auto-fire check. Will land in a separate pass right after the turn system.
-- **Diagonal movement** — allowed (8-directional) or 4-directional only?
-  Sphere should be 8-dir since it can shoot in any direction. Cyborgs?
-- **Turning cost for cyborgs** — should turning take an AP, or piggyback on the
-  move? Sphere is free; cyborgs need a tradeoff so they can't pivot+fire freely.
-- **Ammo finite vs unlimited?** Finite ammo per piece + buyable refills creates
-  resource pressure but adds inventory tracking.
-- **Camp wandering frequency** — every turn (too chaotic) or every 2-3 turns
-  (more natural)? Stationary pieces never wander. (Currently moot once
-  plan-then-play lands — wander becomes a queued "move random" action only
-  if AI is driving the side.)
-- **Sight range blocking** — do walls / other pieces block sight the same way
-  they block projectiles? Probably yes for symmetry, but sniper/spotter pieces
-  may need a "elevated sight" exception.
-- **Sneaky / flank routing** — does an Assassin pathfind around the enemy line,
-  or just prefer cells away from the highest enemy density? Latter is simpler.
+Resolved or shipped:
+
+- ~~Plan-then-play vs one-action-at-a-time?~~ Locked: plan-then-play
+  with initiative-interleaved reveal, strict-skip on invalid actions.
+  See Turn flow above. PLAN phase is currently skipped in production
+  but the engine still consumes pre-built default-action queues.
+- ~~Same-turn fire by structures?~~ Locked: structures auto-fire on
+  their initiative tick. Defender does not queue actions for them.
+- ~~Directional firing arcs?~~ Shipped: compass-rose UI buys extra
+  cardinal facings at 30cr each.
+- ~~Stalemate rule?~~ Replaced with attrition win for the defender
+  via cyborgsCanAttack() in onComplete. Strictly die-or-survive.
+- ~~Ammo finite vs unlimited?~~ Locked: per-game ammo budget on every
+  offensive piece. Crates + Power Core docking provide top-ups.
+
+Still open:
+
+- **Diagonal movement** for cyborgs broadly. Currently opt-in per unit
+  (`allowDiagonalMove`). Medic and Repair are diagonal-capable.
+- **Turning cost** for cyborgs. Currently free (units pivot before firing
+  with no AP cost). Sphere remains free by design.
+- **Sight range blocking.** Do walls / other pieces block sight the same
+  way they block projectiles? Probably yes for symmetry, but sniper /
+  spotter pieces may need an "elevated sight" exception.
+- **Sneaky / flank routing.** Does a future Assassin pathfind around the
+  enemy line, or just prefer cells away from the highest enemy density?
+- **Robot self-destruct AoE tuning.** Currently 60 radius, 25 damage,
+  friendly fire on. Watch for cluster-deaths that wipe defender lines.
+  Lever: damage value, or restrict friendly-fire to non-defender
+  targets if the cascade feels unfair.
+- **Music system.** The MCC has a music toggle that persists a flag,
+  but no audio source consults it yet. Add a backing track.
