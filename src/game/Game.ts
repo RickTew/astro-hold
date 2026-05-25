@@ -1436,34 +1436,60 @@ private enterBuildPhase() {
     return null
   }
 
-  // Click on a placed sphere or cyborg → remove + refund. Returns true if
-  // something was refunded (caller should skip normal placement logic).
+  // Click on a placed sphere, cyborg, dog, or structure to remove and
+  // refund it. Returns true if something was refunded (caller should
+  // skip normal placement logic).
+  //
+  // Type-guard rule (S17.9): if a placement session is active (either
+  // a mobile-unit Game.placement OR a structure BuildPhase.selectedType),
+  // ONLY a piece of the matching type can be refunded by clicking. A
+  // click on a different-typed piece is ignored, so accidentally placing
+  // a Dog on a Laser cannot wipe the Laser. Free-click refund (no
+  // placement active) still works on any piece type.
   private tryRefund(x: number, y: number): boolean {
     const REFUND_RADIUS_SQ = 35 * 35
+    // Resolve the "active type" for this click. Three exclusive states:
+    //   placementKind  -> mobile piece in flight (sphere / cyborg / dog / etc.)
+    //   structureType  -> structure tile selected in BuildPhase
+    //   neither         -> free click, any piece is refundable
+    const placementKind = this.placement?.kind ?? null
+    const structureType = this.buildPhase?.getSelectedType() ?? null
+
+    // Spheres. Match only if we're actively placing a sphere (or free click).
     for (let i = 0; i < this.spheres.length; i++) {
       const s = this.spheres[i]
       const dx = s.worldX - x, dy = s.worldY - y
       if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        // Block cross-type refund. If something else is selected, the
+        // click on this sphere falls through to nothing.
+        if (placementKind !== null && placementKind !== 'sphere') return false
+        if (structureType !== null) return false
         this.spheres.splice(i, 1)
         this.scene.remove(s.mesh)
         this.buildPhase?.addCredits(SPHERE_COST)
         return true
       }
     }
+    // Defender mobile units (dog, repair). Match by u.type === placementKind.
     for (let i = 0; i < this.defenderUnits.length; i++) {
       const u = this.defenderUnits[i]
       const dx = u.worldX - x, dy = u.worldY - y
       if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        if (placementKind !== null && placementKind !== u.type) return false
+        if (structureType !== null) return false
         this.defenderUnits.splice(i, 1)
         this.scene.remove(u.mesh)
         this.buildPhase?.addCredits(Config.UNITS[u.type].cost)
         return true
       }
     }
+    // Attacker units (cyborg variants). Match by u.type === placementKind.
     for (let i = 0; i < this.attackerUnits.length; i++) {
       const u = this.attackerUnits[i]
       const dx = u.worldX - x, dy = u.worldY - y
       if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        if (placementKind !== null && placementKind !== u.type) return false
+        if (structureType !== null) return false
         this.attackerUnits.splice(i, 1)
         this.scene.remove(u.mesh)
         this.attCredits += Config.UNITS[u.type].cost
@@ -1479,16 +1505,20 @@ private enterBuildPhase() {
       const s = structs[i]
       const dx = s.worldX - x, dy = s.worldY - y
       if (dx * dx + dy * dy < REFUND_RADIUS_SQ) {
+        // Structure refund only when the active selection is the SAME
+        // structure type. A different structure type, or any active
+        // mobile placement, blocks the click.
+        if (placementKind !== null) return false
+        if (structureType !== null && structureType !== s.type) return false
         structs.splice(i, 1)
         s.dispose()
         this.buildPhase?.addCredits(Config.STRUCTURES[s.type].cost)
         // Selection STAYS so the player can immediately place a new piece
         // of the same type elsewhere. The skip-next-click tells BuildPhase
-        // to ignore the click that's about to bubble up from this mousedown
-        // — without it BuildPhase would auto-replace the structure on the
+        // to ignore the click that's about to bubble up from this mousedown.
+        // Without it BuildPhase would auto-replace the structure on the
         // very cell we just emptied, defeating the refund.
         this.buildPhase?.requestSkipNextClick()
-        // Tear down the rose if it was editing this structure.
         if (this.editingStructure === s) this.closeCompassRose()
         return true
       }

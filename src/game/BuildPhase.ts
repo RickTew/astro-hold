@@ -64,11 +64,16 @@ export class BuildPhase {
   }
 
   // External API used by Game to swap the active placement mode. Passing null
-  // clears the selection and hides the ghost — call this when a sphere/cyborg
+  // clears the selection and hides the ghost. Call this when a sphere/cyborg
   // placement starts so a tower/wall doesn't drop on the same click.
   selectStructure(type: StructureType | null) {
     this.selectedType = type
     if (!type) this.hideGhost()
+  }
+  // Game reads this in tryRefund so a click on a structure of a different
+  // type than the active one is ignored instead of refunding the wrong piece.
+  getSelectedType(): StructureType | null {
+    return this.selectedType
   }
 
   // Tell the click handler to ignore EXACTLY ONE upcoming click. Used by
