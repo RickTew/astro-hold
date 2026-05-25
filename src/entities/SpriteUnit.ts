@@ -282,6 +282,12 @@ export class SpriteUnit {
   // burned through slams can still punch. Non-Hulks default to 0 and
   // never trigger the slam branch.
   slamAmmoRemaining: number
+  // Repair-only. Separate pool tracking how many ammo refills the bot
+  // can dispense to adjacent friendly defender pieces before it has
+  // to dock at the Power Core to top up. Non-repair units default to
+  // 0 and never trigger the refill code path. Config.UNITS.repair
+  // declares the starting value via the optional refillCharges field.
+  refillRemaining: number
 
   // Medic tether reference. Non-null on BOTH the medic and the target
   // while a Tether is active between them. RevealPhase reads this to
@@ -368,6 +374,7 @@ export class SpriteUnit {
     this.apRemaining = this.apBudget
     this.ammoRemaining = Config.UNITS[type].ammo
     this.slamAmmoRemaining = (Config.UNITS[type] as { slamAmmo?: number }).slamAmmo ?? 0
+    this.refillRemaining = (Config.UNITS[type] as { refillCharges?: number }).refillCharges ?? 0
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
     // Stalker spawns cloaked — drops on first damage-dealing action.
     if (type === 'stalker') this.cloaked = true

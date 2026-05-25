@@ -165,7 +165,17 @@ export const Config = {
     // bombers, cannons, sphere, the Combat Dog, and the Power Core. `damage`
     // is repurposed as repair amount per tick. Diagonal-capable so it can
     // weave through structure clusters to reach a damaged piece.
-    repair:    { cost: 70, hp: 60,  speed: 65,  damage: 30, range: 150, sightRange: 280, aoeRadius: 0,  apBudget: 3, ammo: 5, allowDiagonalMove: true, label: 'Repair',    color: 0xffffff },
+    //
+    // refillCharges (S17.13): separate pool from heal charges. When
+    // adjacent to a friendly defender piece that has burned through
+    // its ammo, the bot can give +1 ammo at the cost of 1 refillCharge.
+    // 3 refills per docking trip. Must roll back to the Power Core to
+    // restore both heal AND refill charges. Designed so an in-the-field
+    // tower keeps firing as long as a repair bot is shuttling between
+    // it and the core, but only one tower at a time before the bot
+    // has to come back. By the time the trip completes the cyborg push
+    // is usually already at the gate.
+    repair:    { cost: 70, hp: 60,  speed: 65,  damage: 30, range: 150, sightRange: 280, aoeRadius: 0,  apBudget: 3, ammo: 5, refillCharges: 3, allowDiagonalMove: true, label: 'Repair',    color: 0xffffff },
   },
 } as const
 

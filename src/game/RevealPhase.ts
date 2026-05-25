@@ -2620,6 +2620,11 @@ export class RevealPhase {
     // siphon a small charge boost. The cyborg analogue is the ammo crate;
     // the robot side gets a permanent in-world energy source instead.
     this.checkPowerCoreRecharge(actor, dest.x, dest.y)
+    // Repair-bot field refill: if this is a repair bot ending its
+    // move adjacent to a low-ammo friendly piece, transfer +1 ammo
+    // from the bot's refill pool. The bot has to roll back to the
+    // Power Core when the refill pool is spent.
+    this.checkRepairBotRefill(actor, dest.x, dest.y)
   }
 
   // Pick up any compatible ammo crate at (x, y). Capped at the unit's
@@ -2665,8 +2670,12 @@ export class RevealPhase {
     if (unit.side !== 'defender') return
     if (unit.type !== 'repair') return
     if (this.core.isDead) return
-    const max = Config.UNITS.repair.ammo
-    if (unit.ammoRemaining >= max) return
+    const healMax = Config.UNITS.repair.ammo
+    const refillMax = (Config.UNITS.repair as { refillCharges?: number }).refillCharges ?? 0
+    // Skip the docking trip entirely if BOTH pools are already topped
+    // up. Without this gate the bot would constantly trigger the docked
+    // path next to the core for no effect.
+    if (unit.ammoRemaining >= healMax && unit.refillRemaining >= refillMax) return
     const cells = this.core.cellCenters()
     // "Adjacent" means within 1.5 grid cells of any of the 4 core sub-
     // cell centers. Each core sub-cell is GRID_CELL wide, so the test
@@ -2683,16 +2692,88 @@ export class RevealPhase {
       }
     }
     if (!docked) return
-    const RECHARGE = 2
-    const before = unit.ammoRemaining
-    unit.ammoRemaining = Math.min(max, unit.ammoRemaining + RECHARGE)
-    const gained = unit.ammoRemaining - before
-    if (gained <= 0) return
+    // Both pools refill on a single dock. Heal charges replenish faster
+    // (+2 per turn) since the bot's primary job is healing. Refill
+    // charges replenish slower (+1 per turn) because each refill unlocks
+    // many extra structure shots downstream.
+    const HEAL_RECHARGE = 2
+    const REFILL_RECHARGE = 1
+    const beforeHeal = unit.ammoRemaining
+    unit.ammoRemaining = Math.min(healMax, unit.ammoRemaining + HEAL_RECHARGE)
+    const healGained = unit.ammoRemaining - beforeHeal
+    const beforeRefill = unit.refillRemaining
+    unit.refillRemaining = Math.min(refillMax, unit.refillRemaining + REFILL_RECHARGE)
+    const refillGained = unit.refillRemaining - beforeRefill
+    if (healGained <= 0 && refillGained <= 0) return
     this.combatThisReveal = true
-    this.log('defender', `${this.actorLabel(unit)} docks at the Power Core (+${gained})`)
+    const parts: string[] = []
+    if (healGained > 0) parts.push(`+${healGained} heal`)
+    if (refillGained > 0) parts.push(`+${refillGained} refill`)
+    this.log('defender', `${this.actorLabel(unit)} docks at the Power Core (${parts.join(', ')})`)
     unit.announce('rearmed')
-    // Defender-side resupply parity counter (mirror of crate_pickup for attackers).
     this.emit({ kind: 'core_recharge', side: 'defender' })
+  }
+
+  // Repair-bot field refill. When a repair bot's move (or hold) leaves
+  // it adjacent to a friendly defender piece that has burned through
+  // its ammo, transfer +1 ammo from the bot's refillRemaining pool to
+  // that piece. One refill per turn, one target. Once the bot's pool
+  // is empty it must roll back to the Power Core to top up. By the
+  // time that round-trip completes the cyborg push is usually already
+  // at the gate, which is the intended balance lever (per user spec).
+  private checkRepairBotRefill(unit: SpriteUnit, x: number, y: number) {
+    if (unit.side !== 'defender') return
+    if (unit.type !== 'repair') return
+    if (unit.refillRemaining <= 0) return
+    const CELL = Config.GRID_CELL
+    const ADJ = CELL * 1.5   // covers cardinal + diagonal cells
+    // Search adjacent friendly defender pieces that have ammoRemaining
+    // < their config max. Picks the FIRST such piece (deterministic;
+    // priority can be tuned later if cluster behavior matters).
+    type Refillable =
+      | { kind: 'struct'; ref: Structure; max: number }
+      | { kind: 'sphere'; ref: SphereDefender; max: number }
+      | { kind: 'unit'; ref: SpriteUnit; max: number }
+    let target: Refillable | null = null
+    for (const s of this.structures) {
+      if (s.isDead) continue
+      const max = (Config.STRUCTURES as Record<string, { ammo: number }>)[s.type]?.ammo ?? 0
+      if (max <= 0) continue                 // walls / mines / shield don't fire
+      if (s.ammoRemaining >= max) continue
+      if (Math.abs(s.worldX - x) > ADJ || Math.abs(s.worldY - y) > ADJ) continue
+      target = { kind: 'struct', ref: s, max }
+      break
+    }
+    if (!target) {
+      for (const sp of this.spheres) {
+        if (sp.isDead) continue
+        const max = Config.SPHERE.ammo
+        if (sp.ammoRemaining >= max) continue
+        if (Math.abs(sp.worldX - x) > ADJ || Math.abs(sp.worldY - y) > ADJ) continue
+        target = { kind: 'sphere', ref: sp, max }
+        break
+      }
+    }
+    if (!target) {
+      for (const du of this.defenderUnits) {
+        if (du === unit || du.isDead) continue
+        const max = Config.UNITS[du.type].ammo
+        if (du.ammoRemaining >= max) continue
+        if (Math.abs(du.worldX - x) > ADJ || Math.abs(du.worldY - y) > ADJ) continue
+        target = { kind: 'unit', ref: du, max }
+        break
+      }
+    }
+    if (!target) return
+    const REFILL = 1
+    const before = target.ref.ammoRemaining
+    target.ref.ammoRemaining = Math.min(target.max, target.ref.ammoRemaining + REFILL)
+    const gained = target.ref.ammoRemaining - before
+    if (gained <= 0) return
+    unit.refillRemaining -= 1
+    this.combatThisReveal = true
+    this.log('defender', `${this.actorLabel(unit)} refills ${this.actorLabel(target.ref)} (+${gained} ammo)`)
+    unit.announce('rearmed')
   }
 
   private executeAttack(actor: Actor, action: QueuedAction) {
