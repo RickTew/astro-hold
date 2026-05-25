@@ -155,6 +155,14 @@ export class Game {
   // True if recordBattleEnd already fired for this game — prevents a
   // double-record if win/lose handlers ever stack.
   private battleRecorded = false
+  // S17.25 stalemate guard. Counts consecutive reveals where the
+  // RevealPhase reported combatThisReveal === false (no damage, no
+  // movement, no combat events of any kind). When the streak hits
+  // STALEMATE_LIMIT the game ends as a defender attrition win.
+  // Without this, a stuck cyborg (no path to core, no targets in
+  // range, no melee available) could spin the auto-loop forever
+  // ("Turn 393 -- no activity" type bug).
+  private noCombatStreak = 0
   // Wall-clock ms at first reveal start. Diff at recordBattleEnd = how
   // long the player actually watched. Skip BUILD/PLAN time so the metric
   // is "battle pacing" not "user think time."
@@ -900,10 +908,15 @@ private enterBuildPhase() {
       // the reference. Even a 0-action reveal gets a header so the lock-step
       // between gameplay and log stays obvious.
       const entries = this.revealPhase?.combatLog ?? []
+      // S17.25: read combatThisReveal BEFORE the revealPhase is nulled.
+      // This drives the no-progress stalemate guard below.
+      const hadCombat = this.revealPhase?.combatThisReveal ?? false
       this.hud.appendCombatLog(this.revealTurn, entries)
       this.accumulateStatsFromLog(entries)
       this.revealTurn++
       this.revealPhase = null
+      if (hadCombat) this.noCombatStreak = 0
+      else this.noCombatStreak++
       // End-of-reveal bomb tick: unarmed → armed, already-armed gets its
       // turnsArmed counter bumped. RevealPhase force-detonates expired bombs
       // at the start of the next reveal (see ARMED_LIFETIME there).
@@ -933,6 +946,22 @@ private enterBuildPhase() {
       // depleted cyborgs would wander the map indefinitely, the core
       // would stand untouched, and the auto-reveal loop would spin forever.
       if (!this.powerCore.isDead && !this.cyborgsCanAttack()) {
+        this.phase = 'win'
+        this.hud.setPhase('win')
+        this.mcc?.setPhase('win')
+        this.recordBattleEnd('attrition')
+        return
+      }
+      // S17.25 stalemate guard. cyborgsCanAttack now returns true for any
+      // alive non-medic cyborg (since melee-fallback covers ammo=0), so
+      // a stuck cyborg that can NEVER reach a target (blocked path, no
+      // melee range to anything) would otherwise spin the loop forever.
+      // 3 consecutive reveals with zero combat events of any kind means
+      // nothing is happening; call it a defender attrition win.
+      const STALEMATE_LIMIT = 3
+      if (!this.powerCore.isDead && this.noCombatStreak >= STALEMATE_LIMIT) {
+        // eslint-disable-next-line no-console
+        console.warn('[astrohold] stalemate: 3 consecutive no-combat reveals, forcing attrition')
         this.phase = 'win'
         this.hud.setPhase('win')
         this.mcc?.setPhase('win')
