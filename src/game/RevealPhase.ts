@@ -309,6 +309,27 @@ export class RevealPhase {
       return
     }
     spawnSpeechBubble(this.scene, x, y, voice, 'on_death')
+
+    // S17.18 Hulk death explosion. Per user: "Hulk will explode and
+    // do AoE damage to his team and enemy when killed." Bigger blast
+    // than the robot self-destruct since Hulk is the heaviest unit
+    // (280 HP, 100cr). Friendly-fire applies (explicit per user) so
+    // a dying Hulk can take cyborg allies with him. Cluster-chain
+    // guard mirrors the robot side.
+    if (target instanceof SpriteUnit && target.type === 'hulk') {
+      if (killerType === 'hulk_blast' || killerType === 'self_destruct') return
+      const HULK_R = 80
+      const HULK_DMG = 40
+      this.explosions.push(new Explosion(this.scene, x, y, HULK_R, 0.6, 0xff7755))
+      this.explosions.push(new Explosion(this.scene, x, y, HULK_R * 0.55, 0.4, 0xffe0a0))
+      playExplosion()
+      const summary = this.applyAoeForSide(x, y, HULK_R, HULK_DMG, 'attacker', 'hulk_blast')
+      if (summary.hits > 0) {
+        this.combatThisReveal = true
+        this.log('attacker', `Hulk death blast hits ${summary.hits} (${summary.damageDealt} dmg${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+      }
+      return
+    }
     if (!isRobot) return
     // Chain-reaction guard. If this death was already caused by a
     // self-destruct AoE, do NOT trigger another self-destruct on top.
@@ -3142,9 +3163,11 @@ export class RevealPhase {
       }
     }
     // Single friendly-fire event per detonation, carrying the ally hit
-    // count. Skipped when the AoE source is a 'self_destruct' chain so
-    // we don't pollute the counter with mandatory chain hits.
-    if (attackerType && attackerType !== 'self_destruct' && allyHits > 0) {
+    // count. Skipped for the death-explosion sources ('self_destruct'
+    // for robots, 'hulk_blast' for hulks) so we don't pollute the
+    // bug-hunting counter with mandatory by-design ally hits.
+    const isDeathBlast = attackerType === 'self_destruct' || attackerType === 'hulk_blast'
+    if (attackerType && !isDeathBlast && allyHits > 0) {
       this.emit({ kind: 'friendly_fire', actorType: attackerType, side, count: allyHits })
     }
     return { hits, damageDealt: hits * damage, kills }
