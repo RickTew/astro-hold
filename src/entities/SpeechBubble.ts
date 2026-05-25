@@ -184,6 +184,19 @@ export const SPEECH_LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> 
       "SIGNAL LOST",
       "TERMINATING",
       "FATAL ERROR",
+      // Self-destruct flavor. Robots that die get to frame the moment
+      // as a deliberate sacrifice instead of a passive shutdown. Lots
+      // of variety here so a battle full of robot deaths reads as
+      // a synchronised dramatic choice rather than identical kills.
+      "DETONATION SET",
+      "SELF-DESTRUCT PROTOCOL ENGAGED",
+      "CORE OVERLOAD IN 3, 2, 1",
+      "FINAL DIRECTIVE. ANNIHILATION",
+      "SACRIFICE CONFIRMED",
+      "DETONATION SEQUENCE ACTIVE",
+      "CRITICAL BREACH. INTENTIONAL",
+      "GOODBYE, ENEMY",
+      "SYSTEM COLLAPSE. BY DESIGN",
     ],
     core_hit: [
       "CORE HIT",

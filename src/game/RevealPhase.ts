@@ -897,15 +897,40 @@ export class RevealPhase {
   // and no useful repositioning target — caller falls through to a wander
   // step so the repair bot drifts without freezing the round.
   private repairDefaultAction(unit: SpriteUnit): QueuedAction | null {
-    // Out of charges — repair bot has no offense. Prefer a repair-kit
-    // crate if visible; otherwise retreat west toward the defender
-    // backline. Same support-pull-back rule as medic.
+    // Out of charges. The repair bot has no offense, so it prioritises
+    // resupply over standing still. Search order:
+    //   1. Compatible repair-kit crate in sight (fastest top-up).
+    //   2. The Power Core (defender-side advantage: a stationary
+    //      energy source the repair bot can dock against to recharge).
+    //   3. Retreat west toward the backline if neither is reachable.
+    // Same support-pull-back rule as the medic. The recharge itself
+    // happens in checkPowerCoreRecharge after the move resolves.
     if (unit.ammoRemaining <= 0) {
       const sight = Config.UNITS.repair.sightRange ?? 280
       const box = this.nearestAmmoBoxFor(unit, sight)
       if (box) {
         const cell = this.pickStepTowardPoint(unit, box.worldX, box.worldY)
         if (cell) return { kind: 'move', cell }
+      }
+      // Power Core recharge. Always reachable for defender repair bots
+      // since the core is required. Walk toward the nearest core cell
+      // (within sight to avoid AI cheating with full-map vision).
+      if (!this.core.isDead) {
+        const coreCells = this.core.cellCenters()
+        let bestCell: { x: number; y: number } | null = null
+        let bestDist = Infinity
+        for (const cc of coreCells) {
+          const cx = cc.x + Config.GRID_CELL / 2
+          const cy = cc.y + Config.GRID_CELL / 2
+          const dx = cx - unit.worldX
+          const dy = cy - unit.worldY
+          const d = Math.hypot(dx, dy)
+          if (d <= sight && d < bestDist) { bestDist = d; bestCell = { x: cx, y: cy } }
+        }
+        if (bestCell) {
+          const cell = this.pickStepTowardPoint(unit, bestCell.x, bestCell.y)
+          if (cell) return { kind: 'move', cell }
+        }
       }
       const retreatX = Config.WORLD.LEFT + Config.GRID_CELL * 0.5
       if (unit.worldX > retreatX + Config.GRID_CELL) {
@@ -2250,6 +2275,10 @@ export class RevealPhase {
     // Resupply pickup: if a compatible ammo crate sits at the destination,
     // the unit grabs it and tops up its ammo (capped at the unit's max).
     this.checkAmmoBoxPickup(actor, dest.x, dest.y)
+    // Power Core docking: defender repair bots adjacent to any core cell
+    // siphon a small charge boost. The cyborg analogue is the ammo crate;
+    // the robot side gets a permanent in-world energy source instead.
+    this.checkPowerCoreRecharge(actor, dest.x, dest.y)
   }
 
   // Pick up any compatible ammo crate at (x, y). Capped at the unit's
@@ -2276,6 +2305,44 @@ export class RevealPhase {
       unit.announce('rearmed')
       return  // only one pickup per move
     }
+  }
+
+  // Power Core recharge. When a defender repair bot ends its move
+  // adjacent to any cell of the 2x2 core footprint, it siphons a small
+  // charge boost (capped at the unit's max). The core is unharmed by
+  // this; it's the defender-side equivalent of the cyborg ammo crate.
+  // Only fires for repair bots and only while ammoRemaining is below
+  // max (so a full bot can stand next to the core without farming).
+  private checkPowerCoreRecharge(unit: SpriteUnit, x: number, y: number) {
+    if (unit.side !== 'defender') return
+    if (unit.type !== 'repair') return
+    if (this.core.isDead) return
+    const max = Config.UNITS.repair.ammo
+    if (unit.ammoRemaining >= max) return
+    const cells = this.core.cellCenters()
+    // "Adjacent" means within 1.5 grid cells of any of the 4 core sub-
+    // cell centers. Each core sub-cell is GRID_CELL wide, so the test
+    // is generous enough to count standing immediately N/E/S/W of the
+    // 2x2 core footprint as docked.
+    const CELL = Config.GRID_CELL
+    let docked = false
+    for (const c of cells) {
+      const cx = c.x + CELL / 2
+      const cy = c.y + CELL / 2
+      if (Math.abs(cx - x) <= CELL * 1.5 && Math.abs(cy - y) <= CELL * 1.5) {
+        docked = true
+        break
+      }
+    }
+    if (!docked) return
+    const RECHARGE = 2
+    const before = unit.ammoRemaining
+    unit.ammoRemaining = Math.min(max, unit.ammoRemaining + RECHARGE)
+    const gained = unit.ammoRemaining - before
+    if (gained <= 0) return
+    this.combatThisReveal = true
+    this.log('defender', `${this.actorLabel(unit)} docks at the Power Core (+${gained})`)
+    unit.announce('rearmed')
   }
 
   private executeAttack(actor: Actor, action: QueuedAction) {
