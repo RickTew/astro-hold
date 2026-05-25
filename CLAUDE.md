@@ -557,9 +557,14 @@ is the position authority — never re-raycast at click time.
 ## Deployment
 - **We do NOT use the local dev server.** The user tests on the live
   Vercel URL. Never run `pnpm dev` / `vite` as a verification step.
-- After any code change: commit → `git push origin main` → `vercel --prod`.
-- Always deploy with `vercel --prod` — `vercel` alone creates a preview URL
-  the user never sees.
+- The Vercel project has Git integration enabled. Every push to
+  `main` triggers an auto-deploy to production. So the deploy ritual
+  is just: commit + `git push origin main`. **DONE.**
+- **Do NOT also run `vercel --prod` after pushing.** That fires a
+  second build of the same code and burns paid Vercel build minutes.
+  The user upgraded to Pro specifically because of this waste. Only
+  run a CLI deploy when the user explicitly asks for one (e.g., to
+  deploy without pushing through Git).
 - Production URL: https://astrohold3.vercel.app
 
 ## Rules
