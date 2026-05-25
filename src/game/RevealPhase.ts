@@ -312,20 +312,23 @@ export class RevealPhase {
     }
     spawnSpeechBubble(this.scene, x, y, voice, 'on_death')
 
-    // S17.18 Hulk death explosion. Per user: "Hulk will explode and
-    // do AoE damage to his team and enemy when killed." Bigger blast
-    // than the robot self-destruct since Hulk is the heaviest unit
-    // (280 HP, 100cr). Friendly-fire applies (explicit per user) so
-    // a dying Hulk can take cyborg allies with him. Cluster-chain
-    // guard mirrors the robot side.
+    // S17.21 unified death explosion. Both Hulk death and defender
+    // self-destruct use Config.DEATH_EXPLOSION values for radius +
+    // damage. One balance knob covers both pieces. Visual + log labels
+    // still differentiate the two source types.
+    const DEATH_R = Config.DEATH_EXPLOSION.radius
+    const DEATH_DMG = Config.DEATH_EXPLOSION.damage
+
+    // Hulk death (cyborg side).
     if (target instanceof SpriteUnit && target.type === 'hulk') {
+      // Chain-guard: hulk killed by another death-blast does not
+      // re-detonate. Otherwise tight cyborg clusters could daisy
+      // chain through their own Hulks.
       if (killerType === 'hulk_blast' || killerType === 'self_destruct') return
-      const HULK_R = 80
-      const HULK_DMG = 40
-      this.explosions.push(new Explosion(this.scene, x, y, HULK_R, 0.6, 0xff7755))
-      this.explosions.push(new Explosion(this.scene, x, y, HULK_R * 0.55, 0.4, 0xffe0a0))
+      this.explosions.push(new Explosion(this.scene, x, y, DEATH_R, 0.6, 0xff7755))
+      this.explosions.push(new Explosion(this.scene, x, y, DEATH_R * 0.55, 0.4, 0xffe0a0))
       playExplosion()
-      const summary = this.applyAoeForSide(x, y, HULK_R, HULK_DMG, 'attacker', 'hulk_blast')
+      const summary = this.applyAoeForSide(x, y, DEATH_R, DEATH_DMG, 'attacker', 'hulk_blast')
       if (summary.hits > 0) {
         this.combatThisReveal = true
         this.log('attacker', `Hulk death blast hits ${summary.hits} (${summary.damageDealt} dmg${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
@@ -333,25 +336,13 @@ export class RevealPhase {
       return
     }
     if (!isRobot) return
-    // Chain-reaction guard. If this death was already caused by a
-    // self-destruct AoE, do NOT trigger another self-destruct on top.
-    // The dying robot still gets its bubble (above) so the cluster
-    // reads as a synchronised dramatic death, but only the first
-    // robot in the chain actually detonates. Without this guard a
-    // tight defender cluster could chain-detonate infinitely.
+    // Defender self-destruct. Same chain-guard idea.
     if (killerType === 'self_destruct') return
-    // Robot self-destruct AoE. Smaller radius + lower damage than a
-    // grenadier blast (60 / 25) so it nudges the balance toward the
-    // defender side without giving every robot a free explosion-on-
-    // death kingmaker. Uses the shared applyAoeForSide so the visual
-    // and audio sequencing matches every other explosion in the game.
-    const RADIUS = 60
-    const DAMAGE = 25
-    this.explosions.push(new Explosion(this.scene, x, y, RADIUS, 0.55, 0xff9a4a))
-    this.explosions.push(new Explosion(this.scene, x, y, RADIUS * 0.55, 0.35, 0xffe0c0))
+    this.explosions.push(new Explosion(this.scene, x, y, DEATH_R, 0.55, 0xff9a4a))
+    this.explosions.push(new Explosion(this.scene, x, y, DEATH_R * 0.55, 0.35, 0xffe0c0))
     playExplosion()
     void killerSide  // kept on signature for future per-killer tuning
-    const summary = this.applyAoeForSide(x, y, RADIUS, DAMAGE, 'defender', 'self_destruct')
+    const summary = this.applyAoeForSide(x, y, DEATH_R, DEATH_DMG, 'defender', 'self_destruct')
     if (summary.hits > 0) {
       this.combatThisReveal = true
       this.log('defender', `Self-destruct AoE hits ${summary.hits} (${summary.damageDealt} dmg${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)

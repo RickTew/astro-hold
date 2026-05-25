@@ -53,6 +53,21 @@ export const Config = {
   // cells (0,3), (1,3), (0,4), (1,4).
   POWER_CORE: { X: -550, Y: 0, HP: 100, RADIUS: 18 },
 
+  // S17.21 unified death-explosion AoE. Every piece that detonates on
+  // death (defender self-destruct, cyborg Hulk death blast) uses these
+  // shared values so balance has ONE knob instead of two.
+  //
+  //   radius 75: cardinal neighbors (50 units) and diagonal neighbors
+  //              (~71 units) are inside; 2-cells-away cardinal (100
+  //              units) is outside. So an explosion damages only the
+  //              eight adjacent cells. This makes cyborg clustering on
+  //              packed defender lines meaningful (chain detonations)
+  //              and lets defenders space towers one cell apart to
+  //              avoid the chain.
+  //   damage 25: light per-target hit. Won't usually one-shot a piece
+  //              at full HP. Tune up/down after observation.
+  DEATH_EXPLOSION: { radius: 75, damage: 25 },
+
   // Sphere defender — values were previously hardcoded in SphereDefender.ts.
   // Centralized here so the turn system can read apBudget alongside everything else.
   // Damage bumped 10→25 so the sphere actually deters cyborgs (was being
