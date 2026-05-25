@@ -44,7 +44,7 @@ export const SPEECH_LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> 
     low_hp: [
       "MEDIC!!",
       "Where's the medic?",
-      "I'm hit — cover me!",
+      "I'm hit, cover me!",
       "Need a patch!",
       "Bleeding out!",
       "Still alive… barely.",
@@ -84,7 +84,7 @@ export const SPEECH_LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> 
     crate_spotted: [
       "Crate spotted!",
       "Resupply incoming!",
-      "Ammo drop — on me!",
+      "Ammo drop, on me!",
       "Mine!!",
     ],
     rearmed: [

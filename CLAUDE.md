@@ -277,8 +277,13 @@ via `.phase-reveal` class), unit icon glow. All theme-matched
   is `{}`. Pieces render with their natural sprite-art colors. Used
   to wash Grenadier green / Doublegun orange / Sniper olive — removed
   at user request.
-- **NO em dashes (`—`) in user-visible text.** Use regular dashes,
-  periods, or rewording. Internal docs/comments fine.
+- **NO em dashes (`—`) ANYWHERE. HARD RULE.** This applies to ALL
+  writing: user-visible UI text, source code comments, JSDoc, commit
+  messages, PR descriptions, documentation, chat replies. No carve-outs
+  for "internal" content. Use regular hyphens (`-`), periods, commas,
+  or reword to remove the dash entirely. The user has flagged this
+  multiple times. Em dashes are a tell of AI-generated writing and
+  they want them gone from every context.
 
 **One piece per cell, strict.** Large pieces (Power Core today) use a 2x2
 footprint per the size rule. Long-term plan and current balance numbers live
