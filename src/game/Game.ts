@@ -1143,17 +1143,33 @@ private enterBuildPhase() {
     }
   }
 
-  // True if at least one alive cyborg can still inflict damage. Medics are
-  // excluded — their ammoRemaining tracks heal charges, not attack rounds.
-  // The Hulk is special-cased: his punches don't consume ammo (set in
-  // RevealPhase.executeAttack), so as long as a Hulk is alive cyborgs can
-  // still threaten the core via melee. Everyone else needs ammoRemaining > 0.
+  // True if at least one alive cyborg can still inflict damage on the
+  // defender side. Used to gate the defender attrition-win condition
+  // ("cyborgs are out of options, defender survives by default").
+  //
+  // The universal melee fallback in RevealPhase.executeAttack lets any
+  // ammo-empty cyborg EXCEPT sniper / medic deal MELEE_FALLBACK_DAMAGE
+  // (10) at adjacency for free. That means any of those alive cyborgs
+  // can still walk up to the core and chip it, so the attrition
+  // condition should not fire when they exist on the field.
+  //
+  // Per-type rules:
+  //   medic   never attacks (heal-only role)
+  //   sniper  attacks only with ammo > 0 (retreats when empty)
+  //   hulk    always (unlimited fists)
+  //   others  always (melee fallback covers ammo=0 case)
   private cyborgsCanAttack(): boolean {
     for (const u of this.attackerUnits) {
       if (u.isDead) continue
       if (u.type === 'medic') continue
-      if (u.type === 'hulk') return true
-      if (u.ammoRemaining > 0) return true
+      if (u.type === 'sniper') {
+        if (u.ammoRemaining > 0) return true
+        continue
+      }
+      // Hulk, cannon, grenadier, doublegun, stalker, bomber, scout,
+      // tank, drone: all can still threaten the core via fists or
+      // melee fallback. Existence alone is enough to deny attrition.
+      return true
     }
     return false
   }
