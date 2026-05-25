@@ -202,6 +202,14 @@ export class Structure {
     plateMats: THREE.MeshBasicMaterial[]
   } | null = null
   private wallPulse = 0
+  // Shield dome overlay (Variant C from the sandbox). Sprite painted with
+  // a translucent cyan radial gradient plus a highlight band so it reads
+  // as a force-field bubble even under a top-down camera. Created in the
+  // constructor when type === 'defense'. Pulsed in update() for a soft
+  // breathing animation; opacity fades to zero when the shield is dying.
+  private shieldDomeSprite: THREE.Sprite | null = null
+  private shieldDomeMat: THREE.SpriteMaterial | null = null
+  private shieldDomePulse = 0
   // Wall orientation. Default = vertical (plates at top/bottom, beam runs
   // north-south, blocks the east-west cyborg corridor). When set to true
   // the entire wallBody Group rotates 90° on Z so plates sit left/right
@@ -235,6 +243,16 @@ export class Structure {
     this.mesh = new THREE.Group()
     this.mesh.position.set(this.worldX, this.worldY, 0)
     this.hpBar = this.buildVisual()
+    // Shield generator gets a translucent dome overlay attached so the
+    // aura coverage reads visually without inspecting the HUD. The dome
+    // covers the same 1.5-grid-cell radius the damage-reduction aura
+    // uses, so what you see is what gets protected.
+    if (type === 'defense') {
+      const dome = makeShieldDomeSprite()
+      this.shieldDomeSprite = dome
+      this.shieldDomeMat = dome.material as THREE.SpriteMaterial
+      this.mesh.add(dome)
+    }
     scene.add(this.mesh)
   }
 
@@ -580,7 +598,18 @@ export class Structure {
   }
 
   update(delta: number) {
-    // Wall pulse — runs every frame while the wall is alive so the beam +
+    // Shield dome pulse. Runs every frame while the shield is alive so
+    // the force-field reads as breathing. Fades to near-zero opacity
+    // during the dying animation so the dome collapses with the piece.
+    if (this.type === 'defense' && this.shieldDomeMat) {
+      this.shieldDomePulse += delta
+      const baseOp = this.dying || this.removed ? 0 : 1
+      // Slow ~0.33 Hz pulse between 0.65 and 1.0 of base. Subtle enough
+      // not to draw the eye away from the action.
+      const k = 0.82 + 0.18 * Math.sin(this.shieldDomePulse * 2.0)
+      this.shieldDomeMat.opacity = baseOp * k
+    }
+    // Wall pulse: runs every frame while the wall is alive so the beam +
     // sockets shimmer subtly. Sits outside the dying gate because we want
     // the pulse to keep running even while taking damage.
     if (this.type === 'wall' && this.wallParts && !this.dying && !this.removed) {
@@ -712,4 +741,75 @@ export class Structure {
 function normAngle(a: number): number {
   const TAU = Math.PI * 2
   return ((a % TAU) + TAU) % TAU
+}
+
+// ── Shield dome overlay ──────────────────────────────────────────────
+// Top-down translucent cyan force-field rendered as a Sprite child of
+// the Shield generator's mesh. Canvas-painted: radial gradient for the
+// dome body, a brighter rim at the edge, and a soft highlight band
+// near the top to suggest a hemisphere under the orthographic camera.
+// Sized to match the 1.5-grid-cell damage-reduction aura.
+
+let shieldDomeTexture: THREE.CanvasTexture | null = null
+function getShieldDomeTexture(): THREE.CanvasTexture {
+  if (shieldDomeTexture) return shieldDomeTexture
+  const c = document.createElement('canvas')
+  c.width = 256; c.height = 256
+  const ctx = c.getContext('2d')!
+  const cx = 128, cy = 128, r = 124
+  // Dome body. Bright cyan core fading to translucent edge.
+  const grad = ctx.createRadialGradient(cx, cy - 18, 20, cx, cy + 14, r)
+  grad.addColorStop(0.00, 'rgba(180, 230, 255, 0.42)')
+  grad.addColorStop(0.45, 'rgba(107, 217, 255, 0.26)')
+  grad.addColorStop(0.78, 'rgba(60, 140, 200, 0.18)')
+  grad.addColorStop(1.00, 'rgba(60, 140, 200, 0)')
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.fill()
+  // Rim. A thin cyan ring at the outer edge so the boundary reads at
+  // a glance even when the gradient fades smoothly into terrain.
+  ctx.strokeStyle = 'rgba(107, 217, 255, 0.7)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(cx, cy, r - 2, 0, Math.PI * 2)
+  ctx.stroke()
+  // Highlight band. Curved horizontal sliver near the top of the dome
+  // to suggest a 3D hemisphere even though we are rendering top-down.
+  const hi = ctx.createRadialGradient(cx, cy - 70, 4, cx, cy - 50, 80)
+  hi.addColorStop(0.0, 'rgba(220, 240, 255, 0.45)')
+  hi.addColorStop(0.6, 'rgba(220, 240, 255, 0.10)')
+  hi.addColorStop(1.0, 'rgba(220, 240, 255, 0)')
+  ctx.fillStyle = hi
+  ctx.beginPath()
+  ctx.ellipse(cx, cy - 60, 70, 24, 0, 0, Math.PI * 2)
+  ctx.fill()
+  shieldDomeTexture = new THREE.CanvasTexture(c)
+  shieldDomeTexture.magFilter = THREE.LinearFilter
+  shieldDomeTexture.minFilter = THREE.LinearFilter
+  shieldDomeTexture.colorSpace = THREE.SRGBColorSpace
+  return shieldDomeTexture
+}
+
+function makeShieldDomeSprite(): THREE.Sprite {
+  const tex = getShieldDomeTexture()
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    opacity: 1.0,
+  })
+  const sprite = new THREE.Sprite(mat)
+  // Dome diameter. Aura is 1.5 grid cells = 75 world units. Render the
+  // sprite a touch larger so the rim sits at the actual aura boundary
+  // when the canvas content (which fades within the last ~5 percent of
+  // the radius) is accounted for.
+  const D = Config.GRID_CELL * 3.2   // ~160 world units across
+  sprite.scale.set(D, D, 1)
+  // Sit BENEATH the structure sprite but above the ground grid. The
+  // structure renderOrder is typically 10; use 5 here.
+  sprite.position.set(0, 0, 0.4)
+  sprite.renderOrder = 5
+  return sprite
 }
