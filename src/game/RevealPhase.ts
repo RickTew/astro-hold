@@ -735,10 +735,23 @@ export class RevealPhase {
         list.push({ actor: st, action: { kind: 'fire', target: { kind: 'unit', id: target.id } } })
         continue
       }
-      // No cyborg in range — defenders can shoot ammo crates to deny
-      // enemy reloads. Costs the structure 1 ammo to destroy a crate
-      // (1 HP), so it's a trade: lose one shot to deny ~2 shots'
-      // worth of enemy ammo. Only fires if the crate sits in our arc.
+      // No cyborg in range. Mobile structures (S17.16 sentry) advance
+      // toward the nearest cyborg on the map so they reach the fight
+      // instead of holding a back-line firing position with no targets.
+      if (st.speed > 0) {
+        const closest = this.nearestCyborgToStructure(st)
+        if (closest) {
+          const cell = this.pickStructureStep(st, closest.worldX, closest.worldY)
+          if (cell) {
+            list.push({ actor: st, action: { kind: 'move', cell } })
+            continue
+          }
+        }
+      }
+      // No cyborg in range and no movement need. Stationary structures
+      // can shoot ammo crates to deny enemy reloads. Costs the
+      // structure 1 ammo to destroy a crate (1 HP), so it's a trade:
+      // lose one shot to deny ~2 shots' worth of enemy ammo.
       const crate = this.pickNearestAmmoBoxInRange(st)
       if (crate) {
         list.push({ actor: st, action: { kind: 'fire', target: { kind: 'ammobox', id: crate.id } } })
@@ -1642,6 +1655,44 @@ export class RevealPhase {
   // traversed bookkeeping, etc.) that the sphere does not have.
   // This is a stripped down cardinal-only "closer is better" picker
   // that respects cell occupancy.
+  // Nearest live cyborg to a structure (no sight gate). Used by mobile
+  // sentry AI when no enemy is in fire range so it can advance.
+  private nearestCyborgToStructure(st: Structure): SpriteUnit | null {
+    let best: SpriteUnit | null = null
+    let bestD = Infinity
+    for (const u of this.units) {
+      if (u.isDead) continue
+      const d = Math.hypot(u.worldX - st.worldX, u.worldY - st.worldY)
+      if (d < bestD) { bestD = d; best = u }
+    }
+    return best
+  }
+
+  // Structure cardinal step picker. Returns the col/row of the
+  // adjacent cell that most reduces the structure's distance to
+  // (tx, ty). Respects cell occupancy. Mirrors pickSphereStep but
+  // typed for Structure (it has col/row instead of worldX/Y as
+  // primary fields).
+  private pickStructureStep(st: Structure, tx: number, ty: number): CellRef | null {
+    const cs = Config.GRID_CELL
+    const curDist = Math.hypot(tx - st.worldX, ty - st.worldY)
+    let best: CellRef | null = null
+    let bestD = curDist
+    for (const [dx, dy] of CARDINAL_STEPS) {
+      const x = st.worldX + dx * cs
+      const y = st.worldY + dy * cs
+      if (x < Config.WORLD.LEFT || x > Config.WORLD.RIGHT) continue
+      if (y < Config.WORLD.BOTTOM || y > Config.WORLD.TOP) continue
+      if (this.isCellOccupiedAtBattle(x, y, st)) continue
+      const d = Math.hypot(tx - x, ty - y)
+      if (d < bestD) {
+        bestD = d
+        best = { col: st.col + dx, row: st.row + dy }
+      }
+    }
+    return best
+  }
+
   private pickSphereStep(sphere: SphereDefender, tx: number, ty: number): CellRef | null {
     const cs = Config.GRID_CELL
     const curDist = Math.hypot(tx - sphere.worldX, ty - sphere.worldY)
@@ -2593,14 +2644,22 @@ export class RevealPhase {
   }
 
   private executeMove(actor: Actor, cell: CellRef) {
-    // Mobile actors only. Structures can never move. SpriteUnit and
-    // SphereDefender both have moveTo. S17.12 made the sphere mobile;
-    // before, this branch only ran for SpriteUnit.
+    // Mobile actors. Structures CAN move now (S17.16 made sentry
+    // mobile via Structure.moveTo). SphereDefender and SpriteUnit
+    // also have moveTo. Wall/turret/etc. have speed=0 and are still
+    // queued only as 'hold' / fire actions, never 'move'.
     if (actor instanceof SphereDefender) {
       const dest = this.cellCenter(cell)
       if (this.isCellOccupiedAtBattle(dest.x, dest.y, actor)) return
       actor.moveTo(dest.x, dest.y)
       this.emit({ kind: 'move', actorType: 'sphere', side: 'defender' })
+      return
+    }
+    if (actor instanceof Structure && actor.speed > 0) {
+      const dest = this.cellCenter(cell)
+      if (this.isCellOccupiedAtBattle(dest.x, dest.y, actor)) return
+      actor.moveTo(cell.col, cell.row)
+      this.emit({ kind: 'move', actorType: actor.type, side: 'defender' })
       return
     }
     if (!(actor instanceof SpriteUnit)) return

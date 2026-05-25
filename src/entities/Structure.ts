@@ -166,14 +166,20 @@ export class Structure {
   hp: number
   readonly maxHp: number
   readonly type: StructureType
-  readonly col: number
-  readonly row: number
+  // S17.16: col/row are no longer readonly. Most structures stay put,
+  // but a few types (sentry currently) carry a speed in Config and are
+  // moved by the reveal engine via moveTo(). worldX/Y derive from col
+  // /row so updating those is the only state change needed.
+  col: number
+  row: number
 
-  // Stationary; sorts late in initiative. apBudget=0 for wall/mine means the
-  // reveal engine will skip them — they stay passive. Turrets/cannons get
-  // apBudget=1 and the reveal engine auto-fires them at their initiative tick
-  // (defender does not queue actions for them in the planning UI).
-  readonly initiative = STATIONARY_INITIATIVE
+  // Stationary by default; sorts late in initiative. apBudget=0 for
+  // wall/mine means the reveal engine will skip them. Mobile structures
+  // (sentry) override the initiative via the speed getter so they
+  // interleave with other mobile pieces instead of always sorting last.
+  get initiative(): number {
+    return Math.max(STATIONARY_INITIATIVE, this.speed)
+  }
   readonly apBudget: number
   apRemaining: number
   // D&D-style total ammo budget for the whole game. Once 0, the structure
@@ -653,6 +659,22 @@ export class Structure {
   get range()        { return Config.STRUCTURES[this.type].range }
   get damage()       { return Config.STRUCTURES[this.type].damage }
   get fireInterval() { return Config.STRUCTURES[this.type].fireInterval }
+  // S17.16: speed for mobile structures (sentry today). Most types
+  // have no speed field and stay at 0 = stationary.
+  get speed(): number {
+    return (Config.STRUCTURES[this.type] as { speed?: number }).speed ?? 0
+  }
+
+  // S17.16: snap-to-cell movement for mobile structures. No animation
+  // lerp; the structure's mesh + col/row update in one frame and the
+  // initiative cycle handles the per-turn cadence. Mirror of the
+  // sphere mobility pattern.
+  moveTo(col: number, row: number) {
+    if (this.isDead) return
+    this.col = col
+    this.row = row
+    this.mesh.position.set(this.worldX, this.worldY, this.mesh.position.z)
+  }
 
   clearPlan() {
     this.queuedActions = []

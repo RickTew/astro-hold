@@ -114,8 +114,10 @@ export class HUD {
       { label: 'HULK',     cost: 100, icon: '/sprites/hulk/south.png',      dataType: 'hulk' },
       { label: 'SNIPER',   cost:  90, icon: '/sprites/sniper/south.png',    dataType: 'sniper' },
       { label: 'MEDIC',    cost:  70, icon: '/sprites/medic/south.png',     dataType: 'medic' },
-      { label: '', cost: 0, icon: '', empty: true },
-      { label: '', cost: 0, icon: '', empty: true },
+      // S17.16: Stalker is now a placeable cyborg piece (was AI-only).
+      { label: 'STALKER',  cost:  70, icon: '/sprites/cyborg_stalker/south.png', dataType: 'stalker' },
+      // Cyborg mine. Tile shows up; placement flow + trigger are PENDING.
+      { label: 'CYBORG MINE', cost: 20, icon: '/sprites/cyborg_mine/south.png', dataType: 'cyborg_mine', preview: true },
     ]
     const tileHtml = (t: Tile, sideTag: 'def' | 'att') => {
       if (t.empty) {
