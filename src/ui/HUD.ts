@@ -331,11 +331,45 @@ export class HUD {
           <details class="sp-howto">
             <summary>How to play</summary>
             <div class="sp-howto-body">
-              <p><strong>BUILD:</strong> Spend credits to place pieces inside your zone. Click a tile to pick a piece, then click a cell.</p>
-              <p><strong>PLAN:</strong> Click any of your pieces, then click a cell to queue a move, or right-click an enemy to queue a shot. Right-click empty space to clear.</p>
-              <p><strong>BATTLE:</strong> Both sides reveal their planned actions in initiative order. Watch the round play out. Repeat until the Power Core falls or every attacker is gone.</p>
-              <p>The AI plays the opposite role. Pick DEFENDER and the AI attacks. Pick ATTACKER and the AI defends.</p>
+              <h4>The basics</h4>
+              <p><strong>BUILD:</strong> Spend credits to place pieces inside your zone. Click a tile to pick a piece, then click a cell. Right-click a placed piece to refund it (only for the piece type currently selected). Right-click a placed tower to open the compass rose and pay 30 credits per extra firing direction.</p>
+              <p><strong>BATTLE:</strong> Click BATTLE to start the reveal. Both sides act in initiative order (faster pieces go first). Reveals auto-chain turn after turn until the Power Core falls, every cyborg is dead, or no cyborg can still damage the core (defender attrition win).</p>
+              <p><strong>SIDES:</strong> Pick DEFENDER (robots) and the AI plays cyborgs. Pick ATTACKER (cyborgs) and the AI plays robots.</p>
               <p><strong>DIFFICULTY:</strong> EASY shrinks the AI army by 25 percent. HARD grows it by 25 percent. Your credits are unchanged either way.</p>
+
+              <h4>Combat rules</h4>
+              <p><strong>Firing arcs:</strong> Towers shoot in a strict CARDINAL LANE only (the row of cells directly in front of them). Diagonals do NOT count as "in front." Buy more facings via the compass rose (right-click on tower, 30cr per direction) to widen coverage.</p>
+              <p><strong>Per-game ammo:</strong> Every offensive piece carries a per-game shot budget (typically 5). Once spent the piece sits inert unless it can melee. Pick your shots.</p>
+              <p><strong>Melee fallback:</strong> Out-of-ammo cyborgs (except Sniper, Medic) can still punch adjacent enemies for 10 damage with no ammo cost.</p>
+              <p><strong>Death explosions:</strong> When any robot or any Hulk dies, an explosion damages all 8 surrounding cells (cardinal AND diagonal) for 25 damage. Cyborgs benefit from clustering attacks on packed towers (chain detonations). Defenders benefit from spacing towers ONE cell apart to avoid the chain.</p>
+              <p><strong>Bomb stacking:</strong> No two bombs can sit on the same cell. A second throw to an occupied cell fizzles.</p>
+
+              <h4>Robot side specials</h4>
+              <p><strong>Phaser beam:</strong> Phaser fires a piercing beam down its facing row. Every cyborg in that row up to range takes the full damage. Walls and allies are skipped (anti-cyborg only). Stack Phasers behind each other for concentrated firepower.</p>
+              <p><strong>Mortar:</strong> Lobs proximity mines onto empty cells. Arms after one turn. Detonates when a cyborg enters its AoE.</p>
+              <p><strong>Sphere:</strong> The most mobile defender. Rolls toward enemies. When out of ammo it suicide-rushes the nearest cyborg and detonates on adjacency.</p>
+              <p><strong>Sentry:</strong> Mobile heavy turret with omni-fire. Advances toward the cyborg push when no enemy is in range.</p>
+              <p><strong>Dog:</strong> Fast harasser. Actively pursues the nearest cyborg from spawn.</p>
+              <p><strong>Repair:</strong> Welds friendly pieces back to full HP and can REFILL their ammo (3 refills per trip, then must dock at the Power Core to recharge). Docking restores both heal charges (+2/turn) and refill charges (+1/turn).</p>
+              <p><strong>Shield:</strong> Generates a translucent cyan dome covering the 8 adjacent cells. Friendlies inside take 25 percent less damage from every source.</p>
+              <p><strong>Signal:</strong> EMP emitter. Stuns the cyborg furthest into the middle map for 2 turns. 2 strikes per game.</p>
+              <p><strong>Mine:</strong> Stationary trap. Detonates with massive AoE when any cyborg steps adjacent.</p>
+              <p><strong>Wall:</strong> 300 HP blocker. No weapon.</p>
+              <p><strong>Power Core defense:</strong> The 4x4 zone around the core electrocutes any cyborg standing in it each turn.</p>
+
+              <h4>Cyborg side specials</h4>
+              <p><strong>Hulk:</strong> Heaviest unit. Unlimited fists at melee. Special POWER SLAM hits a 3-cell wedge for 40 damage (3 slams per game). When killed Hulk explodes in a death blast that damages all 8 adjacent cells, allies included.</p>
+              <p><strong>Stalker:</strong> Cloaked melee bruiser. Spawns invisible. Defender targeting skips cloaked units. Cloak drops permanently on the first damage-dealing action. Melee-only, no ammo cost ever.</p>
+              <p><strong>Sniper:</strong> Single precision shot. CROUCH-AND-SHOOT rule: cannot crouch and shoot the same turn. First turn in range plays the aim pose, next turn fires. Movement breaks the crouch.</p>
+              <p><strong>Grenadier:</strong> Throws timed grenades. Must lob to the SIDE or BEHIND the nearest enemy, never in front. Wears explosive shielding so AoE damage is halved on Grenadiers themselves.</p>
+              <p><strong>Bomber:</strong> Lobs proximity mines like the robot Mortar. Strict no-self-AoE rule.</p>
+              <p><strong>Medic:</strong> Heals allies via three modes (med-pack throw, deployable medic-pad, weld-tether) sharing a 5-charge pool.</p>
+              <p><strong>Crates:</strong> Resupply boxes spawn in the middle of the map every 5 turns (max 4 on field). Cyborgs grab them by walking on top. Robots do NOT pick up crates; they dock at the Power Core instead.</p>
+
+              <h4>Win conditions</h4>
+              <p><strong>Cyborgs win:</strong> Power Core HP reaches 0.</p>
+              <p><strong>Defender wins:</strong> Either every cyborg is dead OR no living cyborg can still damage the core (every shooter is empty AND there are no Hulks or Stalkers alive AND no melee-fallback cyborg can reach the core).</p>
+              <p>No stalemates. The game is strictly die-or-survive.</p>
             </div>
           </details>
         </div>
