@@ -767,13 +767,10 @@ function getShieldDomeTexture(): THREE.CanvasTexture {
   ctx.beginPath()
   ctx.arc(cx, cy, r, 0, Math.PI * 2)
   ctx.fill()
-  // Rim. A thin cyan ring at the outer edge so the boundary reads at
-  // a glance even when the gradient fades smoothly into terrain.
-  ctx.strokeStyle = 'rgba(107, 217, 255, 0.7)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.arc(cx, cy, r - 2, 0, Math.PI * 2)
-  ctx.stroke()
+  // No outer rim stroke. The hard cyan ring used to read the boundary
+  // at a glance but it cut across other in-game visuals (turret
+  // sprites, terrain seams) and the user wanted it gone. The radial
+  // gradient alone still communicates coverage softly.
   // Highlight band. Curved horizontal sliver near the top of the dome
   // to suggest a 3D hemisphere even though we are rendering top-down.
   const hi = ctx.createRadialGradient(cx, cy - 70, 4, cx, cy - 50, 80)
