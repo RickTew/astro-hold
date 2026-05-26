@@ -1,21 +1,30 @@
 # AstroHold — Project Rules for Claude
 
-## Status: Single-player D&D-style strategy LIVE (session 18)
+## Status: Single-player D&D-style strategy LIVE (session 19)
 Turn-based grid strategy. **BUILD → REVEAL** is the live flow (PLAN code
 exists but is skipped, see Phase flow). After the first BATTLE click,
 reveals **auto-chain** until win / lose. **NO stalemate rule** in the
 classical sense (`feedback_die_or_survive`). Two terminal states: core
 dies (defender loses) or all cyborgs dead / unable to attack (defender
 wins). `cyborgsCanAttack()` in onComplete treats every non-medic /
-non-empty-sniper cyborg as a threat (melee fallback counts). S18 added
-a **stalemate guard**: 3 consecutive reveals with zero combat triggers
-an attrition win for defender. This is a safety net for stuck-loop
-bugs, not a balance rule.
+non-empty-sniper cyborg as a threat (melee fallback counts).
+
+**S19 stalemate guard v2.** The S18 guard was misfiring on opening
+marches and mid-match repositioning. Now gated on `firstCombatSeen` +
+`movementThisReveal`: the streak only ticks when neither combat NOR
+movement happened in a reveal. Marching cyborgs reset the streak;
+genuinely stuck pieces still trip it.
 
 **S18 economy:** both sides get the same base credits. Difficulty
 selector on the side picker (`Difficulty.aiCreditMultiplier()`)
 multiplies only the AI's pool: easy 0.75x, normal 1.0x, hard 1.25x.
 `ATTACKER_CREDIT_BONUS` and `AI_CREDIT_BONUS` constants are 0.
+
+**S19 audio + balance.** Full sample-based audio system (music +
+28 SFX events), Balance Health dashboard on `/stats.html`,
+shield-aura observability, balance pass (sniper/phaser -10%, cyborg
+combat ammo 4, Hulk HP 400, doublegun 2-shot burst). See
+`project_session_19_wrap` memory for the full log.
 
 Mechanics tuned for D&D-style strategy:
 - **Single-player mode (session 13).** Asset preload → side-picker modal
@@ -32,10 +41,11 @@ Mechanics tuned for D&D-style strategy:
     is gone — there's no PLAN phase + no second BUILD, so reserving
     credits made no sense.
 - **Limited per-game ammo** on every offensive piece. Once spent, it's inert.
-  **S18 baseline:** every combat piece has `ammo: 5`. Exceptions are
-  intentional: mine 1 (single-use), signal 2 (EMP), walls/shields 0
-  (no weapon), Stalker 0 (melee only, unlimited fists), Hulk fists
-  unlimited (slam costs slamAmmo: 3).
+  **S19 baseline:** defender combat pieces stay at `ammo: 5`. Cyborg
+  combat pieces (cannon, bomber, grenadier, doublegun, sniper) are
+  `ammo: 4` after the S19 balance pass. Exceptions: medic 5 (heal
+  charges), hulk 5 (fists unlimited anyway; slamAmmo: 3 separate),
+  mine 1, signal 2, walls/shields 0, Stalker 0 (melee unlimited).
 - **Cardinal-only fire arc (S18).** Towers + structures shoot only in
   the lane(s) they face. `targetInFireArc` requires forward dot > 0
   AND perpendicular distance ≤ half a cell. Diagonal cells need an

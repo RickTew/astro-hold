@@ -3,24 +3,34 @@
 Living balance document. Update as we tune. Aim: "like chess but not strict" —
 for any strong ability on one side, the other side gets a comparable counter.
 
-**Status:** Single-player D&D-style turn-based grid strategy is LIVE (session 18).
+**Status:** Single-player D&D-style turn-based grid strategy is LIVE (session 19).
 Numbers below are the current Config values. The turn-system transition is
 complete. AP budgets still ship on every piece for future use, but the active
 flow is BUILD then REVEAL (PLAN phase is currently skipped, see Turn flow).
 
-**S18 standardizations to read first:**
+**S19 changes since S18:**
+- **Phaser damage 40 → 36** and **Sniper damage 150 → 135** (-10% each; both were dominating their sides in the data).
+- **Cyborg combat ammo 5 → 4** on cannon, bomber, grenadier, doublegun, sniper. Hulk + medic stay at 5. Defender combat ammo stays at 5.
+- **Hulk HP 280 → 400.** Armor buff per user; data showed hulks dying en route to the core.
+- **Doublegun is a burst weapon.** Two projectiles per turn 80ms apart, 23 dmg each. Same total throughput as the prior single 45 dmg shot.
+- **Stalemate guard v2.** Counts no-progress reveals (no combat AND no movement) AFTER first combat event. Fixes opening-march and mid-match repositioning false trips.
+- **Balance Health dashboard** at the top of `/stats.html` — per-piece-per-side dmg/cr, win rate when deployed, shots vs base ammo, outlier flags.
+
+**S19 audio system.** Music (menu/robots/cyborgs themes) + 28 SFX events with sample pools (`/public/audio/Astrohold3 Suno Sounds/`) and synth fallbacks. Mute toggles in the MCC dial. Test page at `/build-test.html` exposes every active pool.
+
+**S19 shield aura observability.** Cyan flash on every protected hit, `(shielded)` log tag on direct-fire damage, `SHIELD SAVES` + `SHIELD ABSORBED` + `GAMES W/ SHIELD` cards in the stats SUMMARY.
+
+**S18 standardizations still apply:**
 - **Equal credits.** Both sides get the same base pool. `Difficulty.aiCreditMultiplier()` is the only adjustment knob (easy 0.75x, normal 1.0x, hard 1.25x on AI side).
-- **Equal ammo baseline.** Every combat piece is `ammo: 5`. Exceptions held for mechanic reasons: mine 1, signal 2, walls 0, shield 0, Stalker 0 (melee only).
 - **Cardinal-only fire arc.** Structures fire only in their facing lane (forward dot > 0 AND perp ≤ ½ cell). Extra lanes via compass rose.
 - **Unified death explosion.** `Config.DEATH_EXPLOSION = { radius: 75, damage: 25 }` for both robot self-destruct and Hulk death blast.
-- **Phaser beam.** "Cannon" renamed to PHASER in the HUD. Pierces the lane up to range 330; cyborg-only.
+- **Phaser beam.** "Cannon" renamed to PHASER in the HUD. Pierces the lane up to range 330; defender-only structure.
 - **Mortar.** Defender Bomber renamed to MORTAR in the HUD. Mechanic unchanged.
 - **Sphere is mobile.** Speed 110. Out-of-ammo spheres suicide-rush the nearest cyborg.
 - **Sentry is mobile.** Speed 40. Stays a Structure (omni-fire turret, compass rose still works).
 - **Shield aura.** Defender Shield (50cr) projects a 25% damage-reduction aura at 2.0 grid-cell radius.
 - **Repair refill mechanic.** Repair bot has 3 refillCharges separate from heal charges; +1 ammo to adjacent friendlies per refill.
 - **Power Core dock.** Repair units adjacent to the core regain +2 heal + +1 refill per turn.
-- **Stalemate guard.** 3 consecutive reveals with zero combat → attrition win for defender (safety net for stuck-loop bugs).
 - **Robots do NOT pick up ammo crates.** They restore via the core dock instead. Crates are cyborg-only.
 
 ---

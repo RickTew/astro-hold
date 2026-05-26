@@ -2440,3 +2440,221 @@ CLAUDE.md updated:
   the new equal-credits + stalemate guard nudge it above 0%.
 - Robot health tint convention not yet wired. Saved in memory
   for when readability becomes the priority.
+
+
+## Session 19 (2026-05-26/27) — Audio system, balance dashboard, observability, balance pass
+
+Big session: shipped the entire game audio layer, a real
+data-driven balance dashboard, and a measured balance pass
+that moved past the "shallow take" pattern from S18.
+
+### Music + SFX
+
+- `src/audio/music.ts` — three-track player (`/audio/menu.mp3`,
+  `/audio/robots.mp3`, `/audio/cyborgs.mp3`). Crossfade between
+  tracks, autoplay-gesture retry for browser blocking. Menu
+  plays under loading + side-picker; faction theme through
+  build/reveal/win/lose. MCC music toggle calls into
+  `AudioSettings.setMusicOn` which notifies a listener that
+  fades the live element to 0/target.
+
+- `src/audio/samples.ts` — AudioBuffer pool player.
+  `preloadPool(name, urls, opts)` fetches + decodes each url,
+  silently dropping failures. `playPool(name)` picks a random
+  buffer (avoids consecutive repeats on size-2+ pools), creates
+  a fresh BufferSource, returns true on successful trigger.
+
+- `src/audio/sfx.ts` — top dispatcher.
+  `playWeaponSfx(WeaponSfxId)` and `playEventSfx(SampleEvent)`
+  try the sample pool first; weapon ids fall back to existing
+  synth recipes. `preloadAllSamples()` decodes everything in
+  `Game.init` so first fire isn't silent.
+
+  28 event ids wired: rifle, phaser, sniper, doublegun, sentry,
+  sphere, bomb_throw, melee_hit, stalker_swing, hulk_slam, heal,
+  weld, explosion, core_zap, signal_attack, ammo_pickup,
+  core_recharge, repair_recharged, medic_pad_tick, button_click,
+  button_toggle, power_up, robot_alert, structure_placement,
+  refund, signal_placement, shield_placement, step.
+
+  `hulk_callout` was preloaded then removed — Suno-rendered voice
+  callout that macOS Live Caption transcribed as "Wow, wow." File
+  stays on disk for future use.
+
+  Suno samples live in `/public/audio/Astrohold3 Suno Sounds/`
+  (folder has spaces; browser URL-encodes). The heavy `WAV and
+  Alternatives/` backup folders are gitignored.
+
+### Build-test page moved to Vite input
+
+- `build-test.html` moved from `/public/` to repo root and
+  added to `vite.config.ts` rollupOptions.input. New entry
+  module `src/devtools/buildTest.ts` imports production
+  `MiniControlCenter` and `makeShieldDomeSprite` (now
+  exported from `Structure.ts`) and mounts them directly into
+  preview slots. No more sandbox-vs-production drift on those.
+- The Sound Test section was also rebuilt to mirror every
+  active pool in `sfx.ts` grouped by category, with chips per
+  variant.
+- Important: opening the file via `file://` breaks ES module
+  imports and audio fetches. Red warning at the top of the
+  page directs to live URL or `pnpm dev`.
+
+### Stalemate guard v2
+
+S18 guard was misfiring during normal opening marches and
+mid-match repositioning. Two fixes:
+
+1. `firstCombatSeen` boolean — `noCombatStreak` doesn't tick
+   until the first combat event of the match has fired.
+2. `movementThisReveal` on RevealPhase — successful
+   `executeMove` (not blocked attempts) sets it.
+   Game increments `noCombatStreak` only when BOTH `combat-
+   ThisReveal` AND `movementThisReveal` were false in the
+   reveal. Marching cyborgs reset the streak; genuinely
+   stuck pieces still trip the guard at 3 reveals.
+
+### Damage reconciliation
+
+Five log lines used a format the parser regex (`/\(−(\d+)/`)
+couldn't catch, causing the reported damage to undershoot
+attribute totals. Fixed to standard `(−N, K killed)` shape:
+
+- Self-destruct AoE log
+- Hulk death blast log
+- Phaser beam log
+- Mine trigger log (had `(N hit, −total)` — regex needs `(−` adjacent)
+- Core blast (had NO log at all; added one)
+
+Divergence should now stay under 5% in normal matches; the
+residual comes from shield-aura raw-vs-final differential in
+AoE damageDealt calc (raw used in summary, shielded in
+attribute), worth tackling separately if it bothers anyone.
+
+### Balance pass
+
+Driven by 12-match dataset analysis on stats.html.
+
+- **Phaser damage 40 → 36** (10% cut). Was the only defender
+  weapon winning consistently because its lane-piercing beam
+  multi-hits cyborg columns.
+- **Sniper damage 150 → 135** (10% cut). Sniper was 5-7x more
+  efficient (dmg/cr) than any other DPS source in the data.
+- **Cyborg combat ammo 5 → 4** on cannon, bomber, grenadier,
+  doublegun, sniper. Medic + hulk stay at 5 (heal charges /
+  unlimited fists). Sniper ammo specifically was suspect:
+  with base 5 + crate pickups, snipers were firing 13-16
+  shots in some matches.
+- **Hulk HP 280 → 400.** Data showed hulks walking 200-700
+  cells and dying before reaching the core. Armor buff per
+  user direction ("he is a HULK").
+- **Doublegun → burst weapon.** Spawns a second projectile
+  80ms after the first via setTimeout (same target, same
+  onHit handler). Per-shot damage 45 → 23 so total per-turn
+  damage ~46 matches the prior 45. Burst feel, same total.
+
+### Balance Health dashboard
+
+New panel at top of `/stats.html`. Per-piece-per-side rows
+showing:
+- Deployments (matches where piece appeared)
+- Win rate when deployed
+- Avg dmg/match
+- Dmg/cr
+- Avg shots / base ammo
+- Outlier flag: 🔥 OVER (>2x side avg dmg/cr) / ❄ UNDER (<0.5x)
+  / ⚠ AMMO+ (avg shots > 1.5x base, ie crate stacking)
+
+`aggregate()` now tracks deployment count + wins-when-deployed
+per (side, type). Side averages printed above each table so
+outlier thresholds are explicit.
+
+`BASE_AMMO` table inline in `stats.html` mirrors Config; keep
+in sync when ammo values change or AMMO+ flag misfires.
+
+### Shield aura verification
+
+User asked "how do we know the shield is working?" — three
+signals added:
+
+1. Cyan flash explosion on every protected target each time
+   `shieldedDamage` reduces a hit.
+2. `(shielded)` log tag next to direct-fire damage when the
+   aura fires (AoE / Hulk-slam logs are summary-level and
+   don't surface per-target shielding yet).
+3. `shieldSaves` + `shieldAbsorbed` counters per RevealPhase,
+   rolled up in Game.onComplete, persisted in BattleRecord.
+   New SUMMARY cards: SHIELD SAVES, SHIELD ABSORBED, GAMES
+   W/ SHIELD.
+
+### Visual + UX polish
+
+- **Phaser beam height.** Measured directly against
+  `/sprites/gun/south.png` (64x64 px, cyan barrel glow center
+  at image (38.5, 27.5) → world +15.6 forward, +2.8 perp-up
+  from cell center). New constants: BARREL_FORWARD=16,
+  BARREL_PERP_LEFT=3 with perpendicular vector `(-fy, fx)`
+  so future per-facing sprites work too. Don't guess sprite
+  offsets — measure.
+- **Mine sprite.** Procedural circle + torus deleted; mine
+  now uses `/sprites/robot_mine/south.png` at world size 36.
+  Folder name is `robot_mine`, not `mine` (the latter doesn't
+  exist; my first attempt 404'd the preload and hung the
+  splash for one commit).
+- **Laser bolt color** cyan `0x00e5ff` (matches sprite emitter).
+- **Shield dome grow-on-place** 2.5s ease-out-cubic, opacity
+  ramps with scale. Visual bloom syncs with the placement
+  sound. Implemented in Structure.update.
+- **Speech bubble lines** shortened where they overflowed
+  the 320px canvas. Worst offenders: SELF-DESTRUCT PROTOCOL
+  ENGAGED → SELF-DESTRUCT, CRITICAL BREACH. INTENTIONAL →
+  BREACH INTENT, PRECISION SHOT CONFIRMED → PRECISION SHOT.
+- **Refund sound.** Space placement sound.mp3 moved out of
+  structure_placement pool into its own `refund` pool; plays
+  on every refund path (sphere/dog/repair/cyborg click during
+  BUILD, and the compass rose Refund button).
+- **MCC toggle click** — switched from the on/off-pair sample
+  (which read as double-click) to the single Click sound.
+
+### Cyborg Sentry sprites staged
+
+Unzipped Cyborg_Sentry.zip into `/public/sprites/cyborg_sentry/`
+following the project layout: 8 rotation PNGs, 8-direction
+walking (9 frames each), 4-direction shoot animation (N/S/E/W
+only — no diagonals yet). Hash-suffix folder names from PixelLab
+stripped; attack folder renamed to `shoot` to match other
+entities. Not wired to gameplay (cyborg-defender role isn't
+active). Source zip is local-only.
+
+### Memories saved this session
+
+- `project_session_19_wrap` — full session log
+- `project_audio_architecture` — module layout + Suno vocal-pad risk
+- `project_build_test_vite_input` — sandbox in Vite build graph
+- `feedback_data_driven_balance` — read the dashboard, don't drop shallow takes
+- `feedback_base_ammo_mirror_sync` — BASE_AMMO in stats.html mirrors Config
+- `feedback_no_blockquotes` (saved earlier this session) — don't use
+  `>` markdown blockquotes in chat output (copy-paste issue)
+
+### Open going into next session
+
+- **Cyborg-defender role on side picker.** User plans to ship a
+  Cyborg-as-Defender mode; per user direction it'll reuse robot
+  tower art with a color tint until dedicated cyborg defensive
+  sprites are made.
+- **"Wow, wow." Live Caption transcription.** hulk_callout removed
+  from preload; phaser sample tested clean on chip audition. Could
+  still be another Suno render with a vocal pad. Parked as
+  intermittent annoyance, not a blocker.
+- **Damage reconciliation gap** of ~11-15% on a few matches with
+  mixed defender builds (dog + sphere + structures). Likely the
+  shield-aura raw-vs-final differential in AoE `damageDealt` calc.
+  Fixable with a per-victim damageDealt accumulator inside
+  applyAoeForSide.
+- **AoE / Hulk-slam shield log tags.** Per-target shielding doesn't
+  show in summary-level logs. Save counter does catch them, but a
+  per-target annotation would make AoE shielding visible too.
+- **Balance health follow-ups.** Next 5-10 matches with the new
+  numbers should show whether sniper falls off 🔥 OVER, whether any
+  cyborg pieces go ❄ UNDER, and whether hulk arrival rate improved
+  at 400 HP. Then iterate.
