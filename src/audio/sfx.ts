@@ -62,14 +62,8 @@ const POOLS: Record<SampleEvent, PoolSpec> = {
     ],
     volume: 0.7, throttleMs: 35,
   },
-  // phaser sample temporarily disabled. The lone Suno render
-  // (Defender Cannon (phaser Beam) Shot (1).mp3) appears to be the
-  // source of macOS Live Caption "Wow, wow." transcriptions during
-  // matches with multiple laser turrets firing. Falling back to the
-  // synth phaser recipe (square + sine shimmer) until a clean render
-  // is available. File stays on disk.
   phaser: {
-    urls: [],
+    urls: [ `${SUNO_DIR}/Defender Cannon (phaser Beam) Shot (1).mp3` ],
     volume: 0.7, throttleMs: 45,
   },
   sniper: {
