@@ -227,7 +227,7 @@ export class Structure {
   // Synced visually with the shield_placement sample so the dome
   // "blooms" alongside the placement sound.
   private shieldGrowTime = 0
-  private readonly shieldGrowDuration = 2.2
+  private readonly shieldGrowDuration = 2.5
   private shieldFullScale = 0
   // Wall orientation. Default = vertical (plates at top/bottom, beam runs
   // north-south, blocks the east-west cyborg corridor). When set to true

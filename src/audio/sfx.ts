@@ -85,7 +85,7 @@ const POOLS: Record<SampleEvent, PoolSpec> = {
   sphere: {
     urls: [
       `${SUNO_DIR}/Laser Shot.mp3`,
-      `${SUNO_DIR}/Bright Sine Sweep + Triangle Partial.mp3`,
+      `${SUNO_DIR}/Bright Sine Sweep Triangle Partial.mp3`,
     ],
     volume: 0.7, throttleMs: 45,
   },
