@@ -2201,8 +2201,18 @@ export class RevealPhase {
   // beneath them, also addressing the "low" perception.
   private spawnPhaserBeamVisual(ax: number, ay: number, fx: number, fy: number, range: number) {
     const angle = Math.atan2(fy, fx)
-    const barrelOffset = Config.GRID_CELL / 2     // start at cell edge
-    const beamLen = range - barrelOffset          // ends at range from cell center
+    // Beam start position derived from the actual gun sprite art rather
+    // than from cell geometry. Measured against /sprites/gun/south.png
+    // (64x64 px, rendered at 40 world units): the cyan barrel glow's
+    // mid-east tip sits at image (57, 27.5) which maps to world
+    // (+15.6 forward, +2.8 perpendicular-left) from cell center. That is
+    // where the beam should emerge so it reads as "out of the barrel."
+    // Prior values used GRID_CELL/2 = 25 forward + 0 perp, which started
+    // the beam ~9 units east of the visible barrel tip and 3 units below
+    // the glow centerline — that was the "wrong height" the user flagged.
+    const BARREL_FORWARD = 16   // world units along facing direction
+    const BARREL_PERP_LEFT = 3  // world units perpendicular (counter-clockwise from facing)
+    const beamLen = range - BARREL_FORWARD
     const beamWidth = 10
     const geo = new THREE.PlaneGeometry(beamLen, beamWidth)
     const mat = new THREE.MeshBasicMaterial({
@@ -2213,9 +2223,13 @@ export class RevealPhase {
       depthTest: false,
     })
     const mesh = new THREE.Mesh(geo, mat)
-    // Beam centroid sits at (barrel tip) + half beam length in facing dir.
-    const cx = ax + fx * (barrelOffset + beamLen / 2)
-    const cy = ay + fy * (barrelOffset + beamLen / 2)
+    // Perpendicular-counter-clockwise vector for the lateral offset.
+    // For east-facing (fx=1, fy=0) this is (0, +1), so the beam lifts
+    // by +3 world Y to align with the cyan glow.
+    const px = -fy
+    const py = fx
+    const cx = ax + fx * (BARREL_FORWARD + beamLen / 2) + px * BARREL_PERP_LEFT
+    const cy = ay + fy * (BARREL_FORWARD + beamLen / 2) + py * BARREL_PERP_LEFT
     mesh.position.set(cx, cy, 12)
     mesh.rotation.z = angle
     mesh.renderOrder = 14
