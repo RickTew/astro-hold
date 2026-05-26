@@ -23,6 +23,7 @@ const STRUCTURE_SPRITE_FOLDERS: Partial<Record<StructureType, string>> = {
   cannon:  'gun',
   laser:   'laser',    // twin-laser turret
   signal:  'signal',   // satellite dish — EMP emitter
+  mine:    'mine',     // spiky proximity mine (matches the HUD tile sprite)
 }
 // Structures that ship with a 4-frame explosion sequence (folder/explosion/).
 const STRUCTURE_HAS_EXPLOSION: Partial<Record<StructureType, true>> = {
@@ -46,6 +47,9 @@ const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
   // Hulk's override in SpriteUnit.ts is also 84 — kept in sync.
   sentry: 84,
   gun:    40,
+  // Mine sits low on the ground; smaller than a turret so it reads as
+  // a footprint trap, not a structure occupying the whole cell.
+  mine:   36,
 }
 const SPRITE_SIZE = 50   // default — one cell
 // Per-type default facing. Tower has full 8 rotations and ships pointing
@@ -289,7 +293,8 @@ export class Structure {
       case 'defense':
       case 'gun':
       case 'laser':
-      case 'signal': {
+      case 'signal':
+      case 'mine': {
         // Pixel sprite — same SpriteMaterial flags as cyborgs/spheres.
         // depthTest off so we sit cleanly above the ground without z-fighting.
         // Team tint is multiplicative so structures shared between factions
@@ -396,17 +401,6 @@ export class Structure {
           plateMats: [plateMat, plateMat2],
         }
         this.mesh.add(group)
-        break
-      }
-      case 'mine': {
-        this.mesh.add(new THREE.Mesh(
-          new THREE.SphereGeometry(10, 8, 8),
-          new THREE.MeshBasicMaterial({ color: 0xffcc00 })
-        ))
-        this.mesh.add(new THREE.Mesh(
-          new THREE.TorusGeometry(14, 2, 6, 20),
-          new THREE.MeshBasicMaterial({ color: 0xff6600 })
-        ))
         break
       }
     }
