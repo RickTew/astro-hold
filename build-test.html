@@ -618,7 +618,7 @@
       reparented from its floating bottom-right anchor into the preview slot below. Toggles
       and pips are interactive but no-op in the sandbox.
     </p>
-    <div class="preview-frame" style="display:flex;justify-content:center;align-items:center;padding:32px 16px;">
+    <div class="preview-frame" style="display:flex;justify-content:center;align-items:center;padding:32px 16px;height:auto;overflow:visible;">
       <div id="mcc-preview-host" style="width:260px;height:260px;position:relative;"></div>
     </div>
   </div>
@@ -636,7 +636,7 @@
       at settled full-scale (the 2.5s grow-on-place animation skipped). Opacity pulse
       matches the in-game breathing.
     </p>
-    <div class="preview-frame" style="display:flex;justify-content:center;align-items:center;padding:24px 16px;background:rgba(20,28,40,0.6);">
+    <div class="preview-frame" style="display:flex;justify-content:center;align-items:center;padding:24px 16px;background:rgba(20,28,40,0.6);height:auto;overflow:visible;">
       <div id="shield-preview-host" style="width:280px;height:280px;"></div>
     </div>
   </div>
@@ -686,7 +686,7 @@
       the bubble as it appears above a sprite in the actual game
       (140 world units wide, roughly 220 screen pixels).
     </p>
-    <div class="preview-frame" style="padding:32px 24px;">
+    <div class="preview-frame" style="padding:32px 24px;height:auto;overflow:visible;">
       <div class="cm-sample-wrap">
         <canvas id="cm-sample-canvas" width="320" height="80"></canvas>
         <div id="cm-sample-caption" class="cm-sample-caption">Click any cyborg or robot line above to render the bubble.</div>
@@ -1219,7 +1219,7 @@
        ═════════════════════════════════════════════ -->
   <div class="preview-section">
     <h2>SOUND TEST <span class="tag after">SUNO SAMPLE OPTIONS</span></h2>
-    <div class="preview-frame" style="padding: 20px; display: flex; flex-direction: column; gap: 22px;">
+    <div class="preview-frame" style="padding: 20px; display: flex; flex-direction: column; gap: 22px; height: auto; overflow: visible;">
       <p style="color:#cce8ff; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; max-width: 820px;">
         Every pool currently active in <code>src/audio/sfx.ts</code>, grouped by category and
         showing exact current choices. Single-option pools render one chip; multi-option
