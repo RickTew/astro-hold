@@ -3119,7 +3119,12 @@ export class RevealPhase {
 
     const muzzle = this.actorMuzzle(actor, aim.x, aim.y)
     const damage = isMeleeFallback ? MELEE_FALLBACK_DAMAGE : this.actorDamage(actor)
-    const color = actor.side === 'defender' ? 0xffee00 : 0xff3333
+    // Per-weapon projectile colour overrides. Laser tower fires a bolt
+    // that matches its sprite's cyan emitter glow so the shot reads as
+    // "energy weapon" instead of the generic yellow defender bullet.
+    // Defaults stay: yellow for defender, red for cyborg.
+    let color = actor.side === 'defender' ? 0xffee00 : 0xff3333
+    if (actor instanceof Structure && actor.type === 'laser') color = 0x00e5ff
     // Lobbed AoE = Bomber (defender structure) + Bomber/Grenadier (cyborg
     // units). These throw a grenade with a 1-turn fuse: projectile lands as
     // a PendingGrenade sprite, detonates at the start of the next reveal.
