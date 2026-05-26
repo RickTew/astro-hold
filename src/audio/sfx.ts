@@ -181,10 +181,7 @@ const POOLS: Record<SampleEvent, PoolSpec> = {
     volume: 0.5, throttleMs: 300,
   },
   structure_placement: {
-    urls: [
-      `${SUNO_DIR}/Robot placement.mp3`,
-      `${SUNO_DIR}/Robot other placement.mp3`,
-    ],
+    urls: [ `${SUNO_DIR}/Robot placement.mp3` ],
     volume: 0.6, throttleMs: 80,
   },
   refund: {
