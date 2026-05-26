@@ -367,7 +367,7 @@ export class RevealPhase {
       const summary = this.applyAoeForSide(x, y, DEATH_R, DEATH_DMG, 'attacker', 'hulk_blast')
       if (summary.hits > 0) {
         this.combatThisReveal = true
-        this.log('attacker', `Hulk death blast hits ${summary.hits} (${summary.damageDealt} dmg${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+        this.log('attacker', `Hulk death blast hits ${summary.hits} (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
       }
       return
     }
@@ -381,7 +381,7 @@ export class RevealPhase {
     const summary = this.applyAoeForSide(x, y, DEATH_R, DEATH_DMG, 'defender', 'self_destruct')
     if (summary.hits > 0) {
       this.combatThisReveal = true
-      this.log('defender', `Self-destruct AoE hits ${summary.hits} (${summary.damageDealt} dmg${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+      this.log('defender', `Self-destruct AoE hits ${summary.hits} (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
     }
   }
 
@@ -2166,7 +2166,7 @@ export class RevealPhase {
     playWeaponSfx('phaser')
     this.log('defender', hits === 0
       ? `${this.actorLabel(struct)} fires phaser beam (no targets)`
-      : `${this.actorLabel(struct)} phaser beam hits ${hits} (${totalDamage} dmg)`)
+      : `${this.actorLabel(struct)} phaser beam hits ${hits} (−${totalDamage})`)
     if (hits > 0) this.emit({ kind: 'hit',  actorType: 'cannon', side: 'defender' })
     else          this.emit({ kind: 'miss', actorType: 'cannon', side: 'defender' })
   }
