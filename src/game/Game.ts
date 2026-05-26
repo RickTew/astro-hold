@@ -934,16 +934,22 @@ private enterBuildPhase() {
       // S17.25: read combatThisReveal BEFORE the revealPhase is nulled.
       // This drives the no-progress stalemate guard below.
       const hadCombat = this.revealPhase?.combatThisReveal ?? false
+      // S19.2: progress = combat OR movement. A reveal where cyborgs
+      // marched a cell west but didn't reach engagement range is still
+      // forward progress and must not count toward the stalemate streak.
+      const hadMovement = this.revealPhase?.movementThisReveal ?? false
+      const hadProgress = hadCombat || hadMovement
       this.hud.appendCombatLog(this.revealTurn, entries)
       this.accumulateStatsFromLog(entries)
       this.revealTurn++
       this.revealPhase = null
-      if (hadCombat) {
-        this.firstCombatSeen = true
+      if (hadCombat) this.firstCombatSeen = true
+      if (hadProgress) {
         this.noCombatStreak = 0
       } else if (this.firstCombatSeen) {
-        // Only count post-engagement quiet reveals. Pre-engagement march
-        // turns are normal and must not trip the stalemate guard.
+        // Only count post-engagement reveals that produced NEITHER combat
+        // NOR movement. Marching cyborgs reset the streak; truly stuck
+        // pieces (blocked path with no targets) do not.
         this.noCombatStreak++
       }
       // End-of-reveal bomb tick: unarmed → armed, already-armed gets its

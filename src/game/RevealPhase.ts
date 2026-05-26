@@ -157,6 +157,12 @@ export class RevealPhase {
   // this to detect a "no-progress" stalemate when all sides are out of
   // ammo and movement loops indefinitely.
   combatThisReveal = false
+  // True if any unit actually moved this reveal (successful executeMove,
+  // not a blocked attempt). Game combines this with combatThisReveal: a
+  // reveal that produced NEITHER is a true no-progress reveal. Marching
+  // cyborgs counted as no-combat reveals were tripping the stalemate
+  // guard while units were still pathing toward each other.
+  movementThisReveal = false
 
   // D&D-style turn log. Each combat-relevant event pushes one entry here as
   // it resolves. Game reads this after onComplete and forwards it to the HUD.
@@ -2834,6 +2840,7 @@ export class RevealPhase {
       const dest = this.cellCenter(cell)
       if (this.isCellOccupiedAtBattle(dest.x, dest.y, actor)) return
       actor.moveTo(dest.x, dest.y)
+      this.movementThisReveal = true
       this.emit({ kind: 'move', actorType: 'sphere', side: 'defender' })
       return
     }
@@ -2841,6 +2848,7 @@ export class RevealPhase {
       const dest = this.cellCenter(cell)
       if (this.isCellOccupiedAtBattle(dest.x, dest.y, actor)) return
       actor.moveTo(cell.col, cell.row)
+      this.movementThisReveal = true
       this.emit({ kind: 'move', actorType: actor.type, side: 'defender' })
       return
     }
@@ -2848,6 +2856,7 @@ export class RevealPhase {
     const dest = this.cellCenter(cell)
     if (this.isCellOccupiedAtBattle(dest.x, dest.y, actor)) return   // strict skip
     actor.moveTo(dest.x, dest.y)
+    this.movementThisReveal = true
     // Telemetry — one 'move' event per successful step. Game tallies into
     // cellsWalkedByPieceType so /stats.html can show engagement (low number
     // means the type held / was blocked / never advanced).
