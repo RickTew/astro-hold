@@ -4,6 +4,7 @@ import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTy
 import { playExplosion } from '../audio/sfx'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { spawnSpeechBubble, SpeechTrigger } from './SpeechBubble'
+import { makeShadowSprite } from '../scene/Shadow'
 
 // Pixel-sprite atlases for sprite-based structures. Walls/mines stay
 // geometric (Box / Sphere). The five "preview" pieces (defense/dog/gun/laser/
@@ -315,6 +316,13 @@ export class Structure {
         sprite.renderOrder = 10
         this.mesh.add(sprite)
         this.sprite = sprite
+        // Grounded side-themed drop shadow. All structures are defender
+        // pieces (blue) today; mapping leaves room for cyborg-placed
+        // structures (red) if that mechanic lands later.
+        this.mesh.add(makeShadowSprite({
+          size: sz,
+          side: this.team === 'player' ? 'defender' : 'attacker',
+        }))
         break
       }
       case 'wall': {

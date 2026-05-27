@@ -1199,7 +1199,9 @@
     }
     /* DUSTY PLANET: lighter sand-tan with a global warm light. Brighter
        midtones than the old "warm dusk" so it reads as a Mars-like
-       desert surface, not a stone dungeon. */
+       desert surface, not a stone dungeon.
+       Source-of-truth for the live game floor — keep in sync with
+       src/scene/Background.ts buildGround(). */
     .floor-lab .stage-floor-warm {
       background:
         radial-gradient(circle at 25% 20%, rgba(255, 220, 170, 0.22) 0%, transparent 55%),
@@ -1249,14 +1251,16 @@
     .floor-lab .lab-piece.cell-1-5 { width: 13.5%; height: 40.5%; }
 
     /* Wide stage for the REAL TEST preview. Matches the real game's
-       3:1 board aspect, with a 12x4 cell grid (half the live 24x8). */
+       3:1 board aspect, with a 12x4 cell grid (half the live 24x8).
+       NOTE: no fallback background here. The floor variant class
+       (stage-floor-warm etc.) supplies the painter, and a fallback
+       on this rule would override it due to CSS source order. */
     .floor-lab .lab-stage-wide {
       position: relative;
       width: 100%;
       aspect-ratio: 3 / 1;
       border-radius: 6px;
       overflow: hidden;
-      background: #1a160f;
       margin-top: 4px;
     }
     .floor-lab .lab-stage-wide .lab-grid {

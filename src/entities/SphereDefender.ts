@@ -3,6 +3,7 @@ import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { spawnSpeechBubble, SpeechTrigger } from './SpeechBubble'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, STATIONARY_INITIATIVE, nextActorId } from '../game/TurnTypes'
+import { makeShadowSprite } from '../scene/Shadow'
 import { playExplosion } from '../audio/sfx'
 
 // Pre-rendered pixel-art sphere: 8 directions. Cycling through them on a
@@ -106,6 +107,14 @@ export class SphereDefender {
     this.sprite.position.set(0, 0, 5)
     this.sprite.renderOrder = 10
     this.mesh.add(this.sprite)
+    // Floating drop shadow — sphere is the one piece that actually
+    // floats in-game, so the shadow sits well below the visible body
+    // to read the gap. See src/scene/Shadow.ts.
+    this.mesh.add(makeShadowSprite({
+      size: SPHERE_SCREEN_SIZE,
+      side: 'defender',
+      floating: true,
+    }))
 
     const { group, fill } = this.buildHpBar()
     this.hpBarGroup = group

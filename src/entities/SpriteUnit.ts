@@ -3,6 +3,7 @@ import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { spawnSpeechBubble, SpeechTrigger, SpeechVoice } from './SpeechBubble'
+import { makeShadowSprite } from '../scene/Shadow'
 
 // Pixel-sprite attacker unit. Same public shape as Unit (so BattlePhase + Game
 // treat them interchangeably). Body is an 8-direction sprite with per-state
@@ -419,6 +420,12 @@ export class SpriteUnit {
     this.mesh.add(this.sprite)
     // Stalker spawns visibly ghosted (35% opacity) to telegraph the cloak.
     if (this.cloaked) this.sprite.material.opacity = 0.35
+    // Side-themed grounded drop shadow. Defenders blue, attackers red.
+    // Moves with the mesh group as the unit walks. See src/scene/Shadow.ts.
+    this.mesh.add(makeShadowSprite({
+      size: spriteSizeFor(this.type),
+      side: this._side,
+    }))
 
     const { group, fill } = this.buildHpBar()
     this.hpBarGroup = group
