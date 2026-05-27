@@ -69,16 +69,17 @@ export function makeShadowSprite({
     opacity: 1.0,
   })
   const sprite = new THREE.Sprite(mat)
-  // Width 70%, height 16% of sprite_size. Matches the build-test
-  // piece-shadow base CSS (width:70% height:16%).
-  sprite.scale.set(size * 0.7, size * 0.16, 1)
-  // Position: shadow center at fraction below the mesh center. For
-  // standard sprites this is -0.28 (matches build-test top:78%). For
-  // taller-feet sprites (laser/gun/signal) we land the shadow at
-  // their actual feet by passing the measured footFraction.
-  const foot = Math.max(footFraction ?? 0.74, 0.78)
+  // Width 70%, height 14% of sprite_size. Matches the build-test
+  // piece-shadow base CSS (width:70% height:14%).
+  sprite.scale.set(size * 0.7, size * 0.14, 1)
+  // Position the shadow center EXACTLY at the visible feet of the
+  // sprite (no offset past). Half hides behind the opaque sprite
+  // pixels above; half is the visible halo below. No gap between
+  // sprite and shadow, so no "floating" perception.
+  const foot = footFraction ?? 0.74
   const groundedY = (0.5 - foot) * size
-  const floatingY = (0.5 - foot - 0.18) * size
+  // Floating sphere drops 16% past its feet so the float gap reads.
+  const floatingY = (0.5 - foot - 0.16) * size
   sprite.position.set(0, floating ? floatingY : groundedY, 4)
   sprite.renderOrder = 9
   return sprite

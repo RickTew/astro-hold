@@ -1275,31 +1275,31 @@
        relative to the piece container, so the shadow is always tied to
        its sprite (no orphan-coordinate drift).
 
-       Measured offline: every game sprite in /public/sprites/ has its
-       visible content from ~27% to ~74% of the PNG vertically (the
-       remaining ~25% at the bottom is transparent padding). Default
-       shadow top of 78% means the shadow center sits just past the
-       visible feet, with the top of the shadow hiding behind the sprite
-       and the bottom half extending below as a halo. Grounded pieces
-       read as standing on the floor. */
+       Measured offline: every standard game sprite has its visible
+       content from ~27% to ~74% of the PNG vertically (the remaining
+       ~25% at the bottom is transparent padding). Shadow center at
+       top:74% sits EXACTLY at the visible feet — the upper half of
+       the shadow hides behind the sprite, the lower half is the
+       visible halo. No gap between sprite and shadow.
+       SOURCE OF TRUTH alongside src/scene/Shadow.ts — change both. */
     .floor-lab .piece-shadow {
       position: absolute;
       left: 50%;
-      top: 78%;
+      top: 74%;
       transform: translate(-50%, -50%);
       width: 70%;
-      height: 16%;
+      height: 14%;
       border-radius: 50%;
       pointer-events: none;
       z-index: 1;
     }
     /* Floating piece (Sphere): drop shadow well below the piece body,
-       leaving a visible gap. 105% top puts shadow center 5% of piece
-       height past the bottom of the bbox. */
+       leaving a visible gap. 100% top puts shadow center 26% of piece
+       height past the visible feet (16% past for the float gap). */
     .floor-lab .lab-piece[data-grounded="false"] .piece-shadow {
-      top: 105%;
+      top: 100%;
       width: 58%;
-      height: 14%;
+      height: 13%;
       opacity: 0.85;
     }
     /* Shadow tint variants. Defender pieces use blue; cyborg pieces
