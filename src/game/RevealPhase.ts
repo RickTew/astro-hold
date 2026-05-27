@@ -913,6 +913,15 @@ export class RevealPhase {
     //      cloak is to close distance without being shot, so we
     //      don't want him hanging back.
     if (unit.type === 'stalker') {
+      // S20 dramatic intro. Stalker spawns visible; on its first turn,
+      // it plays a callout ("Going dark", "Bye bye", etc.) and then
+      // cloaks ~2s later with a smooth opacity fade. Subsequent turns
+      // use the existing cloaked-stalker behavior.
+      if (!unit.introSpoken) {
+        unit.introSpoken = true
+        unit.announceOnce('intro')
+        setTimeout(() => unit.engageCloak(), 2000)
+      }
       const meleeRange = Config.UNITS.stalker.range
       const melee = this.nearestEnemy(unit, meleeRange)
       if (melee) {

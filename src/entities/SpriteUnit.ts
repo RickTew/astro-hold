@@ -368,6 +368,11 @@ export class SpriteUnit {
   // opacity while cloaked so the player can still see them but they
   // read as stealth-mode.
   cloaked = false
+  // S20 — set true once the unit has fired its 'intro' speech bubble
+  // (Stalker only today). RevealPhase reads this to know whether to
+  // play the intro on the next stalker action, and to know whether
+  // to engage cloak afterward.
+  introSpoken = false
 
   constructor(
     scene: THREE.Scene,
@@ -387,8 +392,11 @@ export class SpriteUnit {
     this.slamAmmoRemaining = (Config.UNITS[type] as { slamAmmo?: number }).slamAmmo ?? 0
     this.refillRemaining = (Config.UNITS[type] as { refillCharges?: number }).refillCharges ?? 0
     this.moveSpeedPS = Config.UNITS[type].speed / Config.TURN_INTERVAL
-    // Stalker spawns cloaked — drops on first damage-dealing action.
-    if (type === 'stalker') this.cloaked = true
+    // Stalker S20: spawns VISIBLE so it can play an intro callout on
+    // its first reveal turn ("Going dark", "Now you see me..." etc.)
+    // The cloak engages a couple seconds after that intro fires, in
+    // RevealPhase. After that, the existing rule applies: cloak drops
+    // permanently on the first damage-dealing action.
     // Defenders look east toward the cyborg side; attackers look west toward
     // the core. Drives the initial sprite direction.
     this.facingAngle = side === 'defender' ? 0 : Math.PI
@@ -704,6 +712,25 @@ export class SpriteUnit {
     if (!this.cloaked) return
     this.cloaked = false
     this.sprite.material.opacity = 1
+  }
+
+  // S20 — engage cloak with a smooth fade (1.0 -> 0.35 over 700ms).
+  // Used by RevealPhase ~2 seconds after the Stalker plays its intro
+  // callout so the player sees the unit dramatically disappear, not
+  // pop out of existence. Idempotent — no-op if already cloaked.
+  engageCloak() {
+    if (this.cloaked || this.isDead) return
+    this.cloaked = true
+    const startTime = performance.now()
+    const duration = 700
+    const tick = () => {
+      if (this.isDead) return
+      const elapsed = performance.now() - startTime
+      const t = Math.min(elapsed / duration, 1)
+      this.sprite.material.opacity = 1.0 - t * 0.65   // 1.0 -> 0.35
+      if (t < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
   }
 
   // Sniper rule: spend a turn settling into the crouched aim pose before

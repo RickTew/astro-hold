@@ -22,6 +22,10 @@ export type SpeechTrigger =
   // mine in their path. Not yet wired in RevealPhase; lines exist
   // for design review and live preview on /build-test.html.
   | 'mine_spotted'
+  // ── S20 ── One-shot spawn callout. Currently only the Cyborg
+  // Stalker fires it (intro + dramatic cloak), but the trigger is
+  // here so other units can be flavored later.
+  | 'intro'
 
 // Lines may include {n} (count) and {s} (auto-pluralizer: '' if n==1
 // else 's') so "{n} shot{s} left!" renders "1 shot left!" / "3 shots left!"
@@ -153,6 +157,17 @@ export const SPEECH_LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> 
       "Trap!",
       "Tread careful!",
     ],
+    // S20 — spawn callout. Currently only Stalker fires it. Lines
+    // flavor the cloak engaging (the dramatic intro the user wanted).
+    intro: [
+      "Going dark.",
+      "Now you see me...",
+      "Bye bye.",
+      "Cloak in 3, 2, 1.",
+      "Watch closely.",
+      "And now... gone.",
+      "Catch me if you can.",
+    ],
   },
   robot: {
     low_hp: [
@@ -248,6 +263,14 @@ export const SPEECH_LINES: Record<SpeechVoice, Record<SpeechTrigger, string[]>> 
       "EXPLOSIVE HAZARD",
       "OBSTRUCTION FLAGGED",
       "TRAP IN PATH",
+    ],
+    // S20 — spawn callout. No defender unit fires this yet, but the
+    // entry is here for future flavor (e.g., Sphere booting up,
+    // Sentry rolling out, etc.).
+    intro: [
+      "ONLINE.",
+      "SYSTEMS NOMINAL.",
+      "DEPLOYED.",
     ],
   },
 }
