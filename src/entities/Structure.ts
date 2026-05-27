@@ -64,7 +64,13 @@ const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
 const STRUCTURE_FOOT_FRACTION: Partial<Record<StructureType, number>> = {
   laser:  0.91,
   gun:    0.97,
-  signal: 0.98,
+  // robot_mine sprite has its content extending all the way to the
+  // PNG bottom (100%), so the shadow sits at the sprite quad bottom.
+  mine:   1.00,
+  // Signal pedestal also reaches near the PNG bottom. We pull the
+  // shadow up to 0.92 instead of the measured 0.98 so the halo stays
+  // visible IN the cell instead of extending past the grid line below.
+  signal: 0.92,
 }
 const SPRITE_SIZE = 50   // default — one cell
 // Per-type default facing. Tower has full 8 rotations and ships pointing

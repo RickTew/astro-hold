@@ -3,6 +3,7 @@ import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { spawnSpeechBubble } from './SpeechBubble'
 import { Config, TEAM_TINT } from '../game/GameConfig'
 import { playExplosion } from '../audio/sfx'
+import { makeShadowSprite } from '../scene/Shadow'
 
 // 2D-sprite alternative to the GLB PowerCore. Billboarded, so it cannot be
 // occluded by its own geometry the way the 3D Meshy export was.
@@ -82,6 +83,14 @@ export class PixelPowerCore {
     this.sprite.position.set(0, 0, 5)
     this.sprite.renderOrder = 10
     this.mesh.add(this.sprite)
+    // Side-themed grounded drop shadow. Power Core is always the
+    // player's central piece, so use defender (blue). Visible feet of
+    // the core PNG sit at ~72.6% of height (measured offline).
+    this.mesh.add(makeShadowSprite({
+      size,
+      side: 'defender',
+      footFraction: 0.726,
+    }))
 
     this.hpBarGroup = new THREE.Group()
     // Bar sits just above the top of the core sprite. Lowered from 0.55 → 0.40
