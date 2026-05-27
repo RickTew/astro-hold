@@ -1184,7 +1184,8 @@
       box-shadow: inset 0 0 14px rgba(106, 196, 255, 0.55);
       z-index: 2;
     }
-    /* Soft procedural drop shadow under each pixel sprite. */
+    /* Soft procedural drop shadow under each pixel sprite. Default is
+       neutral dark. Color variants override via .tint-* modifier. */
     .floor-lab .lab-shadow {
       position: absolute;
       border-radius: 50%;
@@ -1196,6 +1197,26 @@
       pointer-events: none;
       transform: translate(-50%, -50%);
       z-index: 3;
+    }
+    .floor-lab .lab-shadow.tint-dark {
+      background: radial-gradient(ellipse at center,
+        rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
+    }
+    .floor-lab .lab-shadow.tint-navy {
+      background: radial-gradient(ellipse at center,
+        rgba(10, 20, 50, 0.7) 0%, rgba(10, 20, 50, 0) 70%);
+    }
+    .floor-lab .lab-shadow.tint-blue {
+      background: radial-gradient(ellipse at center,
+        rgba(40, 90, 160, 0.55) 0%, rgba(40, 90, 160, 0) 70%);
+    }
+    .floor-lab .lab-shadow.tint-red {
+      background: radial-gradient(ellipse at center,
+        rgba(160, 50, 60, 0.55) 0%, rgba(160, 50, 60, 0) 70%);
+    }
+    .floor-lab .lab-shadow.tint-warm {
+      background: radial-gradient(ellipse at center,
+        rgba(35, 18, 8, 0.65) 0%, rgba(60, 30, 10, 0.2) 40%, rgba(60, 30, 10, 0) 70%);
     }
     /* Real game sprites pulled from /public/sprites/. Sized roughly to
        in-game cell footprint: sphere ~1 cell, tower ~1 cell, hulk
@@ -1295,20 +1316,120 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <!-- Shadow + sprite pairs. Shadow sits at the sprite's
-                 bottom edge to ground the piece on the floor. -->
-            <div class="lab-shadow" style="left: 25%; top: 41%; width: 14%; height: 5%;"></div>
+            <!-- Shadow + sprite pairs. Per-sprite Y tuned so the
+                 shadow lands below the actual visible feet, not just
+                 the PNG bbox bottom (sphere PNG has empty space below
+                 the ball; tower / hulk fill their bbox vertically). -->
+            <div class="lab-shadow" style="left: 25%; top: 42%; width: 14%; height: 5%;"></div>
             <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
 
-            <div class="lab-shadow" style="left: 25%; top: 74%; width: 14%; height: 5%;"></div>
+            <div class="lab-shadow" style="left: 25%; top: 78%; width: 14%; height: 5%;"></div>
             <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
 
-            <div class="lab-shadow" style="left: 70%; top: 62%; width: 20%; height: 7%;"></div>
+            <div class="lab-shadow" style="left: 70%; top: 67%; width: 22%; height: 7%;"></div>
             <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
 
             <div class="lab-callout">HOVER ANY CELL</div>
           </div>
         </div>
+      </div>
+
+      <!-- ── SHADOW COLOR VARIANTS ── -->
+      <!-- Same gradient floor as B/C, same three real sprites, only
+           the shadow tint and side-coloring strategy varies. -->
+      <h2 style="font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;color:#d4a3ff;margin:30px 4px 14px;padding-bottom:6px;border-bottom:1px solid rgba(212,163,255,0.3);">
+        C SHADOW COLOR LAB <span class="lab-tag" style="font-size:9px;">PICK A TINT</span>
+      </h2>
+      <div class="lab-row" style="grid-template-columns: repeat(4, 1fr);">
+
+        <div class="lab-card">
+          <h3>1. NEUTRAL DARK</h3>
+          <div class="lab-note">Classic black shadow at 55% alpha. Reads as a clear shadow on any floor tone. The safe baseline.</div>
+          <div class="lab-stage stage-glow">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-shadow tint-dark" style="left: 25%; top: 42%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-shadow tint-dark" style="left: 25%; top: 78%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-shadow tint-dark" style="left: 70%; top: 67%; width: 22%; height: 7%;"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-callout">BLACK 55%</div>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <h3>2. DEEP NAVY</h3>
+          <div class="lab-note">Cool blue-black shadow that sits inside the floor's tone. Subtle, atmospheric, very XCOM tactical-board feel.</div>
+          <div class="lab-stage stage-glow">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-shadow tint-navy" style="left: 25%; top: 42%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-shadow tint-navy" style="left: 25%; top: 78%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-shadow tint-navy" style="left: 70%; top: 67%; width: 22%; height: 7%;"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-callout">NAVY 60%</div>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <h3>3. SIDE-THEMED</h3>
+          <div class="lab-note">Blue shadow under defender pieces, red shadow under cyborgs. Doubles as a side-identity cue from any zoom level.</div>
+          <div class="lab-stage stage-glow">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-shadow tint-blue" style="left: 25%; top: 42%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-shadow tint-blue" style="left: 25%; top: 78%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-shadow tint-red" style="left: 70%; top: 67%; width: 22%; height: 7%;"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-callout">BLUE / RED 50%</div>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <h3>4. WARM UNDER-LIT</h3>
+          <div class="lab-note">Warm brown-black shadow with a hint of amber, as if torchlight is hitting the piece from above. Cozy dungeon vibe.</div>
+          <div class="lab-stage stage-glow">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-shadow tint-warm" style="left: 25%; top: 42%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-shadow tint-warm" style="left: 25%; top: 78%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-shadow tint-warm" style="left: 70%; top: 67%; width: 22%; height: 7%;"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-callout">WARM 60%</div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
