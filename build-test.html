@@ -1033,6 +1033,267 @@
     </div>
   </div>
 
+  <!-- ═══════════════ FLOOR & GRID STYLE LAB ═══════════════
+       Visual-style guide deliverable. Three static mockups of the
+       Vector-Grid Pixel Hybrid floor concept (docs/VISUAL_STYLE.md):
+         A. CURRENT  — Perlin dusty-dirt texture (approximated in CSS
+                        using the hex tones from src/scene/Background.ts).
+         B. GRADIENT — Per-cell subtle vector gradients, no texture.
+         C. GRADIENT + HOVER + SHADOW — Same gradient floor plus a 1px
+                        cyan hover-glow border and a soft procedural
+                        drop shadow under a placeholder sprite.
+       Pure CSS, no JS, no Three.js. If a direction is picked, promote
+       to a live Three.js scene that swaps Background.ts in place.
+       ═══════════════════════════════════════════════════════════ -->
+  <style>
+    .floor-lab { max-width: 1600px; margin: 0 auto 28px; }
+    .floor-lab > h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: #d4a3ff;
+      margin: 12px 4px 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(212, 163, 255, 0.3);
+    }
+    .floor-lab .lab-tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 2px;
+      padding: 3px 9px;
+      margin-left: 12px;
+      background: rgba(212, 163, 255, 0.08);
+      border: 1px solid rgba(212, 163, 255, 0.4);
+      color: #d4a3ff;
+      vertical-align: middle;
+    }
+    .floor-lab .lab-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .floor-lab .lab-card {
+      background: rgba(8, 18, 32, 0.55);
+      border: 1px solid rgba(110, 170, 220, 0.28);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .floor-lab .lab-card h3 {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: #cce8ff;
+      margin-bottom: 4px;
+    }
+    .floor-lab .lab-card .lab-note {
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #99bbcc;
+      line-height: 1.55;
+      min-height: 56px;
+      margin-bottom: 12px;
+    }
+    .floor-lab .lab-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #1a160f;
+    }
+    /* 6x6 grid, each cell is a positioned absolute div so individual
+       cells can pick up hover/light treatments without affecting the
+       wider grid. Cells sized via CSS custom prop --cs in %. */
+    .floor-lab .lab-grid {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: repeat(6, 1fr);
+    }
+    .floor-lab .lab-cell {
+      position: relative;
+      border-right: 1px solid rgba(170, 187, 204, 0.22);
+      border-bottom: 1px solid rgba(170, 187, 204, 0.22);
+    }
+    .floor-lab .lab-cell:nth-child(6n) { border-right: 0; }
+    .floor-lab .lab-grid > .lab-cell:nth-last-child(-n + 6) { border-bottom: 0; }
+
+    /* ─── A. CURRENT PRODUCTION (Perlin dirt approximation) ─── */
+    .floor-lab .stage-current {
+      /* Approximates the three Perlin color stops from Background.ts:
+         C0 rgb(44,38,30) C1 rgb(60,52,42) C2 rgb(74,65,52). Multi-stop
+         radial gradients fake the noisy splotch feel without a canvas. */
+      background:
+        radial-gradient(circle at 20% 25%, rgb(74,65,52) 0%, transparent 22%),
+        radial-gradient(circle at 75% 35%, rgb(60,52,42) 0%, transparent 30%),
+        radial-gradient(circle at 35% 70%, rgb(70,60,48) 0%, transparent 26%),
+        radial-gradient(circle at 80% 80%, rgb(50,42,34) 0%, transparent 28%),
+        rgb(44,38,30);
+    }
+    .floor-lab .stage-current .lab-cell {
+      border-color: rgba(170, 187, 204, 0.35);
+    }
+
+    /* ─── B. GRADIENT FLOOR (vector-clean per-cell gradient) ─── */
+    .floor-lab .stage-gradient {
+      background:
+        /* Global soft light source from top-left, warmer toward the
+           defender side. This is the cell-agnostic ambient pass. */
+        radial-gradient(circle at 20% 15%, rgba(120, 170, 220, 0.18) 0%, transparent 55%),
+        radial-gradient(circle at 80% 85%, rgba(80, 100, 140, 0.12) 0%, transparent 50%),
+        linear-gradient(180deg, #1f2733 0%, #161c26 100%);
+    }
+    .floor-lab .stage-gradient .lab-cell {
+      /* Each cell picks up a faint radial pulled toward the global
+         light. Subtle so the floor reads as one surface, not a tile
+         set. The light position is cell-relative. */
+      background: radial-gradient(
+        circle at 30% 25%,
+        rgba(170, 200, 235, 0.06) 0%,
+        rgba(170, 200, 235, 0) 65%
+      );
+      border-color: rgba(120, 160, 200, 0.28);
+    }
+
+    /* ─── C. GRADIENT + HOVER + SHADOW ─── */
+    .floor-lab .stage-glow {
+      background:
+        radial-gradient(circle at 20% 15%, rgba(120, 170, 220, 0.18) 0%, transparent 55%),
+        radial-gradient(circle at 80% 85%, rgba(80, 100, 140, 0.12) 0%, transparent 50%),
+        linear-gradient(180deg, #1f2733 0%, #161c26 100%);
+    }
+    .floor-lab .stage-glow .lab-cell {
+      background: radial-gradient(
+        circle at 30% 25%,
+        rgba(170, 200, 235, 0.06) 0%,
+        rgba(170, 200, 235, 0) 65%
+      );
+      border-color: rgba(120, 160, 200, 0.28);
+      transition: box-shadow 120ms ease, border-color 120ms ease;
+    }
+    .floor-lab .stage-glow .lab-cell:hover {
+      border-color: #6ac4ff;
+      box-shadow: inset 0 0 12px rgba(106, 196, 255, 0.45);
+      z-index: 2;
+    }
+    /* Static "active" cell so the demo reads even without mouse-over. */
+    .floor-lab .stage-glow .lab-cell.lab-cell-active {
+      border-color: #6ac4ff;
+      box-shadow: inset 0 0 14px rgba(106, 196, 255, 0.55);
+      z-index: 2;
+    }
+    /* Soft procedural drop shadow under the placeholder sprite. */
+    .floor-lab .lab-shadow {
+      position: absolute;
+      width: 36%;
+      height: 9%;
+      border-radius: 50%;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.55) 0%,
+        rgba(0, 0, 0, 0) 70%
+      );
+      pointer-events: none;
+      z-index: 3;
+    }
+    /* Placeholder "pixel sprite" so we can see the shadow grounding it. */
+    .floor-lab .lab-sprite {
+      position: absolute;
+      width: 22%;
+      height: 22%;
+      background:
+        linear-gradient(180deg, #ff9aa0 0%, #d2484f 50%, #7a1e22 100%);
+      border: 1px solid #4a0f12;
+      box-shadow: 0 1px 0 rgba(255, 200, 200, 0.4) inset;
+      image-rendering: pixelated;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .floor-lab .lab-callout {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: rgba(212, 235, 255, 0.6);
+      background: rgba(8, 14, 22, 0.45);
+      border: 1px solid rgba(120, 160, 200, 0.25);
+      padding: 3px 7px;
+      border-radius: 3px;
+      pointer-events: none;
+      z-index: 5;
+    }
+  </style>
+
+  <div class="floor-lab">
+    <h2>FLOOR &amp; GRID STYLE LAB <span class="lab-tag">VECTOR-GRID PIXEL HYBRID</span></h2>
+    <div class="preview-frame" style="padding: 16px; height: auto; overflow: visible;">
+      <p style="color:#cce8ff; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; max-width: 920px; margin-bottom: 16px;">
+        Static mockups of the three floor / grid directions described in
+        <code>docs/VISUAL_STYLE.md</code>. CSS only; no Three.js or canvas.
+        Hover any cell on the third stage to preview the hover-glow border.
+        Picking a direction here is the cue to promote the chosen treatment
+        into <code>src/scene/Background.ts</code>.
+      </p>
+      <div class="lab-row">
+        <div class="lab-card">
+          <h3>A. CURRENT</h3>
+          <div class="lab-note">Perlin dusty-dirt canvas texture. Warm, photographic, fights with the pixel sprites instead of letting them pop.</div>
+          <div class="lab-stage stage-current">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <div class="lab-callout">PERLIN DIRT TEXTURE</div>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <h3>B. GRADIENT FLOOR</h3>
+          <div class="lab-note">Subtle vector gradient per cell with a global light-source bias. Reads as a tactical board. Pieces pop. No texture sheet, instant load.</div>
+          <div class="lab-stage stage-gradient">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <div class="lab-callout">VECTOR GRADIENT CELLS</div>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <h3>C. GRADIENT + HOVER + SHADOW</h3>
+          <div class="lab-note">Same gradient floor with cyan 1px hover-glow on the active cell and a soft procedural drop shadow grounding the sprite. Hover any cell to preview.</div>
+          <div class="lab-stage stage-glow">
+            <div class="lab-grid">
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell lab-cell-active"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+            </div>
+            <div class="lab-shadow" style="left: 45%; top: 60%;"></div>
+            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <div class="lab-callout">HOVER ANY CELL</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ═════ Tile data — mirrors src/ui/HUD.ts. Keep in sync. ═════
     // BEFORE = current production (single robotTiles array rendered on both
