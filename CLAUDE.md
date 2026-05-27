@@ -63,8 +63,10 @@ Mechanics tuned for D&D-style strategy:
   cyborg the beam touches up to `range: 330`. Visual starts at the
   barrel tip (cell edge in facing dir), z=12. Walls + allies are
   skipped (cyborg-only).
-- **Mortar (S18).** Defender Bomber renamed in HUD to "MORTAR".
-  Same proximity-mine mechanic. Internal type still `bomber`.
+- **Blastor (S20, was Mortar S18).** Defender Bomber renamed in HUD
+  to "BLASTOR" (more robotic-sounding than Mortar). Same proximity-
+  mine mechanic. Internal type still `bomber`. Sprite size bumped
+  66 -> 80 in S20 for a heavier tower-class presence.
 - **Sphere is MOBILE (S18).** Speed 110, the fastest piece. AI:
   fire if in range with ammo, else roll toward nearest cyborg.
   Out of ammo → suicide rush toward nearest cyborg; on adjacency,

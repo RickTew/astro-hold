@@ -112,10 +112,11 @@ export const Config = {
     // Bomber — mid-range proximity-trap thrower. Ammo 3 = three bombs per
     // game total. Combined with the one-bomb-on-field rule this means the
     // defender Bomber is a deliberate placement choice, not a turret.
-    // Mortar (S17.19 rename of internal type 'bomber'). Proximity-trap
-    // thrower; player-facing label changed for distinction from the
-    // cyborg-side Bomber (which is also a unit type).
-    bomber:  { cost: 70, hp: 100, damage: 20, range: 200, fireInterval: 4, apBudget: 1, aoeRadius: 65, ammo: 5, label: 'Mortar 70cr' },
+    // Blastor (S20 rename, was Mortar in S17.19). Internal type stays
+    // 'bomber'; player-facing label distinguishes the robot-side
+    // proximity-trap thrower from the cyborg-side Bomber unit.
+    // "Blastor" reads more robotic than the historical "Mortar".
+    bomber:  { cost: 70, hp: 100, damage: 20, range: 200, fireInterval: 4, apBudget: 1, aoeRadius: 65, ammo: 5, label: 'Blastor 70cr' },
     wall:    { cost: 20, hp: 300, damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, aoeRadius: 0,  ammo: 0, label: 'Wall   20cr' },
     // Sentry — heavy-armor turret (the art is a tracked vehicle with gun
     // arms — reads as a tower, not a wall). Tankier than a tower (HP 150

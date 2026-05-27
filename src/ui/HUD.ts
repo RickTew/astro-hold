@@ -85,7 +85,7 @@ export class HUD {
     const robotLeftTiles: Tile[] = [
       { label: 'PHASER', cost:  60, icon: '/sprites/gun/south.png',     dataType: 'cannon', preview: true },
       { label: 'TOWER',  cost:  30, icon: '/sprites/tower/south.png',   dataType: 'turret' },
-      { label: 'MORTAR', cost:  70, icon: '/sprites/bomber/south.png',  dataType: 'bomber' },
+      { label: 'BLASTOR', cost: 70, icon: '/sprites/bomber/south.png',  dataType: 'bomber' },
       { label: 'LASER',  cost:  40, icon: '/sprites/laser/south.png',   dataType: 'laser', preview: true },
       { label: 'SPHERE', cost: 100, icon: '/sprites/sphere/south.png',  action: 'sphere'   },
       { label: 'SENTRY', cost:  60, icon: '/sprites/sentry/south.png',  dataType: 'sentry' },
@@ -347,7 +347,7 @@ export class HUD {
 
               <h4>Robot side specials</h4>
               <p><strong>Phaser beam:</strong> Phaser fires a piercing beam down its facing row. Every cyborg in that row up to range takes the full damage. Walls and allies are skipped (anti-cyborg only). Stack Phasers behind each other for concentrated firepower.</p>
-              <p><strong>Mortar:</strong> Lobs proximity mines onto empty cells. Arms after one turn. Detonates when a cyborg enters its AoE.</p>
+              <p><strong>Blastor:</strong> Lobs proximity mines onto empty cells. Arms after one turn. Detonates when a cyborg enters its AoE.</p>
               <p><strong>Sphere:</strong> The most mobile defender. Rolls toward enemies. When out of ammo it suicide-rushes the nearest cyborg and detonates on adjacency.</p>
               <p><strong>Sentry:</strong> Mobile heavy turret with omni-fire. Advances toward the cyborg push when no enemy is in range.</p>
               <p><strong>Dog:</strong> Fast harasser. Actively pursues the nearest cyborg from spawn.</p>
@@ -363,7 +363,7 @@ export class HUD {
               <p><strong>Stalker:</strong> Cloaked melee bruiser. Spawns invisible. Defender targeting skips cloaked units. Cloak drops permanently on the first damage-dealing action. Melee-only, no ammo cost ever.</p>
               <p><strong>Sniper:</strong> Single precision shot. CROUCH-AND-SHOOT rule: cannot crouch and shoot the same turn. First turn in range plays the aim pose, next turn fires. Movement breaks the crouch.</p>
               <p><strong>Grenadier:</strong> Throws timed grenades. Must lob to the SIDE or BEHIND the nearest enemy, never in front. Wears explosive shielding so AoE damage is halved on Grenadiers themselves.</p>
-              <p><strong>Bomber:</strong> Lobs proximity mines like the robot Mortar. Strict no-self-AoE rule.</p>
+              <p><strong>Bomber:</strong> Lobs proximity mines like the robot Blastor. Strict no-self-AoE rule.</p>
               <p><strong>Medic:</strong> Heals allies via three modes (med-pack throw, deployable medic-pad, weld-tether) sharing a 5-charge pool.</p>
               <p><strong>Crates:</strong> Resupply boxes spawn in the middle of the map every 5 turns (max 4 on field). Cyborgs grab them by walking on top. Robots do NOT pick up crates; they dock at the Power Core instead.</p>
 
