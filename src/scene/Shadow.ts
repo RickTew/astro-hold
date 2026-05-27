@@ -34,19 +34,18 @@ function shadowTexture(side: ShadowSide): THREE.Texture {
   c.height = H
   const ctx = c.getContext('2d')!
 
-  // Strategy-board feel: the shadow reads as the piece's BASE (like a
-  // miniature standing on a token). Dark core holds a plateau through
-  // mid-radius for a "solid disk" look, then a tinted ring fades to
-  // transparent at the rim. The dark core must be darker than the
-  // floor to actually darken (blue ring alone on warm dust brightens
-  // B/G channels instead of darkening — shadow vanishes).
+  // Strategy-board feel: soft side-tinted disk under the feet,
+  // light + fast (single sprite per unit, cached texture per side).
+  // Dark core does the darkening on the warm Dusty-Planet floor
+  // (blue ring alone would brighten B/G channels instead). The
+  // tinted rim fades to transparent so the shadow doesn't read as
+  // a stamped base — it stays within the cell footprint, no overflow.
   const core = side === 'defender' ? '12, 20, 38' : '40, 12, 15'
   const ring = side === 'defender' ? '50, 95, 160' : '160, 55, 65'
   const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2)
-  grad.addColorStop(0,    `rgba(${core}, 0.92)`)
-  grad.addColorStop(0.55, `rgba(${core}, 0.72)`)
-  grad.addColorStop(0.80, `rgba(${ring}, 0.38)`)
-  grad.addColorStop(0.94, `rgba(${ring}, 0.10)`)
+  grad.addColorStop(0,    `rgba(${core}, 0.78)`)
+  grad.addColorStop(0.50, `rgba(${core}, 0.50)`)
+  grad.addColorStop(0.78, `rgba(${ring}, 0.22)`)
   grad.addColorStop(1,    `rgba(${ring}, 0)`)
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
@@ -70,14 +69,20 @@ export function makeShadowSprite({ size, side, floating }: ShadowOpts): THREE.Sp
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    opacity: 0.95,
+    opacity: 0.88,
   })
   const sprite = new THREE.Sprite(mat)
-  // Slightly wider + taller than the soft-shadow look so the base disk
-  // reads from any zoom level. Still narrower than the cell so adjacent
-  // pieces don't have overlapping bases.
-  sprite.scale.set(size * 0.62, size * 0.20, 1)
-  const yOffset = floating ? -0.45 : -0.24
+  // Size kept tight so the shadow stays inside the 50-unit cell even
+  // for the largest grounded pieces. Hulk is the worst case at
+  // size 84: 0.55w x 0.13h * 84 = 46 x 11 world units; with the
+  // grounded y_offset of -0.22*84 = -18.5, the shadow spans
+  // -24 to -13 in Y. Cell bottom edge is at -25, so we stay just
+  // inside the cell. Smaller pieces stay well inside.
+  sprite.scale.set(size * 0.55, size * 0.13, 1)
+  // Grounded shadow sits just above visible feet so the disk overlaps
+  // the sprite's lower body. Floating sphere drops further below to
+  // read the gap.
+  const yOffset = floating ? -0.40 : -0.22
   sprite.position.set(0, size * yOffset, 4)
   sprite.renderOrder = 9
   return sprite
