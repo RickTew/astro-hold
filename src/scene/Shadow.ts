@@ -38,9 +38,14 @@ function shadowTexture(side: ShadowSide): THREE.Texture {
   const core = side === 'defender' ? '12, 20, 38' : '40, 12, 15'
   const ring = side === 'defender' ? '50, 95, 160' : '160, 55, 65'
   const grad = ctx.createRadialGradient(SQ / 2, SQ / 2, 0, SQ / 2, SQ / 2, SQ / 2)
-  grad.addColorStop(0,    `rgba(${core}, 0.78)`)
-  grad.addColorStop(0.50, `rgba(${core}, 0.50)`)
-  grad.addColorStop(0.78, `rgba(${ring}, 0.22)`)
+  // Light shadow. Per user direction: keep it subtle, no heavy darkening.
+  // Center darkness around alpha 0.65 (times the material opacity below
+  // = ~0.49 effective on the floor). Smooth multi-stop falloff so the
+  // edge is feathered, not stepped.
+  grad.addColorStop(0,    `rgba(${core}, 0.65)`)
+  grad.addColorStop(0.30, `rgba(${core}, 0.48)`)
+  grad.addColorStop(0.55, `rgba(${core}, 0.28)`)
+  grad.addColorStop(0.80, `rgba(${ring}, 0.13)`)
   grad.addColorStop(1,    `rgba(${ring}, 0)`)
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, SQ, SQ)
@@ -74,13 +79,17 @@ export function makeShadowSprite({
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    opacity: 0.88,
+    opacity: 0.75,
   })
   const sprite = new THREE.Sprite(mat)
   sprite.scale.set(size * 0.55, size * 0.13, 1)
-  // Grounded: shadow center 2% past the visible feet (small halo
-  // extends past the feet). Floating: 16% past feet for the float gap.
-  const groundedY = (0.5 - footFraction - 0.02) * size
+  // Grounded: shadow center INSIDE the sprite body, 3% of size ABOVE
+  // the visible feet. The top half of the shadow hides behind the
+  // opaque sprite pixels; only a thin halo extends past the feet as
+  // a ground decal. This eliminates the "floating" gap between
+  // sprite and shadow.
+  // Floating sphere: shadow drops 16% past the feet for a clear gap.
+  const groundedY = (0.5 - footFraction + 0.03) * size
   const floatingY = (0.5 - footFraction - 0.16) * size
   sprite.position.set(0, floating ? floatingY : groundedY, 4)
   sprite.renderOrder = 9
