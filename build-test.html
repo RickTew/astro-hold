@@ -1184,11 +1184,9 @@
       box-shadow: inset 0 0 14px rgba(106, 196, 255, 0.55);
       z-index: 2;
     }
-    /* Soft procedural drop shadow under the placeholder sprite. */
+    /* Soft procedural drop shadow under each pixel sprite. */
     .floor-lab .lab-shadow {
       position: absolute;
-      width: 36%;
-      height: 9%;
       border-radius: 50%;
       background: radial-gradient(
         ellipse at center,
@@ -1196,21 +1194,28 @@
         rgba(0, 0, 0, 0) 70%
       );
       pointer-events: none;
+      transform: translate(-50%, -50%);
       z-index: 3;
     }
-    /* Placeholder "pixel sprite" so we can see the shadow grounding it. */
-    .floor-lab .lab-sprite {
+    /* Real game sprites pulled from /public/sprites/. Sized roughly to
+       in-game cell footprint: sphere ~1 cell, tower ~1 cell, hulk
+       ~1.5 cells. image-rendering: pixelated keeps the source pixel
+       art crisp under scaling. */
+    .floor-lab .lab-piece {
       position: absolute;
-      width: 22%;
-      height: 22%;
-      background:
-        linear-gradient(180deg, #ff9aa0 0%, #d2484f 50%, #7a1e22 100%);
-      border: 1px solid #4a0f12;
-      box-shadow: 0 1px 0 rgba(255, 200, 200, 0.4) inset;
-      image-rendering: pixelated;
+      transform: translate(-50%, -50%);
       pointer-events: none;
       z-index: 4;
     }
+    .floor-lab .lab-piece img {
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      display: block;
+    }
+    .floor-lab .lab-piece.size-1 { width: 18%; height: 18%; }
+    .floor-lab .lab-piece.size-1-5 { width: 26%; height: 26%; }
     .floor-lab .lab-callout {
       position: absolute;
       left: 8px;
@@ -1251,7 +1256,10 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <!-- Real game sprites: defender sphere (top-left), defender tower (left-mid), cyborg hulk (right-mid). -->
+            <div class="lab-piece size-1"   style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-piece size-1"   style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
             <div class="lab-callout">PERLIN DIRT TEXTURE</div>
           </div>
         </div>
@@ -1268,25 +1276,36 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <div class="lab-piece size-1"   style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+            <div class="lab-piece size-1"   style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
             <div class="lab-callout">VECTOR GRADIENT CELLS</div>
           </div>
         </div>
 
         <div class="lab-card">
           <h3>C. GRADIENT + HOVER + SHADOW</h3>
-          <div class="lab-note">Same gradient floor with cyan 1px hover-glow on the active cell and a soft procedural drop shadow grounding the sprite. Hover any cell to preview.</div>
+          <div class="lab-note">Same gradient floor with cyan 1px hover-glow on the active cell and a soft procedural drop shadow grounding each piece. Hover any cell to preview.</div>
           <div class="lab-stage stage-glow">
             <div class="lab-grid">
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
-              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell lab-cell-active"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
+              <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell lab-cell-active"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-shadow" style="left: 45%; top: 60%;"></div>
-            <div class="lab-sprite" style="left: 45%; top: 45%;"></div>
+            <!-- Shadow + sprite pairs. Shadow sits at the sprite's
+                 bottom edge to ground the piece on the floor. -->
+            <div class="lab-shadow" style="left: 25%; top: 41%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
+
+            <div class="lab-shadow" style="left: 25%; top: 74%; width: 14%; height: 5%;"></div>
+            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+
+            <div class="lab-shadow" style="left: 70%; top: 62%; width: 20%; height: 7%;"></div>
+            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+
             <div class="lab-callout">HOVER ANY CELL</div>
           </div>
         </div>

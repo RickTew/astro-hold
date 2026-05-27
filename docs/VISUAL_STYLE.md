@@ -112,6 +112,10 @@ The build-test sandbox is the right surface for any of these. Stage in the AFTER
 
 Each experiment should ship as its own row in the sandbox with a BEFORE / AFTER comparison, same pattern we use for HUD changes.
 
+### Test-lab assets rule
+
+Every test-lab mockup must include real game assets on top of (or in place of) any placeholder shapes. Pull from `/public/sprites/` and use `image-rendering: pixelated` so the source pixel art stays crisp. At minimum show a defender piece and a cyborg piece per stage so both color sides are represented. Placeholder colored boxes alone are not enough to evaluate a visual direction.
+
 ## Hard Rules (carry over from CLAUDE.md and memory)
 
 - No em dashes anywhere. Use periods, commas, hyphens, or reword. See `feedback_no_em_dashes_ever`.
