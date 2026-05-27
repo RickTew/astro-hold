@@ -1197,11 +1197,14 @@
         radial-gradient(circle at 80% 85%, rgba(80, 100, 140, 0.12) 0%, transparent 50%),
         linear-gradient(180deg, #1f2733 0%, #161c26 100%);
     }
+    /* DUSTY PLANET: lighter sand-tan with a global warm light. Brighter
+       midtones than the old "warm dusk" so it reads as a Mars-like
+       desert surface, not a stone dungeon. */
     .floor-lab .stage-floor-warm {
       background:
-        radial-gradient(circle at 20% 15%, rgba(220, 170, 120, 0.16) 0%, transparent 55%),
-        radial-gradient(circle at 80% 85%, rgba(160, 90, 60, 0.10) 0%, transparent 50%),
-        linear-gradient(180deg, #2a221b 0%, #1a1410 100%);
+        radial-gradient(circle at 25% 20%, rgba(255, 220, 170, 0.22) 0%, transparent 55%),
+        radial-gradient(circle at 80% 80%, rgba(180, 130, 90, 0.15) 0%, transparent 50%),
+        linear-gradient(180deg, #4a3e2e 0%, #322820 100%);
     }
     .floor-lab .stage-floor-space {
       background:
@@ -1219,59 +1222,78 @@
         radial-gradient(circle at 50% 15%, rgba(120, 170, 220, 0.10) 0%, transparent 55%),
         linear-gradient(180deg, #1c2433 0%, #141a26 100%);
     }
-    /* Soft procedural drop shadow under each pixel sprite. Default is
-       neutral dark. Color variants override via .tint-* modifier. */
-    .floor-lab .lab-shadow {
-      position: absolute;
-      border-radius: 50%;
-      background: radial-gradient(
-        ellipse at center,
-        rgba(0, 0, 0, 0.55) 0%,
-        rgba(0, 0, 0, 0) 70%
-      );
-      pointer-events: none;
-      transform: translate(-50%, -50%);
-      z-index: 3;
-    }
-    .floor-lab .lab-shadow.tint-dark {
-      background: radial-gradient(ellipse at center,
-        rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
-    }
-    .floor-lab .lab-shadow.tint-navy {
-      background: radial-gradient(ellipse at center,
-        rgba(10, 20, 50, 0.7) 0%, rgba(10, 20, 50, 0) 70%);
-    }
-    .floor-lab .lab-shadow.tint-blue {
-      background: radial-gradient(ellipse at center,
-        rgba(40, 90, 160, 0.55) 0%, rgba(40, 90, 160, 0) 70%);
-    }
-    .floor-lab .lab-shadow.tint-red {
-      background: radial-gradient(ellipse at center,
-        rgba(160, 50, 60, 0.55) 0%, rgba(160, 50, 60, 0) 70%);
-    }
-    .floor-lab .lab-shadow.tint-warm {
-      background: radial-gradient(ellipse at center,
-        rgba(35, 18, 8, 0.65) 0%, rgba(60, 30, 10, 0.2) 40%, rgba(60, 30, 10, 0) 70%);
-    }
-    /* Real game sprites pulled from /public/sprites/. Sized roughly to
-       in-game cell footprint: sphere ~1 cell, tower ~1 cell, hulk
-       ~1.5 cells. image-rendering: pixelated keeps the source pixel
-       art crisp under scaling. */
+    /* Real game sprites pulled from /public/sprites/. Each .lab-piece
+       is a positioning container for the sprite IMG + an optional
+       .piece-shadow child. Sized roughly to in-game cell footprint:
+       sphere ~1 cell, tower ~1 cell, hulk ~1.5 cells. */
     .floor-lab .lab-piece {
       position: absolute;
       transform: translate(-50%, -50%);
       pointer-events: none;
       z-index: 4;
     }
-    .floor-lab .lab-piece img {
+    .floor-lab .lab-piece > img {
+      position: relative;
       width: 100%;
       height: 100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       display: block;
+      z-index: 2;
     }
     .floor-lab .lab-piece.size-1 { width: 18%; height: 18%; }
     .floor-lab .lab-piece.size-1-5 { width: 26%; height: 26%; }
+
+    /* Procedural drop shadow as a CHILD of the .lab-piece. Positioned
+       relative to the piece container, so the shadow is always tied to
+       its sprite (no orphan-coordinate drift).
+
+       Measured offline: every game sprite in /public/sprites/ has its
+       visible content from ~27% to ~74% of the PNG vertically (the
+       remaining ~25% at the bottom is transparent padding). Default
+       shadow top of 78% means the shadow center sits just past the
+       visible feet, with the top of the shadow hiding behind the sprite
+       and the bottom half extending below as a halo. Grounded pieces
+       read as standing on the floor. */
+    .floor-lab .piece-shadow {
+      position: absolute;
+      left: 50%;
+      top: 78%;
+      transform: translate(-50%, -50%);
+      width: 70%;
+      height: 16%;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* Floating piece (Sphere): drop shadow well below the piece body,
+       leaving a visible gap. 105% top puts shadow center 5% of piece
+       height past the bottom of the bbox. */
+    .floor-lab .lab-piece[data-grounded="false"] .piece-shadow {
+      top: 105%;
+      width: 58%;
+      height: 14%;
+      opacity: 0.85;
+    }
+    /* Shadow tint variants. Defender pieces use blue; cyborg pieces
+       use red. .tint-dark and .tint-warm are kept for reference but
+       no current stage uses them. */
+    .floor-lab .piece-shadow.tint-dark {
+      background: radial-gradient(ellipse at center,
+        rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 70%);
+    }
+    .floor-lab .piece-shadow.tint-blue {
+      background: radial-gradient(ellipse at center,
+        rgba(40, 90, 160, 0.55) 0%, rgba(40, 90, 160, 0) 70%);
+    }
+    .floor-lab .piece-shadow.tint-red {
+      background: radial-gradient(ellipse at center,
+        rgba(160, 50, 60, 0.55) 0%, rgba(160, 50, 60, 0) 70%);
+    }
+    .floor-lab .piece-shadow.tint-warm {
+      background: radial-gradient(ellipse at center,
+        rgba(35, 18, 8, 0.6) 0%, rgba(60, 30, 10, 0) 70%);
+    }
     .floor-lab .lab-callout {
       position: absolute;
       left: 8px;
@@ -1312,7 +1334,7 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <!-- Real game sprites: defender sphere (top-left), defender tower (left-mid), cyborg hulk (right-mid). -->
+            <!-- Real game sprites with no shadows on stage A (baseline). -->
             <div class="lab-piece size-1"   style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
             <div class="lab-piece size-1"   style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
             <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
@@ -1332,6 +1354,7 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
+            <!-- No shadows on stage B either: isolating just the floor change. -->
             <div class="lab-piece size-1"   style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
             <div class="lab-piece size-1"   style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
             <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
@@ -1351,39 +1374,47 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <!-- Sphere FLOATS: shadow offset clearly below the body. -->
-            <div class="lab-shadow" style="left: 25%; top: 50%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
-            <!-- Tower GROUNDED: shadow centered AT the feet, half hidden behind sprite. -->
-            <div class="lab-shadow" style="left: 25%; top: 73%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
+            <!-- Sphere FLOATS: data-grounded="false" pulls the shadow
+                 child past the piece bbox to show the float gap. -->
+            <div class="lab-piece size-1" data-grounded="false" style="left: 25%; top: 33%;">
+              <div class="piece-shadow tint-dark"></div>
+              <img src="./sprites/sphere/south.png" alt="sphere">
+            </div>
+            <!-- Tower GROUNDED: shadow sits at visible feet of sprite. -->
+            <div class="lab-piece size-1" data-grounded="true" style="left: 25%; top: 66%;">
+              <div class="piece-shadow tint-dark"></div>
+              <img src="./sprites/tower/south.png" alt="tower">
+            </div>
             <!-- Hulk GROUNDED: same treatment, larger footprint. -->
-            <div class="lab-shadow" style="left: 70%; top: 61%; width: 22%; height: 6%;"></div>
-            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-piece size-1-5" data-grounded="true" style="left: 70%; top: 50%;">
+              <div class="piece-shadow tint-dark"></div>
+              <img src="./sprites/hulk/south.png" alt="hulk">
+            </div>
 
             <div class="lab-callout">HOVER ANY CELL</div>
           </div>
         </div>
       </div>
 
-      <!-- ── FLOOR COLOR LAB ── -->
-      <!-- Same grounded shadows + sprites, varying the floor tone.
-           All four variants use side-themed shadows (blue under
-           defender, red under cyborg) since user has flagged that
-           variant as worth keeping. -->
+      <!-- ── PLANET SURFACE FLOOR LAB ── -->
+      <!-- All four variants are planet-surface options (no dungeon
+           framings). Same grounded shadows + side-themed tints (blue
+           under defenders, red under cyborgs). Only the floor tone
+           changes. Space-station floors will be a future test row. -->
       <h2 style="font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;color:#d4a3ff;margin:30px 4px 14px;padding-bottom:6px;border-bottom:1px solid rgba(212,163,255,0.3);">
-        FLOOR COLOR LAB <span class="lab-tag" style="font-size:9px;">PICK A TONE</span>
+        PLANET SURFACE FLOOR LAB <span class="lab-tag" style="font-size:9px;">PICK A TONE</span>
       </h2>
       <p style="color:#cce8ff; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; max-width: 920px; margin: 0 4px 14px;">
-        All four variants share the corrected ground-decal shadows (Sphere FLOATS,
-        Tower + Hulk are GROUNDED) and side-themed shadow tints (defender blue,
-        cyborg red). Only the floor color changes.
+        Four planet-surface candidates for the live game. All share the
+        grounded-shadow logic (Sphere FLOATS, Tower + Hulk GROUNDED) and
+        side-themed shadow tints (defender blue, cyborg red). Space-
+        station floors will be a future test row.
       </p>
       <div class="lab-row" style="grid-template-columns: repeat(4, 1fr);">
 
         <div class="lab-card">
           <h3>1. COOL TACTICAL</h3>
-          <div class="lab-note">Dark blue-gray gradient. Modern, XCOM tactical-board feel. Pieces pop because nothing competes with them tonally.</div>
+          <div class="lab-note">Dark blue-gray gradient. Modern XCOM tactical-board feel. Pieces pop because nothing competes with them tonally.</div>
           <div class="lab-stage stage-floor-cool">
             <div class="lab-grid">
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
@@ -1393,19 +1424,25 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 50%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 73%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
-            <div class="lab-shadow tint-red"  style="left: 70%; top: 61%; width: 22%; height: 6%;"></div>
-            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-piece size-1" data-grounded="false" style="left: 25%; top: 33%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/sphere/south.png" alt="sphere">
+            </div>
+            <div class="lab-piece size-1" data-grounded="true" style="left: 25%; top: 66%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/tower/south.png" alt="tower">
+            </div>
+            <div class="lab-piece size-1-5" data-grounded="true" style="left: 70%; top: 50%;">
+              <div class="piece-shadow tint-red"></div>
+              <img src="./sprites/hulk/south.png" alt="hulk">
+            </div>
             <div class="lab-callout">#1F2733 to #161C26</div>
           </div>
         </div>
 
         <div class="lab-card">
-          <h3>2. WARM DUSK</h3>
-          <div class="lab-note">Warm sepia gradient with amber bias. Cozy dungeon / fantasy vibe. Pulls toward the existing dirt color without the noise.</div>
+          <h3>2. DUSTY PLANET</h3>
+          <div class="lab-note">Lighter warm sand-tan. Closest to the current Perlin dirt without the noise. Reads as a Mars-style desert planet.</div>
           <div class="lab-stage stage-floor-warm">
             <div class="lab-grid">
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
@@ -1415,19 +1452,25 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 50%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 73%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
-            <div class="lab-shadow tint-red"  style="left: 70%; top: 61%; width: 22%; height: 6%;"></div>
-            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
-            <div class="lab-callout">#2A221B to #1A1410</div>
+            <div class="lab-piece size-1" data-grounded="false" style="left: 25%; top: 33%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/sphere/south.png" alt="sphere">
+            </div>
+            <div class="lab-piece size-1" data-grounded="true" style="left: 25%; top: 66%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/tower/south.png" alt="tower">
+            </div>
+            <div class="lab-piece size-1-5" data-grounded="true" style="left: 70%; top: 50%;">
+              <div class="piece-shadow tint-red"></div>
+              <img src="./sprites/hulk/south.png" alt="hulk">
+            </div>
+            <div class="lab-callout">#4A3E2E to #322820</div>
           </div>
         </div>
 
         <div class="lab-card">
-          <h3>3. DEEP SPACE</h3>
-          <div class="lab-note">Near-black gradient with a faint blue glow toward the center. Pure tactical screen feel. Highest piece contrast of any variant.</div>
+          <h3>3. DARK PLANET</h3>
+          <div class="lab-note">Deep-space night-side surface. Near-black with a faint blue glow. Maximum piece contrast — pieces feel lit up against the surface.</div>
           <div class="lab-stage stage-floor-space">
             <div class="lab-grid">
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
@@ -1437,19 +1480,25 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 50%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 73%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
-            <div class="lab-shadow tint-red"  style="left: 70%; top: 61%; width: 22%; height: 6%;"></div>
-            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-piece size-1" data-grounded="false" style="left: 25%; top: 33%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/sphere/south.png" alt="sphere">
+            </div>
+            <div class="lab-piece size-1" data-grounded="true" style="left: 25%; top: 66%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/tower/south.png" alt="tower">
+            </div>
+            <div class="lab-piece size-1-5" data-grounded="true" style="left: 70%; top: 50%;">
+              <div class="piece-shadow tint-red"></div>
+              <img src="./sprites/hulk/south.png" alt="hulk">
+            </div>
             <div class="lab-callout">#0A0E16 to #050810</div>
           </div>
         </div>
 
         <div class="lab-card">
           <h3>4. ZONE-TINTED</h3>
-          <div class="lab-note">Cool base with subtle blue bleed on the defender (left) side and red bleed on the cyborg (right) side. Side identity baked into the floor.</div>
+          <div class="lab-note">Cool planet base with subtle blue bleed on the defender (left) side and red bleed on the cyborg (right) side. Side identity baked into the floor.</div>
           <div class="lab-stage stage-floor-zoned">
             <div class="lab-grid">
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
@@ -1459,12 +1508,18 @@
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
               <div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div><div class="lab-cell"></div>
             </div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 50%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 33%;"><img src="./sprites/sphere/south.png" alt="sphere"></div>
-            <div class="lab-shadow tint-blue" style="left: 25%; top: 73%; width: 14%; height: 5%;"></div>
-            <div class="lab-piece size-1" style="left: 25%; top: 66%;"><img src="./sprites/tower/south.png"  alt="tower"></div>
-            <div class="lab-shadow tint-red"  style="left: 70%; top: 61%; width: 22%; height: 6%;"></div>
-            <div class="lab-piece size-1-5" style="left: 70%; top: 50%;"><img src="./sprites/hulk/south.png"   alt="hulk"></div>
+            <div class="lab-piece size-1" data-grounded="false" style="left: 25%; top: 33%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/sphere/south.png" alt="sphere">
+            </div>
+            <div class="lab-piece size-1" data-grounded="true" style="left: 25%; top: 66%;">
+              <div class="piece-shadow tint-blue"></div>
+              <img src="./sprites/tower/south.png" alt="tower">
+            </div>
+            <div class="lab-piece size-1-5" data-grounded="true" style="left: 70%; top: 50%;">
+              <div class="piece-shadow tint-red"></div>
+              <img src="./sprites/hulk/south.png" alt="hulk">
+            </div>
             <div class="lab-callout">BLUE LEFT / RED RIGHT</div>
           </div>
         </div>
