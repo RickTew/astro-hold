@@ -37,14 +37,16 @@ const STRUCTURE_HAS_EXPLOSION: Partial<Record<StructureType, true>> = {
 const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
   turret: 64,
   // S20 visual pass per user feedback:
-  //   Phaser (cannon): default 50 -> 44. Sprite reads as "the biggest"
-  //     because of its wide barrel + energy-spike VFX; trimming the
-  //     base size rebalances it against Tower and the line-up.
+  //   Phaser (cannon): default 50 -> 40. Energy-spike VFX makes the
+  //     sprite read big; trimming the base size rebalances it.
   //   Bomber (Blastor): 66 -> 80. Real heavy-tower presence.
-  //   Laser: 44 -> 38. Trimmed so it doesn't crowd Tower visually.
-  cannon: 44,
+  //   Laser: 44 -> 34. Trimmed so it doesn't crowd Tower visually.
+  //   Signal: default 50 -> 42. User flagged dish overshadowed
+  //     neighboring structures.
+  cannon: 40,
   bomber: 80,
-  laser:  38,
+  laser:  34,
+  signal: 42,
   // Sentry renders as tall as the Hulk (84) so the heavy-tower piece
   // reads as a real bruiser on the field, not a slightly bigger tower.
   // Hulk's override in SpriteUnit.ts is also 84 — kept in sync.
