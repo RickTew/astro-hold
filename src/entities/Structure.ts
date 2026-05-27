@@ -743,33 +743,45 @@ export class Structure {
       this.wallParts.socketMats[1].opacity = socketBase * socketK
       this.wallParts.socketMats[2].opacity = haloBase   * socketK
     }
-    // S20 walking animation playback. Cycle through WALK_FRAMES of the
-    // current direction; when the sequence ends, snap back to the
-    // static rotation texture and exit walking state.
+    // S20 mobile-structure motion. Lerp the mesh position toward the
+    // current cell's worldX/worldY at the type's speed (per second),
+    // identical to how SpriteUnit slides cyborgs / dog / etc. While
+    // in motion, cycle through the directional walking-frame texture
+    // pack. On arrival, restore the static rotation.
     if (this.walking && this.sprite && !this.dying && !this.removed) {
-      const dirMap = structureWalkTextures.get(this.type)
-      const frames = dirMap?.get(this.walkDir)
-      if (frames) {
-        this.walkTime += delta
-        const idx = Math.floor(this.walkTime / WALK_FRAME_INTERVAL)
-        if (idx >= WALK_FRAMES) {
-          this.walking = false
-          // Restore the static rotation that matched the most recent
-          // facing. For pieces with rotation textures we let the next
-          // setSingleFacing handle re-orientation; here we just snap
-          // to the type's default rotation as a safe fallback.
-          const baseTex = structureTextures.get(this.type)
-          if (baseTex) {
-            this.sprite.material.map = baseTex
-            this.sprite.material.needsUpdate = true
-          }
-        } else if (idx !== this.walkFrame) {
-          this.walkFrame = idx
-          this.sprite.material.map = frames[idx]
+      const dx = this.worldX - this.mesh.position.x
+      const dy = this.worldY - this.mesh.position.y
+      const dist = Math.hypot(dx, dy)
+      const speed = (Config.STRUCTURES[this.type] as { speed?: number }).speed ?? 0
+      const moveSpeedPS = speed / Config.TURN_INTERVAL
+      const step = moveSpeedPS * delta
+      if (step >= dist) {
+        // Arrived.
+        this.mesh.position.x = this.worldX
+        this.mesh.position.y = this.worldY
+        this.walking = false
+        const baseTex = structureTextures.get(this.type)
+        if (baseTex) {
+          this.sprite.material.map = baseTex
           this.sprite.material.needsUpdate = true
         }
-      } else {
-        this.walking = false
+      } else if (dist > 0) {
+        this.mesh.position.x += (dx / dist) * step
+        this.mesh.position.y += (dy / dist) * step
+      }
+      // Cycle walking frames while still moving.
+      if (this.walking) {
+        const dirMap = structureWalkTextures.get(this.type)
+        const frames = dirMap?.get(this.walkDir)
+        if (frames) {
+          this.walkTime += delta
+          const idx = Math.floor(this.walkTime / WALK_FRAME_INTERVAL) % WALK_FRAMES
+          if (idx !== this.walkFrame) {
+            this.walkFrame = idx
+            this.sprite.material.map = frames[idx]
+            this.sprite.material.needsUpdate = true
+          }
+        }
       }
     }
     if (!this.dying || this.removed) return
@@ -801,27 +813,25 @@ export class Structure {
     return (Config.STRUCTURES[this.type] as { speed?: number }).speed ?? 0
   }
 
-  // S17.16: snap-to-cell movement for mobile structures. No animation
-  // lerp; the structure's mesh + col/row update in one frame and the
-  // initiative cycle handles the per-turn cadence. Mirror of the
-  // sphere mobility pattern.
+  // S17.16: cell-based logical movement. col/row updates immediately so
+  // collision / targeting reads the unit at its new cell right away.
   //
-  // S20: if the type has walking frames preloaded (sentry today), kick
-  // off a short in-place walk animation. Cycles through WALK_FRAMES of
-  // the directional walking texture and reverts to the static rotation
-  // when done. Direction is derived from the (col, row) delta.
+  // S20: position used to snap; now lerps for types with walk anims
+  // (sentry today). The mesh slides toward the new worldX/worldY over
+  // the per-turn interval, matching how SpriteUnit moves cyborgs / dog
+  // / etc. The walking animation cycles while the lerp is in progress
+  // and stops when the sprite arrives.
   moveTo(col: number, row: number) {
     if (this.isDead) return
     const prevCol = this.col
     const prevRow = this.row
     this.col = col
     this.row = row
-    this.mesh.position.set(this.worldX, this.worldY, this.mesh.position.z)
     if (STRUCTURE_HAS_WALK[this.type] && structureWalkTextures.has(this.type)) {
+      // Defer the visual position to update()'s lerp loop. Pick walking
+      // direction from the (col, row) delta.
       const dCol = col - prevCol
       const dRow = row - prevRow
-      // Cardinal-only walking anims, pick the dominant axis. Row+ is
-      // north (top-down camera Y is up), col+ is east.
       let dir: WalkDir = 'south'
       if (Math.abs(dRow) >= Math.abs(dCol)) dir = dRow > 0 ? 'north' : 'south'
       else dir = dCol > 0 ? 'east' : 'west'
@@ -829,6 +839,9 @@ export class Structure {
       this.walkTime = 0
       this.walkFrame = 0
       this.walkDir = dir
+    } else {
+      // Snap for everything else (stationary structures that won't lerp).
+      this.mesh.position.set(this.worldX, this.worldY, this.mesh.position.z)
     }
   }
 
