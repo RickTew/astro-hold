@@ -58,6 +58,25 @@ Implementation notes by engine:
 
 Either way, keep the shadow procedural and tunable from one place. Do not bake shadows into the sprite art.
 
+### Shadow primitive: pre-baked textured quad, NOT a triangulated ellipse
+
+For both engines, the right primitive is a single textured quad whose texture is pre-baked with the gradient + soft edge. Concretely:
+
+- **AstroHold (Three.js):** `THREE.Sprite` with a `THREE.CanvasTexture` painted once at startup by `ctx.createRadialGradient`. One cached texture per side (`defender`, `attacker`) shared across every piece's shadow. See `src/scene/Shadow.ts`.
+- **Phaser:** a `Sprite` or `Image` using a pre-baked PNG or a `RenderTexture` painted once at startup. The blur and gradient are part of the texture, not the geometry.
+
+Avoid the alternative primitives:
+- Three.js: don't use `RingGeometry`, custom ellipse triangulation, or a `Graphics2`-equivalent path. They add ~16-32 triangles per shadow.
+- Phaser: don't use `Graphics.fillEllipse` per piece. It re-emits geometry every frame and doesn't batch with sprites under the same draw call.
+
+Why the textured quad wins:
+1. **4 verts vs ~16-32 triangles** for a smooth ellipse — basically free for the GPU.
+2. **The blurred edge is free at render time.** Bake the soft fade into the texture and let the GPU sample it. No shader needed, no per-frame redraw.
+3. **Batches with other sprites.** A textured quad sharing a material with other quads collapses into the same draw call. Graphics-style ellipses each emit their own draw.
+4. **Equal cost from a static PNG or a runtime canvas.** A static PNG asset has the blur built in but costs a network fetch + decode; a runtime `createRadialGradient` paint costs a few microseconds at startup and produces an identical texture in VRAM. Pick whichever fits the build pipeline — the GPU doesn't care.
+
+Future optimization (only if piece counts climb past ~100): consolidate all shadows into a single `THREE.InstancedMesh` (Three.js) or a `Blitter`-style batched render (Phaser). One draw call for every shadow on the field, position + tint per instance. Not needed today — premature.
+
 ## Typography Rules
 
 - NEVER use pixelated fonts anywhere in the UI. No exceptions.
