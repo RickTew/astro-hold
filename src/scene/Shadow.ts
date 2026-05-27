@@ -34,11 +34,19 @@ function shadowTexture(side: ShadowSide): THREE.Texture {
   c.height = H
   const ctx = c.getContext('2d')!
 
-  const rgb = side === 'defender' ? '40, 90, 160' : '160, 50, 60'
+  // Shadow base must be DARKER than the floor, otherwise blending on a
+  // warm Dusty-Planet floor brightens the B/G channels instead of
+  // darkening — the shadow disappears. So the core of each tint is a
+  // very dark color with a side-tinted ring that fades out. The dark
+  // center does the "darkening" work; the colored ring carries
+  // side identity.
+  const core = side === 'defender' ? '15, 25, 45' : '45, 15, 18'
+  const ring = side === 'defender' ? '40, 80, 140' : '140, 50, 60'
   const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2)
-  grad.addColorStop(0,   `rgba(${rgb}, 0.55)`)
-  grad.addColorStop(0.5, `rgba(${rgb}, 0.25)`)
-  grad.addColorStop(1,   `rgba(${rgb}, 0)`)
+  grad.addColorStop(0,    `rgba(${core}, 0.85)`)
+  grad.addColorStop(0.45, `rgba(${core}, 0.55)`)
+  grad.addColorStop(0.75, `rgba(${ring}, 0.25)`)
+  grad.addColorStop(1,    `rgba(${ring}, 0)`)
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
 
@@ -61,10 +69,10 @@ export function makeShadowSprite({ size, side, floating }: ShadowOpts): THREE.Sp
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    opacity: 0.85,
+    opacity: 0.95,
   })
   const sprite = new THREE.Sprite(mat)
-  sprite.scale.set(size * 0.55, size * 0.14, 1)
+  sprite.scale.set(size * 0.6, size * 0.16, 1)
   const yOffset = floating ? -0.45 : -0.24
   sprite.position.set(0, size * yOffset, 4)
   sprite.renderOrder = 9
