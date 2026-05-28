@@ -49,34 +49,17 @@ sniper is on a 104-px canvas. **The artist's chosen resolution per
 piece IS the visual hierarchy.** Want a bigger Hulk? Commission a
 larger PNG. Don't scale the existing one.
 
-## Cell sized for the sprite (structural tile container)
+## Sprite overflows its cell — and that's fine
 
-The grid cell is 128 wu — sized to fit the largest sprite (124-px
-Bomber) with breathing room. This follows the guide's "structural
-tile container" pattern: the cell accommodates the artist's chosen
-sprite size; smaller sprites center inside with empty space around
-them. Compare to the prior 50 wu cell where everything overflowed.
+The grid cell is 50 wu (logical footprint: collision, occupancy,
+placement). Most sprites are 104-124 px native, so they overflow
+their cell visually by ~2x. That's intentional. The cell is what the
+piece OCCUPIES; the sprite is what the piece LOOKS LIKE. They don't
+have to match.
 
-Bumping the cell scaled the world proportionally so cell count
-stays at 24 x 8 = 192 cells (same logical layout, larger absolute
-world). All distance-typed Config values (speed, range, sightRange,
-aoeRadius, special radii like MINE_DETECT_RADIUS and
-MELEE_FALLBACK_RANGE) multiply by `WORLD_SCALE` (= GRID_CELL /
-_LEGACY_CELL = 2.56) so the game plays the same at the new scale: a
-piece still covers ~1 cell per turn.
-
-To change cell size: bump `_GRID_CELL` in `GameConfig.ts`. The world,
-zones, Power Core position, and every distance value scale
-automatically.
-
-## Grid lines: thin Planes, not LineSegments
-
-`LineBasicMaterial` draws 1-GPU-pixel-wide lines. The browser's
-nearest-neighbor upscale snaps that 1px line unevenly across the
-final canvas: some lines render at 1 css px, others get dropped or
-doubled. The fix: render the grid as thin Plane meshes 1/PPWU wu
-thick (= 1 internal px wide). After browser upscale, every line is
-the same number of css pixels = even.
+When two pieces stand on adjacent cells, their sprites overlap a bit.
+Read order keeps the further-back piece behind the closer one
+(top-down ordering by world Y).
 
 ## When you add a new piece
 
