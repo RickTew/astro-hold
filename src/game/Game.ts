@@ -292,7 +292,7 @@ export class Game {
     // occupancy, but the sprite renders at GRID_CELL * 3 (= 150) so it reads
     // as the dominant objective piece. Sprite overflows the footprint
     // visually — fine, it's billboard-only.
-    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y, Config.GRID_CELL * 3)
+    this.powerCore = new PixelPowerCore(this.scene, Config.POWER_CORE.X, Config.POWER_CORE.Y)
     // Persistent visual overlay for the core's electric defense zone —
     // 12 cells around the 2×2 core. Translucent yellow tiles so the
     // player can see the danger area at all times.

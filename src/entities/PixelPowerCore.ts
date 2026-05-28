@@ -62,8 +62,12 @@ export class PixelPowerCore {
   private dyingTime = 0
   private dyingFrame = 0
 
-  constructor(scene: THREE.Scene, x: number, y: number, size = 130, team: 'player' | 'ai' = 'player') {
-    this.size = size
+  constructor(scene: THREE.Scene, x: number, y: number, size?: number, team: 'player' | 'ai' = 'player') {
+    // S21 native 1:1. If no explicit size is passed, render at the source
+    // PNG's native pixel width. Falls back to 130 if textures haven't
+    // finished loading (defensive only).
+    this.size = size ?? (loaded ? ((rotTextures[0]?.image as HTMLImageElement | undefined)?.width ?? 130) : 130)
+    size = this.size
     this.hp = this.maxHp = Config.POWER_CORE.HP
     this.mesh = new THREE.Group()
     this.mesh.position.set(x, y, 0)

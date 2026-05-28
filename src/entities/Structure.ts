@@ -54,30 +54,14 @@ const WALK_FRAME_INTERVAL = 0.06   // seconds per frame (~540ms total)
 const structureWalkTextures: Map<StructureType, Map<string, THREE.Texture[]>> = new Map()
 const WALK_DIRS = ['north', 'south', 'east', 'west'] as const
 type WalkDir = (typeof WALK_DIRS)[number]
-// Per-type sprite size override. Default = 50 (one cell). Towers render
-// slightly bigger so they read as the dominant defender pieces; Gun preview
-// is smaller per user feedback (sprite was overflowing its cell).
-const STRUCTURE_SPRITE_SIZE: Partial<Record<StructureType, number>> = {
-  turret: 64,
-  // S20 visual pass per user feedback:
-  //   Phaser (cannon): default 50 -> 40. Energy-spike VFX makes the
-  //     sprite read big; trimming the base size rebalances it.
-  //   Bomber (Blastor): 66 -> 80. Real heavy-tower presence.
-  //   Laser: 44 -> 34. Trimmed so it doesn't crowd Tower visually.
-  //   Signal: default 50 -> 42. User flagged dish overshadowed
-  //     neighboring structures.
-  cannon: 40,
-  bomber: 80,
-  laser:  34,
-  signal: 42,
-  // Sentry renders as tall as the Hulk (84) so the heavy-tower piece
-  // reads as a real bruiser on the field, not a slightly bigger tower.
-  // Hulk's override in SpriteUnit.ts is also 84 — kept in sync.
-  sentry: 84,
-  gun:    40,
-  // Mine sits low on the ground; smaller than a turret so it reads as
-  // a footprint trap, not a structure occupying the whole cell.
-  mine:   36,
+// S21 native 1:1. Per-type sprite size is the source PNG's native pixel
+// width, cached at preload time. Visual hierarchy (Bomber bigger than
+// Laser, Tower bigger than Gun) comes from the artist's chosen canvas
+// per piece, not from runtime scale multiplication. Defaults to 64 for
+// any type whose texture hasn't loaded yet (defensive only).
+const NATIVE_SIZE = new Map<StructureType, number>()
+function structureSizeFor(type: StructureType): number {
+  return NATIVE_SIZE.get(type) ?? 64
 }
 
 // Per-type foot fraction for shadow placement: the % of PNG height
@@ -97,7 +81,6 @@ const STRUCTURE_FOOT_FRACTION: Partial<Record<StructureType, number>> = {
   // visible IN the cell instead of extending past the grid line below.
   signal: 0.92,
 }
-const SPRITE_SIZE = 50   // default — one cell
 // Per-type default facing. Tower has full 8 rotations and ships pointing
 // EAST per the planned directional-arc mechanic (player pays to add more
 // facing directions later). Preview pieces only have a single south.png so
@@ -189,7 +172,11 @@ export async function preloadStructureSprites(): Promise<void> {
     ...(Object.keys(STRUCTURE_SPRITE_FOLDERS) as StructureType[]).map(async type => {
       const folder = STRUCTURE_SPRITE_FOLDERS[type]!
       const dir = STRUCTURE_DEFAULT_DIR[type] ?? 'south'
-      structureTextures.set(type, await loadTex(`/sprites/${folder}/${dir}.png`))
+      const tex = await loadTex(`/sprites/${folder}/${dir}.png`)
+      structureTextures.set(type, tex)
+      // S21: cache native pixel size for structureSizeFor(). Source PNG
+      // is the size authority — no per-type runtime scaling.
+      NATIVE_SIZE.set(type, (tex.image as HTMLImageElement | undefined)?.width ?? 64)
       if (STRUCTURE_HAS_EXPLOSION[type]) {
         const count = explosionFrameCountFor(type)
         const frames: THREE.Texture[] = []
@@ -377,7 +364,7 @@ export class Structure {
           alphaTest: 0.1,
         })
         const sprite = new THREE.Sprite(mat)
-        const sz = STRUCTURE_SPRITE_SIZE[this.type] ?? SPRITE_SIZE
+        const sz = structureSizeFor(this.type)
         sprite.scale.set(sz, sz, 1)
         sprite.position.set(0, 0, 5)
         sprite.renderOrder = 10

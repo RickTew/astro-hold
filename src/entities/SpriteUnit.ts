@@ -18,19 +18,17 @@ const ALL_DIRS = DIRECTIONS as readonly Direction[]
 
 export type AnimState = 'idle' | 'walking' | 'shoot' | 'throw' | 'die' | 'repair' | 'aim'
 
-// Sprite world size — matches the perceived height of the prior 3D cyborg.
-const SPRITE_SIZE = 60
-// Per-type size overrides. Hulk is a bruiser — visually larger than a
-// rank-and-file cyborg so his presence on the field is unmistakable.
-const SPRITE_SIZE_OVERRIDE: Partial<Record<UnitType, number>> = {
-  hulk:    84,
-  // Stalker is a heavy bruiser too — bigger than rank-and-file cyborgs
-  // (60) but visibly smaller than the Hulk so silhouette difference is
-  // still readable on the field.
-  stalker: 76,
-}
+// S21 native 1:1 pixel art. Each sprite renders at its source PNG's
+// native pixel size as world units. No per-piece scale knob — the
+// artist's chosen resolution IS the on-screen size. Visual hierarchy
+// (Hulk bigger than rank-and-file) comes from the artist drawing Hulk
+// at a larger canvas, not from runtime scale multiplication.
+// NATIVE_SIZE is populated during preload from the loaded texture's
+// `.image.width`; falls back to 104 for any type whose textures haven't
+// finished loading by the time `spriteSizeFor` is called (defensive only).
+const NATIVE_SIZE = new Map<UnitType, number>()
 function spriteSizeFor(type: UnitType): number {
-  return SPRITE_SIZE_OVERRIDE[type] ?? SPRITE_SIZE
+  return NATIVE_SIZE.get(type) ?? 104
 }
 
 // Per-unit shadow foot fraction override. Default 0.74 in Shadow.ts
@@ -267,6 +265,13 @@ export async function preloadSpriteUnit(type: UnitType, folder: string): Promise
   }))
 
   animSets.set(type, { folder, staticTextures, anims })
+
+  // S21: cache the source PNG's native pixel size so spriteSizeFor(type)
+  // can return it. Render-wu == source-px = true 1:1 with PPWU=2 giving
+  // a clean 2x integer upscale to screen.
+  const southTex = staticTextures.get('south')
+  const img = southTex?.image as HTMLImageElement | undefined
+  NATIVE_SIZE.set(type, img?.width ?? 104)
 }
 
 export class SpriteUnit {

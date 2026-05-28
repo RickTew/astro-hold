@@ -13,7 +13,9 @@ const SPHERE_DIRECTIONS = [
   'north', 'north-west', 'west', 'south-west',
 ] as const
 const SPHERE_FRAME_INTERVAL = 0.4    // seconds per direction = ~3.2 s per full spin
-const SPHERE_SCREEN_SIZE = 45        // sprite world-units — sized to match other defender units on screen
+// S21 native 1:1. Sphere renders at its source PNG's native pixel size
+// as world units. Cached from the south.png texture after preload.
+let SPHERE_SCREEN_SIZE = 108         // default; overwritten by preloadSphereSprites
 
 const sphereTextures: THREE.Texture[] = []
 const sphereExplosionTextures: THREE.Texture[] = []
@@ -43,6 +45,9 @@ export async function preloadSphereSprites(): Promise<void> {
     }),
   ])
   sphereTexturesLoaded = true
+  // S21: cache the source PNG's native size so the renderer can scale at
+  // 1:1. Read off the first loaded direction (all 8 are same size).
+  SPHERE_SCREEN_SIZE = (sphereTextures[0]?.image as HTMLImageElement | undefined)?.width ?? SPHERE_SCREEN_SIZE
 }
 
 export class SphereDefender {
