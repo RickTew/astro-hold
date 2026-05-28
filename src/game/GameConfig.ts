@@ -24,6 +24,23 @@ export const Config = {
   DEFENDER_MAX_X: -200,
   ATTACKER_MIN_X: 200,
   GRID_CELL: 50,
+
+  // S21 pixel-perfect contract. PPWU = pixels per world unit at base zoom.
+  // The internal renderer canvas is sized so 1 wu = PPWU integer pixels,
+  // regardless of the browser viewport. The canvas element is then CSS
+  // scaled to fit the window with `image-rendering: pixelated` so the
+  // browser nearest-neighbor stretches without blur. World gameplay code
+  // stays in float wu; the render loop snaps each sprite/projectile to
+  // the nearest 1/PPWU wu so on-screen pixels are integer.
+  //
+  // Don't change PPWU casually — every sprite asset is sized assuming this
+  // value, and changing it requires re-tuning sprite scales OR re-exporting
+  // PNGs. See docs/STATS.md "S21" entry + docs/PIXEL_PERFECT.md.
+  PPWU: 2,
+  // World is 1200 wu wide horizontally. Visible vertical extent depends on
+  // window aspect (camera adapts). PPWU × WORLD_WIDTH_WU = base internal
+  // canvas width (2400 px at PPWU=2).
+  WORLD_WIDTH_WU: 1200,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
   // ─── S17.15 credit economy ─────────────────────────────────────────
   // Both teams now start with the SAME base credit budget. Earlier

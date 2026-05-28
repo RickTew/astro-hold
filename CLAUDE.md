@@ -23,6 +23,9 @@ you touch that area:
 - **`docs/VISUAL_STYLE.md`** — Vector-Grid Pixel Hybrid spec (procedural
   vector geometry for environment, pixel sprites for characters, side
   tinted drop shadows).
+- **`docs/PIXEL_PERFECT.md`** — S21 pixel-perfect render contract: PPWU,
+  internal canvas sizing, render-time position snap, NearestFilter audit.
+  Read before touching the camera / renderer / sprite size constants.
 - **`docs/DEVNOTES.md`** — session-by-session decisions, gotchas, bugs.
 - **Session wrap memories** — `project_session_NN_wrap` in memory has
   the recent-session summary. Check current `project_session_20_wrap`
@@ -169,6 +172,14 @@ facing comes from `STRUCTURE_DEFAULT_DIR` in `Structure.ts`.
 **Measure, don't guess** (`feedback_measure_dont_guess_sprite_offsets`).
 When a sprite renders off-center, measure the source PNG bbox before
 tweaking. Guessing wastes loops.
+
+**Pixel-perfect render snap (S21).** Every frame, top-level scene
+children + the camera have `.position.x / .y` rounded to nearest
+`1 / Config.PPWU` wu before render. Gameplay logic uses
+`entity.worldX/Y` (logical, not snapped) so collision + targeting
+math is unaffected. Don't bypass `Game.snapForRender()`. Don't snap
+in entity update loops either; movement interpolation needs float
+positions for smooth deltas. See `docs/PIXEL_PERFECT.md`.
 
 ## Rules
 - Don't hardcode rules or patterns that don't match the actual build.

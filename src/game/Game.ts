@@ -221,8 +221,9 @@ export class Game {
     this.scene.background = new THREE.Color(0x322820)  // matches Dusty Planet darkest stop
     this.placementArcPreview = new FireArcPreview(this.scene)
 
-    const halfH = 600 / (window.innerWidth / window.innerHeight)
-    this.camera = new THREE.OrthographicCamera(-600, 600, halfH, -halfH, 1, 1500)
+    const halfW = Config.WORLD_WIDTH_WU / 2
+    const halfH = halfW / (window.innerWidth / window.innerHeight)
+    this.camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 1500)
     // Top-down view — square grid cells project as on-screen squares. Sprites
     // are billboarded so they still face the camera with the same image.
     // Camera is OFFSET in Y so the world content sits below the floating
@@ -233,9 +234,18 @@ export class Game {
     this.camera.position.set(0, camY, 500)
     this.camera.lookAt(0, camY, 0)
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    // S21 pixel-perfect render contract. Internal canvas is locked to
+    // WORLD_WIDTH_WU * PPWU pixels wide (height matches viewport aspect),
+    // setPixelRatio(1) so devicePixelRatio doesn't multiply the texture
+    // sample rate, and `image-rendering: pixelated` on the canvas style
+    // tells the browser to nearest-neighbor scale up/down to the actual
+    // window without smoothing. antialias OFF — we want hard pixel edges.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false })
+    this.renderer.setPixelRatio(1)
+    this.applyInternalCanvasSize()
+    // Crisp upscale at the browser-stretch step. Without this, devicePixelRatio
+    // != 1 displays would blur our pixel-art textures during the final blit.
+    canvas.style.imageRendering = 'pixelated'
 
     window.addEventListener('resize', this.onResize)
     window.addEventListener('wheel', this.onWheel, { passive: false })
@@ -1539,14 +1549,42 @@ private enterBuildPhase() {
       this.zoomVelocity *= 0.82
     }
 
+    // S21 pixel-perfect snap. Quantize every top-level scene child + the
+    // camera to the nearest 1/PPWU wu so sprite billboards land on integer
+    // screen pixels. Cosmetic-only (entity.worldX/worldY return logical
+    // positions independent of mesh.position), and re-applied each frame
+    // before the next update() runs, so movement interpolation chases
+    // logicalX from the snapped position with no accumulating drift.
+    this.snapForRender()
     this.renderer.render(this.scene, this.camera)
+  }
+
+  // S21: per-frame position snap. Operates on top-level children only —
+  // nested objects (shadows, HP bars, child sprites) ride along on their
+  // parent's snapped local transform, so we don't need to descend. Camera
+  // is snapped too so the world-to-screen mapping never drifts by half a
+  // pixel between frames.
+  private readonly snapStep = 1 / Config.PPWU
+  private snapForRender() {
+    const step = this.snapStep
+    for (const child of this.scene.children) {
+      if (child instanceof THREE.Sprite || child instanceof THREE.Mesh || child instanceof THREE.Group) {
+        child.position.x = Math.round(child.position.x / step) * step
+        child.position.y = Math.round(child.position.y / step) * step
+      }
+    }
+    this.camera.position.x = Math.round(this.camera.position.x / step) * step
+    this.camera.position.y = Math.round(this.camera.position.y / step) * step
   }
 
   private onResize = () => {
     const { innerWidth: w, innerHeight: h } = window
     if (w === 0 || h === 0) return
-    this.renderer.setSize(w, h)
-    const halfH = 600 / (w / h)
+    this.applyInternalCanvasSize()
+    const halfW = Config.WORLD_WIDTH_WU / 2
+    const halfH = halfW / (w / h)
+    this.camera.left   = -halfW
+    this.camera.right  =  halfW
     this.camera.top    =  halfH
     this.camera.bottom = -halfH
     // Re-apply the HUD-aware Y offset on resize. We preserve any user pan
@@ -1558,6 +1596,25 @@ private enterBuildPhase() {
     this.camera.position.y += (newBase - oldBase)
     this.cameraBaseY = newBase
     this.camera.updateProjectionMatrix()
+  }
+
+  // S21 pixel-perfect internal canvas sizing. Internal pixels are locked to
+  // PPWU integer pixels per world unit (WORLD_WIDTH_WU * PPWU wide). Height
+  // matches the viewport aspect so the camera frustum-to-internal mapping
+  // stays 1:1. CSS dimensions equal the actual window size — the canvas is
+  // then nearest-neighbor stretched by the browser via image-rendering:
+  // pixelated. This keeps PPWU integer regardless of devicePixelRatio.
+  private applyInternalCanvasSize() {
+    const { innerWidth: w, innerHeight: h } = window
+    if (w === 0 || h === 0) return
+    const internalW = Config.WORLD_WIDTH_WU * Config.PPWU
+    const internalH = Math.max(1, Math.round(internalW * h / w))
+    // setSize(..., false) keeps three.js from overwriting the CSS dimensions
+    // we apply below — we want internal != CSS so the browser does the final
+    // pixelated stretch.
+    this.renderer.setSize(internalW, internalH, false)
+    this.canvas.style.width = w + 'px'
+    this.canvas.style.height = h + 'px'
   }
 
   // Tracks the HUD-aware base camera Y (what camera.position.y would be
