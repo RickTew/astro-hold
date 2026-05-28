@@ -39,24 +39,46 @@ Gameplay-truth lives on `entity.worldX` / `entity.worldY` (which return
 is cosmetic — the next `update()` chase loop reads logicalX and walks
 from the snapped position with no accumulating drift.
 
-## What S21 did NOT do (next sessions)
+## Native PNG sizes match render targets (S21 session 2)
 
-- **Sprites still scale at render time.** Native PNG sizes (104-124 px)
-  are scaled to target world-unit sizes (40-84 wu) per
-  `SPRITE_SIZE_OVERRIDE` tables in `SpriteUnit.ts` / `Structure.ts`.
-  Sprites stay crisp because NearestFilter masks the downsample, but
-  we're throwing away texel detail every frame.
-- **Re-export sprite PNGs to their target sizes.** Hulk PNG 108 -> 84,
-  Sniper 104 -> 60, Phaser 120 -> 40, etc. After re-export, the
-  `SPRITE_SIZE_OVERRIDE` constants can be deleted because sprites
-  render at native size. Smaller files (faster loads, less GPU memory)
-  and true 1:1 pixel-to-texel mapping.
+Every sprite folder's PNGs have been nearest-neighbor downsampled to
+match the per-type target world-unit size (which is also the on-screen
+pixel size at PPWU=2 and zoom 1). Hulk PNG 108 -> 84, Sniper 104 -> 60,
+Phaser 120 -> 40, etc. The `SPRITE_SIZE_OVERRIDE` tables in
+`SpriteUnit.ts`, `Structure.ts`, and the `SPHERE_SCREEN_SIZE` constant
+in `SphereDefender.ts` now match the source PNG dimensions exactly.
+
+Result: 1 source texel = 1 world unit = 2 screen pixels at PPWU=2.
+Clean integer upscale at every default-zoom render. No texel data
+discarded at runtime.
+
+Re-running `scripts/downsample_sprites.py` is idempotent (the script
+skips files already at the target size). Use it when you commission
+new sprite art that comes in oversized.
+
+The override tables stay as per-piece visual hierarchy knobs. If a
+piece feels too small, bump its override value — the renderer will
+NearestFilter upscale the PNG to the larger wu size. That break the
+clean 1:1 ratio for that one piece but is visually subtle for ratios
+close to 1.
+
+## What S21 did NOT do (future sessions)
+
+- **Zoom-aware PPWU.** Mouse-wheel zoom changes the camera frustum
+  continuously, breaking the integer PPWU contract at non-default
+  zoom levels. Grid lines shimmer slightly during zoom. Fix: snap
+  zoom factor to discrete integer-PPWU steps (1x, 2x, 0.5x).
 - **Integer-multiple canvas upscale.** Today the browser stretches
   the 2400-px-wide internal canvas to whatever CSS width the window
   is (e.g. 1920 px = 0.8x). With `imageRendering: pixelated` this is
   nearest-neighbor but non-integer scale produces slightly uneven
   texel sizes. A future pass could letterbox to the nearest integer
   multiple instead.
+- **Skipped folders.** `cyborg_gatling`, `cyborg_sentry`,
+  `freeze_mine`, `grenade_*`, `powercore` were not downsampled.
+  First three are staged but unused. Powercore's native (124) is
+  smaller than its target (150), so downsample would do nothing.
+  Re-export from PixelLab at the target sizes when these go live.
 
 ## What to do when adding new visuals
 
