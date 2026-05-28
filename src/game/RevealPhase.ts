@@ -76,7 +76,9 @@ interface AoeSummary { hits: number; damageDealt: number; kills: number }
 // flying during subsequent steps, which actually reads nicely.
 const STEP_DURATION = 0.6
 
-const MINE_DETECT_RADIUS = 65
+// 1.3 cells (mine triggers when an enemy steps within ~one cell + a
+// little). Expressed in cells so the value scales with Config.GRID_CELL.
+const MINE_DETECT_RADIUS = 1.3 * Config.GRID_CELL
 
 // Half-angle of a structure's fire arc, in radians. 60° each side = 120°
 // total wedge. East-facing defender towers cover everything between NE and
@@ -103,7 +105,9 @@ const STRUCTURE_OMNI_FIRE: Partial<Record<StructureType, true>> = {
 //   - Sniper: no melee — retreats to base when empty
 //   - Medic + Repair: support, retreat when charges are spent
 const MELEE_FALLBACK_DAMAGE = 10
-const MELEE_FALLBACK_RANGE  = 70   // ~1.4 cells — must be in a neighboring cell
+// ~1.4 cells — must be in a neighboring cell. Expressed in cells so it
+// scales with Config.GRID_CELL.
+const MELEE_FALLBACK_RANGE  = 1.4 * Config.GRID_CELL
 
 // Each bomb now carries its own timerTurns based on triggerMode (see
 // PendingGrenade). Proximity bombs default to 3 armed reveals (safety

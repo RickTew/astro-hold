@@ -460,30 +460,42 @@ export class Game {
     return group
   }
 
-  private makeMapGrid(): THREE.LineSegments {
-    const verts: number[] = []
+  private makeMapGrid(): THREE.Group {
+    // S21 pixel-perfect grid. LineBasicMaterial draws 1-GPU-pixel-wide
+    // lines that survive the browser's nearest-neighbor upscale unevenly
+    // (some lines render at 1 css px, others get dropped or doubled).
+    // Use thin Plane meshes at a fixed wu thickness so every line is
+    // PPWU internal pixels (= 2 at PPWU=2) and stays even-width after
+    // the browser stretches the canvas.
     const left = Config.WORLD.LEFT
     const right = Config.WORLD.RIGHT
     const top = Config.WORLD.TOP
     const bottom = Config.WORLD.BOTTOM
     const cell = Config.GRID_CELL
-    const z = 0.3   // just below fence borders (z=0.4), above terrain
+    const z = 0.3
+    const thickness = 1 / Config.PPWU   // 1 internal pixel exactly
+    const worldW = right - left
+    const worldH = top - bottom
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xaabbcc, transparent: true, opacity: 0.55,
+      depthTest: false, depthWrite: false,
+    })
+    const group = new THREE.Group()
     // Vertical lines
     for (let x = left; x <= right + 0.5; x += cell) {
-      verts.push(x, bottom, z, x, top, z)
+      const geo = new THREE.PlaneGeometry(thickness, worldH)
+      const m = new THREE.Mesh(geo, mat)
+      m.position.set(x, (top + bottom) / 2, z)
+      group.add(m)
     }
     // Horizontal lines
     for (let y = bottom; y <= top + 0.5; y += cell) {
-      verts.push(left, y, z, right, y, z)
+      const geo = new THREE.PlaneGeometry(worldW, thickness)
+      const m = new THREE.Mesh(geo, mat)
+      m.position.set((left + right) / 2, y, z)
+      group.add(m)
     }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-    // Cool blue-gray contrasts against the warm brown dirt; higher opacity so
-    // every cell boundary reads clearly.
-    const mat = new THREE.LineBasicMaterial({
-      color: 0xaabbcc, transparent: true, opacity: 0.55,
-    })
-    return new THREE.LineSegments(geo, mat)
+    return group
   }
 
 private enterBuildPhase() {

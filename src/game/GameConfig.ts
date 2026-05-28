@@ -19,11 +19,33 @@ export const TEAM_TINT: Record<Team, number> = {
 export type Faction = 'robot' | 'cyborg'
 export type Role = 'defender' | 'attacker'
 
+// S21 grid sizing. Cell is the structural container per the
+// native-1:1 guide: sized to accommodate the largest sprite (Bomber
+// 124 px) with a little breathing room. Pieces center inside, smaller
+// sprites have empty pixels around them.
+const _LEGACY_CELL = 50    // historical cell size; all balance values
+                           // (speed, range, sight, aoe) were tuned at
+                           // this scale. WORLD_SCALE re-applies them
+                           // at the new cell size so a piece still
+                           // moves ~1 cell per turn.
+const _COLS = 24
+const _ROWS = 8
+const _GRID_CELL = 128     // bumped from 50 so 124-px Bomber fits + breathing room
+const WORLD_SCALE = _GRID_CELL / _LEGACY_CELL    // 2.56
+// Distance-typed fields below (speed, range, sightRange, aoeRadius,
+// special radii) multiply legacy values by WORLD_SCALE so the game
+// plays the same at the new cell scale.
+
 export const Config = {
-  WORLD: { LEFT: -600, RIGHT: 600, TOP: 200, BOTTOM: -200 },
-  DEFENDER_MAX_X: -200,
-  ATTACKER_MIN_X: 200,
-  GRID_CELL: 50,
+  WORLD: {
+    LEFT:   -_COLS * _GRID_CELL / 2,
+    RIGHT:   _COLS * _GRID_CELL / 2,
+    TOP:     _ROWS * _GRID_CELL / 2,
+    BOTTOM: -_ROWS * _GRID_CELL / 2,
+  },
+  DEFENDER_MAX_X: -200 * WORLD_SCALE,
+  ATTACKER_MIN_X:  200 * WORLD_SCALE,
+  GRID_CELL: _GRID_CELL,
 
   // S21 pixel-perfect contract. PPWU = pixels per world unit at base zoom.
   // The internal renderer canvas is sized so 1 wu = PPWU integer pixels,
@@ -37,10 +59,9 @@ export const Config = {
   // value, and changing it requires re-tuning sprite scales OR re-exporting
   // PNGs. See docs/STATS.md "S21" entry + docs/PIXEL_PERFECT.md.
   PPWU: 2,
-  // World is 1200 wu wide horizontally. Visible vertical extent depends on
-  // window aspect (camera adapts). PPWU × WORLD_WIDTH_WU = base internal
-  // canvas width (2400 px at PPWU=2).
-  WORLD_WIDTH_WU: 1200,
+  // Visible vertical extent depends on window aspect (camera adapts).
+  // PPWU × WORLD_WIDTH_WU = base internal canvas width.
+  WORLD_WIDTH_WU: _COLS * _GRID_CELL,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
   // ─── S17.15 credit economy ─────────────────────────────────────────
   // Both teams now start with the SAME base credit budget. Earlier
@@ -68,7 +89,7 @@ export const Config = {
   // not a cell center. With GRID_CELL=50 and WORLD.LEFT=-600 / BOTTOM=-200,
   // (-550, 0) is the corner where cols 0/1 meet rows 3/4, so the core covers
   // cells (0,3), (1,3), (0,4), (1,4).
-  POWER_CORE: { X: -550, Y: 0, HP: 150, RADIUS: 18 },
+  POWER_CORE: { X: -550 * WORLD_SCALE, Y: 0, HP: 150, RADIUS: 18 * WORLD_SCALE },
 
   // S17.21 unified death-explosion AoE. Every piece that detonates on
   // death (defender self-destruct, cyborg Hulk death blast) uses these
@@ -83,7 +104,7 @@ export const Config = {
   //              avoid the chain.
   //   damage 25: light per-target hit. Won't usually one-shot a piece
   //              at full HP. Tune up/down after observation.
-  DEATH_EXPLOSION: { radius: 75, damage: 25 },
+  DEATH_EXPLOSION: { radius: 75 * WORLD_SCALE, damage: 25 },
 
   // Sphere defender — values were previously hardcoded in SphereDefender.ts.
   // Centralized here so the turn system can read apBudget alongside everything else.
@@ -102,7 +123,7 @@ export const Config = {
   // to 5 (BASE_AMMO baseline). The 8-shot pool is gone; sphere will
   // hit suicide-rush mode sooner, making it a more aggressive walking
   // bomb instead of a stationary turret that eventually wanders.
-  SPHERE: { cost: 100, hp: 300, damage: 25, range: 300, sightRange: 400, apBudget: 3, ammo: 5, speed: 110 },
+  SPHERE: { cost: 100, hp: 300, damage: 25, range: 300 * WORLD_SCALE, sightRange: 400 * WORLD_SCALE, apBudget: 3, ammo: 5, speed: 110 * WORLD_SCALE },
 
   // Per-piece Action Point budgets used by the plan-then-play turn system.
   // Walls/mines stay passive (apBudget 0 → reveal skips them). Turrets/cannons
@@ -117,7 +138,7 @@ export const Config = {
     // ammo = D&D-style shots-per-game. Once 0, the piece is inert (its
     // weapon is spent). Drives strategic resource-allocation — towers can't
     // hold the line forever, bombers can't carpet the map.
-    turret:  { cost: 30, hp: 80,  damage: 25, range: 250, fireInterval: 2, apBudget: 1, aoeRadius: 0,  ammo: 5, label: 'Turret 30cr' },
+    turret:  { cost: 30, hp: 80,  damage: 25, range: 250 * WORLD_SCALE, fireInterval: 2, apBudget: 1, aoeRadius: 0 * WORLD_SCALE,  ammo: 5, label: 'Turret 30cr' },
     // Phaser (S17.19 rename of internal type 'cannon'). Fires a piercing
     // beam along its facing direction. Every enemy in the cardinal
     // lane takes the listed damage. aoeRadius left at 0 since the beam
@@ -125,7 +146,7 @@ export const Config = {
     // direct-fire profile on the defender side.
     // S17.20 Phaser range bumped 280 -> 330 (one cell longer per user
     // request). Beam length follows. Damage stays 40 per enemy in lane.
-    cannon:  { cost: 60, hp: 120, damage: 36, range: 330, fireInterval: 4, apBudget: 1, aoeRadius: 0, ammo: 5, label: 'Phaser 60cr' },
+    cannon:  { cost: 60, hp: 120, damage: 36, range: 330 * WORLD_SCALE, fireInterval: 4, apBudget: 1, aoeRadius: 0 * WORLD_SCALE, ammo: 5, label: 'Phaser 60cr' },
     // Bomber — mid-range proximity-trap thrower. Ammo 3 = three bombs per
     // game total. Combined with the one-bomb-on-field rule this means the
     // defender Bomber is a deliberate placement choice, not a turret.
@@ -133,8 +154,8 @@ export const Config = {
     // 'bomber'; player-facing label distinguishes the robot-side
     // proximity-trap thrower from the cyborg-side Bomber unit.
     // "Blastor" reads more robotic than the historical "Mortar".
-    bomber:  { cost: 70, hp: 100, damage: 20, range: 200, fireInterval: 4, apBudget: 1, aoeRadius: 65, ammo: 5, label: 'Blastor 70cr' },
-    wall:    { cost: 20, hp: 300, damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, aoeRadius: 0,  ammo: 0, label: 'Wall   20cr' },
+    bomber:  { cost: 70, hp: 100, damage: 20, range: 200 * WORLD_SCALE, fireInterval: 4, apBudget: 1, aoeRadius: 65 * WORLD_SCALE, ammo: 5, label: 'Blastor 70cr' },
+    wall:    { cost: 20, hp: 300, damage: 0,  range: 0 * WORLD_SCALE,   fireInterval: 0, apBudget: 0, aoeRadius: 0 * WORLD_SCALE,  ammo: 0, label: 'Wall   20cr' },
     // Sentry — heavy-armor turret (the art is a tracked vehicle with gun
     // arms — reads as a tower, not a wall). Tankier than a tower (HP 150
     // vs 80) but shorter range and slightly less ammo so it isn't a strict
@@ -146,34 +167,34 @@ export const Config = {
     // Sentry advances toward the cyborg push when no enemy is in range,
     // then plants itself when something enters its fire arc. Defenders
     // now have THREE mobile pieces: Dog (90), Repair (65), Sentry (40).
-    sentry:  { cost: 60, hp: 150, damage: 25, range: 200, fireInterval: 2, apBudget: 1, aoeRadius: 0,  ammo: 5, speed: 40, label: 'Sentry 60cr' },
-    mine:    { cost: 20, hp: 50,  damage: 60, range: 60,  fireInterval: 0, apBudget: 0, aoeRadius: 0,  ammo: 1, label: 'Mine   20cr' },
+    sentry:  { cost: 60, hp: 150, damage: 25, range: 200 * WORLD_SCALE, fireInterval: 2, apBudget: 1, aoeRadius: 0 * WORLD_SCALE,  ammo: 5, speed: 40 * WORLD_SCALE, label: 'Sentry 60cr' },
+    mine:    { cost: 20, hp: 50,  damage: 60, range: 60 * WORLD_SCALE,  fireInterval: 0, apBudget: 0, aoeRadius: 0 * WORLD_SCALE,  ammo: 1, label: 'Mine   20cr' },
     // Shield generator. HUD tile labels this as SHIELD and prices it at
     // 50cr. Cost aligned to 50 so the BUILD ledger matches what the
     // shop displays. Currently NO active shield mechanic is wired:
     // the piece just sits there as a 50cr 80hp blocker. See open
     // questions in docs/STATS.md re: the aura design (damage reduction
     // for adjacent allies, shield HP pool, or visual-only dome).
-    defense: { cost: 50, hp: 80,  damage: 0,  range: 0,   fireInterval: 0, apBudget: 0, aoeRadius: 0,  ammo: 0, label: 'Shield 50cr (preview)' },
-    gun:     { cost: 30, hp: 80,  damage: 15, range: 200, fireInterval: 2, apBudget: 1, aoeRadius: 0,  ammo: 5, label: 'Gun 30cr (preview)' },
+    defense: { cost: 50, hp: 80,  damage: 0,  range: 0 * WORLD_SCALE,   fireInterval: 0, apBudget: 0, aoeRadius: 0 * WORLD_SCALE,  ammo: 0, label: 'Shield 50cr (preview)' },
+    gun:     { cost: 30, hp: 80,  damage: 15, range: 200 * WORLD_SCALE, fireInterval: 2, apBudget: 1, aoeRadius: 0 * WORLD_SCALE,  ammo: 5, label: 'Gun 30cr (preview)' },
     // Laser — twin-laser direct-fire turret. Promoted out of "preview" in
     // S17.2: stats kept (damage 25, range 300 = longest direct-fire on the
     // defender side, ammo 5). HP 70 — squishier than tower (80) so it
     // demands repair support to last.
-    laser:   { cost: 40, hp: 70,  damage: 25, range: 300, fireInterval: 3, apBudget: 1, aoeRadius: 0,  ammo: 5, label: 'Laser  40cr' },
+    laser:   { cost: 40, hp: 70,  damage: 25, range: 300 * WORLD_SCALE, fireInterval: 3, apBudget: 1, aoeRadius: 0 * WORLD_SCALE,  ammo: 5, label: 'Laser  40cr' },
     // Signal — EMP emitter (satellite dish art). NO direct damage. Auto-
     // targets the cyborg currently FURTHEST INSIDE the middle map and stuns
     // them for 2 turns (no fire, no move). 2 ammo = 2 EMP strikes per game
     // per Signal. Range 500 covers the full middle corridor. Designed as a
     // strategic counter to back-line snipers/hulks before they engage.
-    signal:  { cost: 70, hp: 80,  damage: 0,  range: 500, fireInterval: 0, apBudget: 1, aoeRadius: 0,  ammo: 2, label: 'Signal 70cr (EMP)' },
+    signal:  { cost: 70, hp: 80,  damage: 0,  range: 500 * WORLD_SCALE, fireInterval: 0, apBudget: 1, aoeRadius: 0 * WORLD_SCALE,  ammo: 2, label: 'Signal 70cr (EMP)' },
     // S17.16 cyborg-side mine. Same stats as the defender mine but
     // placed in the attacker zone and triggered when a DEFENDER mobile
     // unit (sphere, dog, repair) steps within MINE_DETECT_RADIUS.
     // Config entry + HUD tile are wired now; full placement-flow + side-
     // aware trigger logic is the next push (BuildPhase is defender-only
     // today, so cyborg structures need a new placement path).
-    cyborg_mine: { cost: 20, hp: 50, damage: 60, range: 60, fireInterval: 0, apBudget: 0, aoeRadius: 0, ammo: 1, label: 'Cyborg Mine 20cr' },
+    cyborg_mine: { cost: 20, hp: 50, damage: 60, range: 60 * WORLD_SCALE, fireInterval: 0, apBudget: 0, aoeRadius: 0 * WORLD_SCALE, ammo: 1, label: 'Cyborg Mine 20cr' },
   },
 
   UNITS: {
@@ -184,28 +205,28 @@ export const Config = {
     // dictated values. Sniper jumps from 1 to 5 and Stalker drops from
     // 99 to 5. The user wants observation-then-tuning, not unique
     // starting values for each piece.
-    scout:     { cost: 20, hp: 120, speed: 130, damage: 10, range: 280, sightRange: 360, aoeRadius: 0,  apBudget: 3, ammo: 5, label: 'Scout',     color: 0x4488ff },
-    tank:      { cost: 50, hp: 200, speed: 44,  damage: 25, range: 200, sightRange: 260, aoeRadius: 0,  apBudget: 3, ammo: 5, label: 'Tank',      color: 0xff4444 },
-    bomber:    { cost: 60, hp: 80,  speed: 70,  damage: 25, range: 160, sightRange: 240, aoeRadius: 70, apBudget: 3, ammo: 4, label: 'Bomber',    color: 0xff8800 },
-    drone:     { cost: 30, hp: 20,  speed: 160, damage: 8,  range: 350, sightRange: 420, aoeRadius: 0,  apBudget: 3, ammo: 5, label: 'Drone',     color: 0x44ffff },
-    cannon:    { cost: 70, hp: 180, speed: 55,  damage: 35, range: 240, sightRange: 320, aoeRadius: 0,  apBudget: 3, ammo: 4, label: 'Cannon',    color: 0xffaa55 },
-    grenadier: { cost: 50, hp: 110, speed: 75,  damage: 20, range: 180, sightRange: 280, aoeRadius: 60, apBudget: 3, ammo: 4, label: 'Grenadier', color: 0x88dd44 },
+    scout:     { cost: 20, hp: 120, speed: 130 * WORLD_SCALE, damage: 10, range: 280 * WORLD_SCALE, sightRange: 360 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, label: 'Scout',     color: 0x4488ff },
+    tank:      { cost: 50, hp: 200, speed: 44 * WORLD_SCALE,  damage: 25, range: 200 * WORLD_SCALE, sightRange: 260 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, label: 'Tank',      color: 0xff4444 },
+    bomber:    { cost: 60, hp: 80,  speed: 70 * WORLD_SCALE,  damage: 25, range: 160 * WORLD_SCALE, sightRange: 240 * WORLD_SCALE, aoeRadius: 70 * WORLD_SCALE, apBudget: 3, ammo: 4, label: 'Bomber',    color: 0xff8800 },
+    drone:     { cost: 30, hp: 20,  speed: 160 * WORLD_SCALE, damage: 8,  range: 350 * WORLD_SCALE, sightRange: 420 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, label: 'Drone',     color: 0x44ffff },
+    cannon:    { cost: 70, hp: 180, speed: 55 * WORLD_SCALE,  damage: 35, range: 240 * WORLD_SCALE, sightRange: 320 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 4, label: 'Cannon',    color: 0xffaa55 },
+    grenadier: { cost: 50, hp: 110, speed: 75 * WORLD_SCALE,  damage: 20, range: 180 * WORLD_SCALE, sightRange: 280 * WORLD_SCALE, aoeRadius: 60 * WORLD_SCALE, apBudget: 3, ammo: 4, label: 'Grenadier', color: 0x88dd44 },
     // Double Gun — dual hand-cannons. Fires TWO shots per turn (RevealPhase
     // schedules the second projectile 80ms after the first). Per-shot damage
     // is halved (23) so total burst ~46 matches the prior single-shot 45,
     // i.e. same throughput with a burst-weapon feel. Total game damage budget
     // is therefore unchanged (5 turns × 2 shots × 23 ≈ 230).
-    doublegun: { cost: 90, hp: 160, speed: 65,  damage: 23, range: 230, sightRange: 300, aoeRadius: 0,  apBudget: 3, ammo: 4, label: 'Double Gun',color: 0xff8866 },
+    doublegun: { cost: 90, hp: 160, speed: 65 * WORLD_SCALE,  damage: 23, range: 230 * WORLD_SCALE, sightRange: 300 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 4, label: 'Double Gun',color: 0xff8866 },
     // Combat Dog — DEFENDER mobile unit. Fast and now armed: the sprite
     // has a gun mounted on top so it should shoot. range 150 + damage 15
     // = short-medium harasser. Closes the gap to flank cyborgs then fires.
-    dog:       { cost: 40, hp: 80,  speed: 90,  damage: 15, range: 150, sightRange: 280, aoeRadius: 0,  apBudget: 3, ammo: 5, label: 'Dog',        color: 0x4488aa },
+    dog:       { cost: 40, hp: 80,  speed: 90 * WORLD_SCALE,  damage: 15, range: 150 * WORLD_SCALE, sightRange: 280 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, label: 'Dog',        color: 0x4488aa },
     // Cyborg Sniper — precision-strike specialist. Longest range in the game
     // (400 = covers half the world from spawn) and a single, heavy round
     // (ammo 1) that one-shots any single defender structure. Squishy and
     // slow — after firing the sniper is just a slow target. Use the shot
     // wisely: the cannon turret (HP 120) is the natural target.
-    sniper:    { cost: 90, hp: 80, speed: 50,  damage: 110, range: 350, sightRange: 400, aoeRadius: 0, apBudget: 2, ammo: 4, label: 'Sniper',     color: 0x99bb66 },
+    sniper:    { cost: 90, hp: 80, speed: 50 * WORLD_SCALE,  damage: 110, range: 350 * WORLD_SCALE, sightRange: 400 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE, apBudget: 2, ammo: 4, label: 'Sniper',     color: 0x99bb66 },
     // Cyborg Hulk — exo-suited melee bruiser. Highest HP and damage in the
     // roster, slowest speed, very short range (must close to melee). Ammo
     // budget is low so each punch matters.
@@ -213,13 +234,13 @@ export const Config = {
     // tile forward. Lower per-target damage than a punch (40 vs 55) but
     // can hit up to 3 enemies at once. `slamAmmo` is a separate counter
     // from punch ammo — the Hulk picks his moments.
-    hulk:      { cost: 100, hp: 400, speed: 45, damage: 55, range: 70,  sightRange: 220, aoeRadius: 0, apBudget: 2, ammo: 5, slamDamage: 40, slamAmmo: 3, label: 'Hulk',       color: 0x886622 },
+    hulk:      { cost: 100, hp: 400, speed: 45 * WORLD_SCALE, damage: 55, range: 70 * WORLD_SCALE,  sightRange: 220 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE, apBudget: 2, ammo: 5, slamDamage: 40, slamAmmo: 3, label: 'Hulk',       color: 0x886622 },
     // Cyborg Medic — support unit with three heal modes (med-pack throw,
     // deployable medic-pad, tether). Fragile (HP 50) so positioning matters.
     // `damage` repurposed as heal amount per tick; `range` is throw range
     // (3 cells); `ammo` is the SHARED heal-charge pool: throw=1, pad-deploy=2,
     // tether tick=1 per turn. `allowDiagonalMove: true` per the spec.
-    medic:     { cost: 70, hp: 50,  speed: 70,  damage: 30, range: 150, sightRange: 280, aoeRadius: 0,  apBudget: 3, ammo: 5, allowDiagonalMove: true, label: 'Medic',     color: 0xffffff },
+    medic:     { cost: 70, hp: 50,  speed: 70 * WORLD_SCALE,  damage: 30, range: 150 * WORLD_SCALE, sightRange: 280 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, allowDiagonalMove: true, label: 'Medic',     color: 0xffffff },
     // Cyborg Stalker — cloaked melee unit. Spawns invisible (cyborg-side
     // ghost sprite at 35% opacity; defender targeting AI skips cloaked
     // units). Cloak drops permanently on Stalker's first damage-dealing
@@ -233,7 +254,7 @@ export const Config = {
     // treats stalker as meleeUnlimited (same as Hulk fists) so hits
     // never decrement and the ammo field stays at zero forever.
     // Compare to Hulk who DOES have meaningful ammo via slamAmmo (3).
-    stalker:   { cost: 70, hp: 130, speed: 60,  damage: 40, range: 70,  sightRange: 220, aoeRadius: 0,  apBudget: 2, ammo: 0, label: 'Stalker',   color: 0xaaaaaa },
+    stalker:   { cost: 70, hp: 130, speed: 60 * WORLD_SCALE,  damage: 40, range: 70 * WORLD_SCALE,  sightRange: 220 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 2, ammo: 0, label: 'Stalker',   color: 0xaaaaaa },
     // Robot Repair — defender-side support unit, the medic's structural twin.
     // Three repair modes: pack-throw, deployable repair-pad, weld-tether.
     // Targets are anything defender-side with HP — towers, walls, mines,
@@ -250,7 +271,7 @@ export const Config = {
     // it and the core, but only one tower at a time before the bot
     // has to come back. By the time the trip completes the cyborg push
     // is usually already at the gate.
-    repair:    { cost: 70, hp: 60,  speed: 65,  damage: 30, range: 150, sightRange: 280, aoeRadius: 0,  apBudget: 3, ammo: 5, refillCharges: 3, allowDiagonalMove: true, label: 'Repair',    color: 0xffffff },
+    repair:    { cost: 70, hp: 60,  speed: 65 * WORLD_SCALE,  damage: 30, range: 150 * WORLD_SCALE, sightRange: 280 * WORLD_SCALE, aoeRadius: 0 * WORLD_SCALE,  apBudget: 3, ammo: 5, refillCharges: 3, allowDiagonalMove: true, label: 'Repair',    color: 0xffffff },
   },
 } as const
 
