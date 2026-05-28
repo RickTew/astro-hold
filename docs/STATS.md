@@ -10,6 +10,8 @@ flow is BUILD then REVEAL (PLAN phase is currently skipped, see Turn flow).
 
 **S21 changes since S20 (unvalidated):**
 - **Diminishing-returns heal scaling.** Repeated heals on the same target decay: 100% / 75% / 50% / 25% / 0%. Streak resets if (a) the target takes a single hit >=25% of maxHp, or (b) 5 reveals pass without a heal landing on it. Applies to BOTH sides (Repair tether/pad/refill on defender; Medic tether/pad/throw on attacker). Fixes the cannon vs Repair stalemate where 10 dmg/turn was being cancelled by 20 heal/turn forever. Multi-repair emergency stacks still cover real damage spikes (5+ uncapped heals across multiple bots), light chip-damage loops decay away. Tether/weld auto-releases when the streak hits 0 so the bot can re-target.
+- **Pixel-perfect render foundation.** PPWU=2 contract, locked internal canvas, render-time position snap, native PNG sizes used as world-unit render sizes. No per-piece SPRITE_SIZE_OVERRIDE / STRUCTURE_SPRITE_SIZE / SPHERE_SCREEN_SIZE constants. Sprites are crisp at any window size and zoom level. Does NOT affect balance numbers. See `docs/PIXEL_PERFECT.md` for the full contract.
+- **Cell-vs-sprite question OPEN.** Sprites are 104-124 px native, cells are 50 wu, so sprites overflow cells visually. User wants cells sized as structural tile containers. Past attempt to scale the world 2.56x was too invasive. S22 first task: pick the right approach (see `project_session_21_wrap` memory).
 
 **S20 changes since S19 (unvalidated — retest first task next session):**
 - **Sniper damage 135 → 110** (-19%). Snipers were averaging ~821 damage / 5 kills per game across 6-game losing streak.

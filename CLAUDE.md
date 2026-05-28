@@ -7,6 +7,16 @@ Two terminal states: core dies (defender loses) or all cyborgs dead /
 unable to attack (defender wins). No stalemate rule
 (`feedback_die_or_survive`).
 
+**S21 state.** Pixel-perfect render foundation is live: PPWU=2,
+internal canvas locked, `image-rendering: pixelated`, per-frame
+position snap, sprites render at their PNG-native size (no per-piece
+scale knobs). Diminishing-returns heal scaling fixes the cannon vs
+Blastor stalemate. See `docs/PIXEL_PERFECT.md` and the
+`project_session_21_wrap` memory. **Open question for S22:** cells
+are 50 wu, sprites overflow by ~2x; user wants them sized as
+structural tile containers but past attempts to scale the world were
+too invasive. Confirm the approach before touching Config.
+
 ## Where to find what
 The detail lives in topical docs, not here. Read the relevant file when
 you touch that area:
