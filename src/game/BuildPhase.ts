@@ -1,15 +1,9 @@
 import * as THREE from 'three'
-import { Config, StructureType } from './GameConfig'
+import { Config, StructureType, canPlace } from './GameConfig'
 import { Structure } from '../entities/Structure'
 import { FireArcPreview } from '../entities/FireArcPreview'
 import { HUD } from '../ui/HUD'
 import { playEventSfx } from '../audio/sfx'
-
-// Derived from the world + cell size so a GRID_CELL change (S22: 50 -> 100)
-// doesn't need a hand edit here. COLS = defender-zone width / cell, ROWS =
-// world height / cell. Used for placement bounds checking, not a visible grid.
-const COLS = Math.floor((Config.DEFENDER_MAX_X - Config.WORLD.LEFT) / Config.GRID_CELL)
-const ROWS = Math.floor((Config.WORLD.TOP - Config.WORLD.BOTTOM) / Config.GRID_CELL)
 
 export class BuildPhase {
   private structures: Structure[] = []
@@ -89,12 +83,16 @@ export class BuildPhase {
   requestSkipNextClick() { this.skipNextClick = true }
 
 private buildHitPlane(): THREE.Mesh {
-    const W = Config.DEFENDER_MAX_X - Config.WORLD.LEFT   // 400
-    const H = Config.WORLD.TOP - Config.WORLD.BOTTOM       // 400
+    // Invisible raycast target covering the defender's buildable zone (LEFT
+    // edge to DEFENDER_MAX_X), full board height. Centered on that zone, all
+    // derived so it tracks the active stage.
+    const W = Config.DEFENDER_MAX_X - Config.WORLD.LEFT
+    const H = Config.WORLD.TOP - Config.WORLD.BOTTOM
+    const centerX = (Config.WORLD.LEFT + Config.DEFENDER_MAX_X) / 2
     const geo = new THREE.PlaneGeometry(W, H)
     const mat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
     const plane = new THREE.Mesh(geo, mat)
-    plane.position.set(-400, 0, 0.2)
+    plane.position.set(centerX, 0, 0.2)
     this.scene.add(plane)
     return plane
   }
@@ -110,7 +108,9 @@ private buildHitPlane(): THREE.Mesh {
     const p = hits[0].point
     const col = Math.floor((p.x - Config.WORLD.LEFT)   / Config.GRID_CELL)
     const row = Math.floor((p.y - Config.WORLD.BOTTOM) / Config.GRID_CELL)
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null
+    // Defender structures may only land in the defender's buildable territory
+    // (the active placement rule). Occupancy is checked separately downstream.
+    if (!canPlace('defender', col, row)) return null
 
     const wx = Config.WORLD.LEFT   + col * Config.GRID_CELL + Config.GRID_CELL / 2
     const wy = Config.WORLD.BOTTOM + row * Config.GRID_CELL + Config.GRID_CELL / 2

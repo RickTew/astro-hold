@@ -133,15 +133,26 @@ evaluated and rejected.
 - GLBs are not loaded at runtime.
 
 ## Key constants
-- World: x [-600, +600], y [-225, +225] = 1200 x 450 world units
-  (S22b nudged height 400 -> 450 so cell 75 gives 6 even rows)
-- Grid cell: **75 x 75** world units -> 16 cols x 6 rows = **96 cells**
-- Defender zone: x < -225 (5 cols)
-- Attacker zone: x > 225 (5 cols)
-- Battlefield: middle 6 cols, no placements
-- Power Core at (-525, 0), **2x2 footprint** (cells (0,2)(1,2)(0,3)(1,3),
-  the two center rows). Sprite renders at native PNG width x
-  `POWER_CORE.RENDER_SCALE` (= 2), not tied to GRID_CELL.
+**S22c: the board is DERIVED from `STAGE` (a `StageDef` in `GameConfig.ts`),
+the "set the stage" seam. Change the board by editing `STAGE`, not the
+derived `Config.WORLD` / zone / `WORLD_WIDTH_WU` / `POWER_CORE` fields.
+Placement territory is rule-driven via `canPlace(side, col, row)` (modes:
+`zones` default / `coreRadius` / `half` / `free`), NOT hardcoded x-bounds.
+See `project_lobby_configurable_stage` memory.**
+
+Map #1 ("Proving Ground"):
+- World: x [-750, +750], y [-450, +450] = 1500 x 900 world units
+  (= STAGE.cols*cell x STAGE.rows*cell). `WORLD_WIDTH_WU` = 1500, so the
+  camera frames more world = reads zoomed out vs the old 1200.
+- Grid cell: **75 x 75** -> **20 cols x 12 rows = 240 cells**
+- Defender zone: x < -300 (6 cols, `STAGE.defenderCols`)
+- Attacker zone: x > 300 (6 cols, `STAGE.attackerCols`)
+- Battlefield: middle 8 cols, no placements
+- Power Core at (-675, 0) (= WORLD.LEFT + cell, derived), **2x2 footprint**
+  (cells (0,5)(1,5)(0,6)(1,6), the two center rows). Sprite renders at
+  native PNG width x `POWER_CORE.RENDER_SCALE` (= 2), not tied to GRID_CELL.
+- Floor is one flat themed color (`STAGE.theme.floor`); zone tint bands +
+  dividers are gone. Blue/red base outlines come from `STAGE.theme`.
 - Start credits: 1000 (testing). Equal credits both sides;
   `Difficulty.aiCreditMultiplier()` is the only economic knob
   (easy 0.75x, normal 1.0x, hard 1.25x on AI side)

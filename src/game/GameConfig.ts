@@ -19,22 +19,85 @@ export const TEAM_TINT: Record<Team, number> = {
 export type Faction = 'robot' | 'cyborg'
 export type Role = 'defender' | 'attacker'
 
+// ─── STAGE / MAP DEFINITION ───────────────────────────────────────────────
+// S22c: the "set the stage" seam. A match's board is one StageDef. The lobby
+// will eventually pick or generate one ("Planet Zooboobo", random, etc.); for
+// now there is a single hand-authored Map #1. All world geometry below
+// (WORLD bounds, zone dividers, cell size, core position, theme colors) is
+// DERIVED from this object, so swapping the stage swaps the whole board with
+// no other edits. See the project_lobby_configurable_stage memory.
+//
+// Placement is rule-driven via canPlace() rather than hardcoded x-bounds, so
+// a future lobby can offer 'zones' / 'coreRadius' / 'half' / 'free' without a
+// geometry refactor. Obstacles (blocking pixel-art cover: rocks, wreckage)
+// will be added to StageDef later and fed into canPlace + movement/targeting.
+export type PlacementMode = 'zones' | 'coreRadius' | 'half' | 'free'
+export interface StageDef {
+  name: string
+  cols: number          // board width in cells
+  rows: number          // board height in cells (keep EVEN so a grid line
+                        // sits on y=0 for the Power Core's centered 2x2)
+  cell: number          // world units per cell
+  defenderCols: number  // buildable columns from the LEFT edge (defender)
+  attackerCols: number  // buildable columns from the RIGHT edge (attacker)
+  placement: PlacementMode
+  theme: {
+    background: number       // scene clear color behind the floor
+    floor: number            // flat procedural floor color
+    grid: number             // grid line color
+    defenderBorder: number   // defender base outline (blue)
+    attackerBorder: number   // attacker base outline (red)
+  }
+}
+
+// Map #1. cols*cell = 1500 wide, rows*cell = 900 tall. 6 defender + 8 middle
+// + 6 attacker columns; 12 rows (even). Bigger than the old 16x6 so the
+// camera reads more zoomed out and each base has real room to build.
+export const STAGE: StageDef = {
+  name: 'Proving Ground',
+  cols: 20,
+  rows: 12,
+  cell: 75,
+  defenderCols: 6,
+  attackerCols: 6,
+  placement: 'zones',
+  theme: {
+    background: 0x2a2620,
+    floor: 0x39322a,
+    grid: 0xaabbcc,
+    defenderBorder: 0x00ddff,
+    attackerBorder: 0xff4488,
+  },
+}
+
+const STAGE_W = STAGE.cols * STAGE.cell  // 1500
+const STAGE_H = STAGE.rows * STAGE.cell  // 900
+
+// Territory rule for one cell. Occupancy (core/structures/units) is checked
+// separately by the placement code; this is purely "is this cell in the side's
+// buildable territory" per the active placement mode.
+export function canPlace(side: Role, col: number, row: number): boolean {
+  if (col < 0 || col >= STAGE.cols || row < 0 || row >= STAGE.rows) return false
+  switch (STAGE.placement) {
+    case 'half':
+      return side === 'defender' ? col < STAGE.cols / 2 : col >= STAGE.cols / 2
+    case 'free':
+      return true
+    case 'zones':
+    case 'coreRadius':  // coreRadius rule not implemented yet; falls back to zones
+    default:
+      return side === 'defender'
+        ? col < STAGE.defenderCols
+        : col >= STAGE.cols - STAGE.attackerCols
+  }
+}
+
 export const Config = {
-  WORLD: { LEFT: -600, RIGHT: 600, TOP: 225, BOTTOM: -225 },
-  DEFENDER_MAX_X: -225,
-  ATTACKER_MIN_X: 225,
-  // S22b: cell 100 -> 75 ("cell 75 + map nudge"). 75 fills the placement
-  // boxes noticeably better than 100 while keeping the Power Core a
-  // perfectly centered 2x2. Making 75 tile cleanly took a small map nudge:
-  //   field height 400 -> 450  =>  (TOP - BOTTOM) / 75 = 6 rows (even, with
-  //                                a grid line on y=0 the centered core needs)
-  //   zone dividers +/-200 -> +/-225  =>  each side zone is 375 / 75 = 5 cols
-  // World stays 1200 wide: 1200 / 75 = 16 cols (5 defender + 6 middle +
-  // 5 attacker). Ranges/speeds/units are UNCHANGED (still raw wu, now
-  // spanning more, smaller cells). Grid is 16 cols x 6 rows. The camera
-  // frames by WORLD_WIDTH_WU + window aspect (not WORLD.TOP/BOTTOM), so the
-  // taller field needs no camera change and does not clip.
-  GRID_CELL: 75,
+  WORLD: { LEFT: -STAGE_W / 2, RIGHT: STAGE_W / 2, TOP: STAGE_H / 2, BOTTOM: -STAGE_H / 2 },
+  // Zone dividers derived from the stage's buildable-column counts.
+  DEFENDER_MAX_X: -STAGE_W / 2 + STAGE.defenderCols * STAGE.cell,
+  ATTACKER_MIN_X:  STAGE_W / 2 - STAGE.attackerCols * STAGE.cell,
+  GRID_CELL: STAGE.cell,
 
   // S21 pixel-perfect contract. PPWU = pixels per world unit at base zoom.
   // The internal renderer canvas is sized so 1 wu = PPWU integer pixels,
@@ -48,10 +111,10 @@ export const Config = {
   // value, and changing it requires re-tuning sprite scales OR re-exporting
   // PNGs. See docs/STATS.md "S21" entry + docs/PIXEL_PERFECT.md.
   PPWU: 2,
-  // World is 1200 wu wide horizontally. Visible vertical extent depends on
-  // window aspect (camera adapts). PPWU × WORLD_WIDTH_WU = base internal
-  // canvas width (2400 px at PPWU=2).
-  WORLD_WIDTH_WU: 1200,
+  // World width = stage width (cols * cell). Visible vertical extent depends
+  // on window aspect (camera adapts). PPWU × WORLD_WIDTH_WU = base internal
+  // canvas width. A wider stage frames more world = reads as zoomed out.
+  WORLD_WIDTH_WU: STAGE_W,
   START_CREDITS: 1000,  // testing budget — production should be lower (suggest 200-300)
   // ─── S17.15 credit economy ─────────────────────────────────────────
   // Both teams now start with the SAME base credit budget. Earlier
@@ -76,12 +139,11 @@ export const Config = {
   // Power Core uses a 2x2 footprint (4 cells) per the size rule: small pieces
   // get one cell, large pieces step up to the next tier (4 cells). The (X, Y)
   // here is the CENTROID of the 2x2 block. It sits on a grid INTERSECTION,
-  // not a cell center. With GRID_CELL=75 and WORLD.LEFT=-600 / BOTTOM=-225,
-  // (-525, 0) is the corner where cols 0/1 meet rows 2/3, so the core covers
-  // cells (0,2), (1,2), (0,3), (1,3), the two CENTER rows of 6 (vertically
-  // centered on y=0). X tracked the cell size as it changed (-550 at 50,
-  // -500 at 100, -525 at 75) so the centroid stays one cell in from the left
-  // edge and lands on a vertical grid line.
+  // not a cell center. X is DERIVED as one cell in from the left edge
+  // (WORLD.LEFT + cell), which lands on a vertical grid line; Y = 0 sits on
+  // the horizontal midline (STAGE.rows is even), so the 2x2 covers the two
+  // center rows and is vertically centered. With Map #1 (cell 75, left -750)
+  // that is (-675, 0) covering cells (0,5)(1,5)(0,6)(1,6).
   // RENDER_SCALE: the core's billboard renders at native PNG width * this
   // factor. Kept an INTEGER so one source texel maps to a whole block of
   // screen pixels (stays pixel-perfect crisp, identical pixel look, just
@@ -89,7 +151,7 @@ export const Config = {
   // a 124 canvas), so native 1:1 renders it smaller than any unit. 2x makes
   // it read as the dominant 2x2 objective. Visual only -- occupancy/footprint
   // math reads GRID_CELL, not this, so the core still occupies a clean 2x2.
-  POWER_CORE: { X: -525, Y: 0, HP: 150, RADIUS: 18, RENDER_SCALE: 2 },
+  POWER_CORE: { X: -STAGE_W / 2 + STAGE.cell, Y: 0, HP: 150, RADIUS: 18, RENDER_SCALE: 2 },
 
   // S17.21 unified death-explosion AoE. Every piece that detonates on
   // death (defender self-destruct, cyborg Hulk death blast) uses these

@@ -54,12 +54,15 @@ flow is BUILD then REVEAL (PLAN phase is currently skipped, see Turn flow).
 
 ## Map & Grid
 
-- World extent: x [-600, +600], y [-225, +225] = 1200 × 450 world units
-  (S22b nudged height 400 → 450 so cell 75 yields 6 even rows)
-- Grid cell: **75 × 75** world units → **16 columns × 6 rows = 96 cells**
-- Defender zone (Robots): x < -225 (5 columns)
-- Battlefield (no-build zone): -225 ≤ x ≤ 225 (6 columns)
-- Attacker zone (Cyborgs): x > 225 (5 columns)
+- S22c: the board is DERIVED from `STAGE` in `GameConfig.ts`. Edit `STAGE`
+  to change the board; everything below is computed from it. Map #1 below.
+- World extent: x [-750, +750], y [-450, +450] = 1500 × 900 world units
+  (= STAGE.cols·cell × STAGE.rows·cell)
+- Grid cell: **75 × 75** world units → **20 columns × 12 rows = 240 cells**
+- Defender zone (Robots): x < -300 (6 columns, STAGE.defenderCols)
+- Battlefield (no-build zone): -300 ≤ x ≤ 300 (8 columns)
+- Attacker zone (Cyborgs): x > 300 (6 columns, STAGE.attackerCols)
+- Placement is rule-driven via `canPlace(side, col, row)` (default `zones`)
 - **One piece per cell.** Strict. No stacking. Enforced at placement;
   movement will enforce it once the turn system lands.
 - Placement snaps to cell centers automatically. Cell centers are at

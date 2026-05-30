@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, StructureType, UnitType, Faction, Role } from './GameConfig'
+import { Config, STAGE, StructureType, UnitType, Faction, Role } from './GameConfig'
 import { Background } from '../scene/Background'
 import { PixelPowerCore, preloadPixelPowerCore } from '../entities/PixelPowerCore'
 import { SphereDefender, preloadSphereSprites } from '../entities/SphereDefender'
@@ -218,7 +218,7 @@ export class Game {
 
   constructor(private canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x322820)  // matches Dusty Planet darkest stop
+    this.scene.background = new THREE.Color(STAGE.theme.background)  // flat stage background
     this.placementArcPreview = new FireArcPreview(this.scene)
 
     const halfW = Config.WORLD_WIDTH_WU / 2
@@ -478,10 +478,10 @@ export class Game {
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-    // Cool blue-gray contrasts against the warm brown dirt; higher opacity so
-    // every cell boundary reads clearly.
+    // Grid line color comes from the active stage theme. Higher opacity so
+    // every cell boundary reads clearly against the flat floor.
     const mat = new THREE.LineBasicMaterial({
-      color: 0xaabbcc, transparent: true, opacity: 0.55,
+      color: STAGE.theme.grid, transparent: true, opacity: 0.55,
     })
     return new THREE.LineSegments(geo, mat)
   }
@@ -519,12 +519,13 @@ private enterBuildPhase() {
       },
     )
 
-    // Thin fence borders mark each zone without covering sprites.
+    // Thin borders mark each base without covering sprites. Colors come from
+    // the active stage theme (blue defender / red attacker).
     this.defZoneMesh = this.makeZoneBorder(
-      Config.WORLD.LEFT, Config.DEFENDER_MAX_X, 0x00ddff
+      Config.WORLD.LEFT, Config.DEFENDER_MAX_X, STAGE.theme.defenderBorder
     )
     this.attZoneMesh = this.makeZoneBorder(
-      Config.ATTACKER_MIN_X, Config.WORLD.RIGHT, 0xff4488
+      Config.ATTACKER_MIN_X, Config.WORLD.RIGHT, STAGE.theme.attackerBorder
     )
 
     this.hud.onBuySphere = () => {
@@ -1275,7 +1276,7 @@ private enterBuildPhase() {
     // behind when switching attacker types.
     this.endPlacement()
     const ghost = this.makeGhostRing(0x44aaff, 16, 24)
-    ghost.position.set(-400, 0, 1)
+    ghost.position.set((Config.WORLD.LEFT + Config.DEFENDER_MAX_X) / 2, 0, 1)
     this.scene.add(ghost)
     this.placement = {
       kind: 'sphere',
@@ -1298,7 +1299,7 @@ private enterBuildPhase() {
     this.endPlacement()
     const color = Config.UNITS.dog.color
     const ghost = this.makeGhostRing(color, 12, 20)
-    ghost.position.set(-400, 0, 1)
+    ghost.position.set((Config.WORLD.LEFT + Config.DEFENDER_MAX_X) / 2, 0, 1)
     this.scene.add(ghost)
     this.placement = {
       kind: 'dog',
@@ -1321,7 +1322,7 @@ private enterBuildPhase() {
     this.endPlacement()
     const color = Config.UNITS.repair.color
     const ghost = this.makeGhostRing(color, 12, 20)
-    ghost.position.set(-400, 0, 1)
+    ghost.position.set((Config.WORLD.LEFT + Config.DEFENDER_MAX_X) / 2, 0, 1)
     this.scene.add(ghost)
     this.placement = {
       kind: 'repair',
@@ -1345,7 +1346,7 @@ private enterBuildPhase() {
     this.endPlacement()
     const color = Config.UNITS[type].color
     const ghost = this.makeGhostRing(color, 12, 20)
-    ghost.position.set(400, 0, 1)
+    ghost.position.set((Config.ATTACKER_MIN_X + Config.WORLD.RIGHT) / 2, 0, 1)
     this.scene.add(ghost)
     this.hud.setSelectedUnitType(type)
     this.placement = {

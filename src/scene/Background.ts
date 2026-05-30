@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { STAGE } from '../game/GameConfig'
 
 // ─── Background ───────────────────────────────────────────────────────────────
 
@@ -8,99 +9,48 @@ export class Background {
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group()
     this.buildGround()
-    this.buildZoneOverlays()
     scene.add(this.group)
   }
 
   private buildGround() {
-    // DUSTY PLANET surface (Vector-Grid Pixel Hybrid style). Pure
-    // procedural gradient. No Perlin noise, no specks, no crack lines.
-    // The visual style guide calls for vector-clean floors that let
-    // pixel sprites pop off the surface. See docs/VISUAL_STYLE.md.
-    //
-    // Three layered gradients on a single canvas:
-    //   1. Base vertical fade from lighter sand-tan to darker.
-    //   2. Soft warm-light pool top-left (sun bias).
-    //   3. Soft warm pool bottom-right (atmospheric depth).
-    //
-    // 1024x512 canvas is enough resolution for smooth gradients on a
-    // 4000x4000 world plane; no detail to alias since it's all
-    // continuous color.
-    const W = 1024
-    const H = 512
+    // S22c: flat procedural floor. One themed color with a whisper of vertical
+    // shading for depth so the pixel sprites still pop. The old gradient pools,
+    // zone tint bands, and divider lines were removed: the blue/red grid base
+    // borders now mark territory, and decorative add-ons (rocks, wreckage)
+    // will come later as stage obstacles, not painted into the ground.
+    const base = STAGE.theme.floor
+    const r = (base >> 16) & 0xff
+    const g = (base >> 8) & 0xff
+    const b = base & 0xff
+    const top = `rgb(${r}, ${g}, ${b})`
+    const bottom = `rgb(${Math.round(r * 0.82)}, ${Math.round(g * 0.82)}, ${Math.round(b * 0.82)})`
+
+    // Tiny canvas: it is a continuous single-hue gradient, no detail to lose.
+    const W = 16
+    const H = 256
     const canvas = document.createElement('canvas')
     canvas.width = W
     canvas.height = H
     const ctx = canvas.getContext('2d')!
-
-    // Base vertical gradient (the Dusty Planet color stops match the
-    // FLOOR COLOR LAB variant 2 in build-test.html).
-    const base = ctx.createLinearGradient(0, 0, 0, H)
-    base.addColorStop(0, '#4a3e2e')
-    base.addColorStop(1, '#322820')
-    ctx.fillStyle = base
-    ctx.fillRect(0, 0, W, H)
-
-    // Warm sun-light pool from the upper-left.
-    const sun = ctx.createRadialGradient(
-      W * 0.25, H * 0.20, 0,
-      W * 0.25, H * 0.20, Math.min(W, H) * 0.85,
-    )
-    sun.addColorStop(0, 'rgba(255, 220, 170, 0.22)')
-    sun.addColorStop(1, 'rgba(255, 220, 170, 0)')
-    ctx.fillStyle = sun
-    ctx.fillRect(0, 0, W, H)
-
-    // Soft warm pool toward the lower-right for atmospheric depth.
-    const pool = ctx.createRadialGradient(
-      W * 0.80, H * 0.80, 0,
-      W * 0.80, H * 0.80, Math.min(W, H) * 0.7,
-    )
-    pool.addColorStop(0, 'rgba(180, 130, 90, 0.15)')
-    pool.addColorStop(1, 'rgba(180, 130, 90, 0)')
-    ctx.fillStyle = pool
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, top)
+    grad.addColorStop(1, bottom)
+    ctx.fillStyle = grad
     ctx.fillRect(0, 0, W, H)
 
     const texture = new THREE.CanvasTexture(canvas)
     texture.wrapS = THREE.ClampToEdgeWrapping
     texture.wrapT = THREE.ClampToEdgeWrapping
-    // Smooth filtering since this is continuous gradient, not pixel art.
     texture.minFilter = THREE.LinearFilter
     texture.magFilter = THREE.LinearFilter
 
-    const geo = new THREE.PlaneGeometry(4000, 4000)
+    // 8000 wide so the floor always overflows the (larger) board + margins on
+    // any window aspect or zoom.
+    const geo = new THREE.PlaneGeometry(8000, 8000)
     const mat = new THREE.MeshBasicMaterial({ map: texture })
     const plane = new THREE.Mesh(geo, mat)
     plane.position.z = -6
     this.group.add(plane)
-  }
-
-  private buildZoneOverlays() {
-    const H = 4000
-
-    // Defender zone — subtle blue tint
-    const defMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, H),
-      new THREE.MeshBasicMaterial({ color: 0x001133, transparent: true, opacity: 0.12 })
-    )
-    defMesh.position.set(-400, 0, -4)
-    this.group.add(defMesh)
-
-    // Attacker zone — subtle red tint
-    const attMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, H),
-      new THREE.MeshBasicMaterial({ color: 0x220000, transparent: true, opacity: 0.12 })
-    )
-    attMesh.position.set(400, 0, -4)
-    this.group.add(attMesh)
-
-    // Zone divider lines
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x334455 })
-    const mkLine  = (pts: THREE.Vector3[]) =>
-      new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat)
-
-    this.group.add(mkLine([new THREE.Vector3(-200, -2000, -3), new THREE.Vector3(-200, 2000, -3)]))
-    this.group.add(mkLine([new THREE.Vector3( 200, -2000, -3), new THREE.Vector3( 200, 2000, -3)]))
   }
 
   dispose() {
