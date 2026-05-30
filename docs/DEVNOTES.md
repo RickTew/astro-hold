@@ -511,9 +511,15 @@ Per-state per-direction frame sequences for every cyborg type. Folder layout:
     divider lines removed; blue/red GRID base borders mark territory instead.
   - Resizing the board WILL shift battle balance (bigger board, same credits =
     sparser armies); expect a retune. Did NOT touch piece stats.
-- Map-wide grid: **75×75 cells** (S22b→S22c). Drawn as subtle themed line
-  segments at z=0.3 (under base borders). History: 50 (24×8) → 100 (12×4, S22)
-  → 75 (16×6, S22b) → 75 (20×12, S22c, STAGE-derived).
+- Map-wide grid: **75×75 cells** (S22b→S22c). BAKED into a repeating
+  CanvasTexture (one cell tile, RepeatWrapping, mipmapped) on a 9000-unit plane
+  at z=0.3, NOT world-space GL lines. Reason: 1px world lines round onto whole
+  screen pixels unevenly at fractional zoom, so cells looked different sizes and
+  shimmered while zooming; as a texture every cell is the same texel block, so
+  it stays consistent and scales smoothly (lines soften/fade when zoomed in/out,
+  the accepted trade). Plane is a multiple of cell + centered at 0 so a tile
+  boundary lands on world 0 (a real cell boundary). History: 50 (24×8) → 100
+  (12×4, S22) → 75 (16×6, S22b) → 75 (20×12, S22c, STAGE-derived).
 - **S22b "cell 75 + map nudge."** Goal was smaller cells (units fill the box
   better than at 100) WITHOUT the core going off-center. 75 only tiles cleanly
   if the map is nudged: field height 400→450 (`WORLD.TOP/BOTTOM` ±200→±225)

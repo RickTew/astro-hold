@@ -460,39 +460,48 @@ export class Game {
     return group
   }
 
-  private makeMapGrid(): THREE.LineSegments {
-    const verts: number[] = []
+  private makeMapGrid(): THREE.Object3D {
     const cell = Config.GRID_CELL
-    const z = 0.3   // just below base borders (z=0.4), above the floor
-    // S22c: the grid spans the WHOLE visible map, not just the playable board,
-    // so the flat floor reads as one continuous gridded surface. Extent is a
-    // generous cell-aligned box that covers any zoom-out/pan (camera width
-    // clamps at 2800 -> halfW 1400). The board origin (WORLD.LEFT/BOTTOM) is a
-    // multiple of `cell`, so lines at k*cell pass exactly through the board's
-    // cell boundaries; the blue/red base borders mark the playable zones on
-    // top of this larger grid.
-    const halfCols = 40   // 40 cells each side of center horizontally
-    const halfRows = 28   // 28 cells each side vertically
-    const left = -halfCols * cell
-    const right = halfCols * cell
-    const bottom = -halfRows * cell
-    const top = halfRows * cell
-    // Vertical lines
-    for (let x = left; x <= right + 0.5; x += cell) {
-      verts.push(x, bottom, z, x, top, z)
-    }
-    // Horizontal lines
-    for (let y = bottom; y <= top + 0.5; y += cell) {
-      verts.push(left, y, z, right, y, z)
-    }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
-    // Grid line color comes from the active stage theme. Higher opacity so
-    // every cell boundary reads clearly against the flat floor.
-    const mat = new THREE.LineBasicMaterial({
-      color: STAGE.theme.grid, transparent: true, opacity: 0.55,
-    })
-    return new THREE.LineSegments(geo, mat)
+    // S22c: the grid is BAKED into a repeating texture instead of world-space
+    // GL lines. World-space 1px lines round onto whole screen pixels unevenly
+    // at fractional zoom, so cells looked slightly different sizes and shimmered
+    // while zooming. As a texture, every cell is the SAME texel block, so the
+    // grid stays consistent and scales smoothly with zoom (lines soften a touch
+    // when zoomed way in, the accepted trade for "always looks the same").
+    //
+    // One transparent cell tile, RepeatWrapping across a large plane. The plane
+    // is a multiple of cell and centered at 0, so a tile boundary lands on world
+    // 0 (a real board cell boundary, since the board origin is a multiple of
+    // cell). Lines therefore align with where pieces snap.
+    const TILE = 150   // px per cell (2 px / wu at PPWU=2)
+    const LW = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = TILE
+    canvas.height = TILE
+    const ctx = canvas.getContext('2d')!
+    const c = STAGE.theme.grid
+    ctx.fillStyle = `rgba(${(c >> 16) & 0xff}, ${(c >> 8) & 0xff}, ${c & 0xff}, 0.55)`
+    ctx.fillRect(0, 0, LW, TILE)        // left edge -> vertical boundary line
+    ctx.fillRect(0, TILE - LW, TILE, LW) // bottom edge -> horizontal boundary line
+
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.wrapS = THREE.RepeatWrapping
+    tex.wrapT = THREE.RepeatWrapping
+    tex.magFilter = THREE.LinearFilter
+    // Mipmaps so the thin lines don't moire/shimmer when zoomed out (they just
+    // soften and fade, which reads fine). magFilter Linear keeps zoom-in smooth.
+    tex.minFilter = THREE.LinearMipmapLinearFilter
+    tex.generateMipmaps = true
+
+    const PLANE = 9000           // 9000 / 75 = 120 cells (integer -> aligns to 0)
+    tex.repeat.set(PLANE / cell, PLANE / cell)
+
+    const geo = new THREE.PlaneGeometry(PLANE, PLANE)
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+    const mesh = new THREE.Mesh(geo, mat)
+    mesh.position.set(0, 0, 0.3)   // above zone tints (0.2), below base borders (0.4)
+    mesh.renderOrder = 1
+    return mesh
   }
 
 private enterBuildPhase() {
