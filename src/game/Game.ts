@@ -461,60 +461,31 @@ export class Game {
   }
 
   private makeMapGrid(): THREE.Object3D {
-    // S22c: PROCEDURAL grid shader. Earlier tries (world-space GL lines, then a
-    // baked repeating texture) both showed uneven cell widths + shimmer at
-    // fractional zoom -- thin lines rounding/beating against the pixel grid.
-    // This computes each line analytically from WORLD coordinates with
-    // derivative-based (fwidth) anti-aliasing, so every cell is mathematically
-    // identical and the line holds a consistent ~1px at ANY zoom. Smooth zoom
-    // and grab-drag pan are unaffected (the line math is independent of them).
-    //
-    // Lines land where worldXY / cell is an integer = multiples of cell. The
-    // board origin is a multiple of cell, so they align with where pieces snap.
+    // S22c WORKING FALLBACK: world-space GL lines spanning the full map.
+    // KNOWN ISSUE (open, see project_grid_zoom_quality memory): at fractional
+    // zoom the 1px lines round onto screen pixels unevenly, so cells look
+    // slightly different widths / shimmer while zooming. Two fixes were tried
+    // and pulled: a baked repeating texture (still uneven: thin lines beat in a
+    // minified mipmap) and a procedural fwidth grid shader (correct in theory
+    // but rendered invisible here -- finish/debug that next session; it lives
+    // in git at commit 28f65ca). This visible line grid is the overnight state.
+    const verts: number[] = []
     const cell = Config.GRID_CELL
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      extensions: { derivatives: true } as any,  // fwidth on a WebGL1 fallback
-      uniforms: {
-        uCell:      { value: cell },
-        uColor:     { value: new THREE.Color(STAGE.theme.grid) },
-        uOpacity:   { value: 0.5 },
-        uThickness: { value: 1.0 },   // line half-width, in screen pixels
-      },
-      vertexShader: `
-        varying vec2 vWorld;
-        void main() {
-          vec4 wp = modelMatrix * vec4(position, 1.0);
-          vWorld = wp.xy;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        precision highp float;
-        varying vec2 vWorld;
-        uniform float uCell;
-        uniform float uOpacity;
-        uniform float uThickness;
-        uniform vec3 uColor;
-        void main() {
-          vec2 coord = vWorld / uCell;
-          vec2 d = 0.5 - abs(fract(coord) - 0.5);   // distance to nearest line
-          vec2 g = d / (fwidth(coord) * uThickness);
-          float line = min(g.x, g.y);
-          float a = (1.0 - clamp(line, 0.0, 1.0)) * uOpacity;
-          if (a <= 0.002) discard;
-          gl_FragColor = vec4(uColor, a);
-        }
-      `,
+    const z = 0.3   // above zone tints (0.2), below base borders (0.4)
+    const halfCols = 40
+    const halfRows = 28
+    const left = -halfCols * cell
+    const right = halfCols * cell
+    const bottom = -halfRows * cell
+    const top = halfRows * cell
+    for (let x = left; x <= right + 0.5; x += cell) verts.push(x, bottom, z, x, top, z)
+    for (let y = bottom; y <= top + 0.5; y += cell) verts.push(left, y, z, right, y, z)
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    const mat = new THREE.LineBasicMaterial({
+      color: STAGE.theme.grid, transparent: true, opacity: 0.55,
     })
-    // Large plane so the grid covers the view at any zoom/pan; the shader only
-    // paints the lines (everything else discards), so the size is cheap.
-    const geo = new THREE.PlaneGeometry(16000, 16000)
-    const mesh = new THREE.Mesh(geo, mat)
-    mesh.position.set(0, 0, 0.3)   // above zone tints (0.2), below base borders (0.4)
-    mesh.renderOrder = 1
-    return mesh
+    return new THREE.LineSegments(geo, mat)
   }
 
 private enterBuildPhase() {
