@@ -296,9 +296,6 @@ export class HUD {
         <div class="sp-inner">
           <div class="sp-title">ASTROHOLD</div>
           <div class="sp-headline">CHOOSE YOUR SIDE</div>
-          <button id="sp-swap" class="sp-swap" type="button" title="Swap which faction plays each side">
-            <span class="sp-swap-icon">&#8646;</span> Swap factions
-          </button>
           <div class="sp-cards">
             <button class="sp-card defender" data-faction="robot" data-role="defender">
               <div class="sp-role-label">DEFENDER</div>
@@ -315,6 +312,9 @@ export class HUD {
               <div class="sp-cta">PLAY</div>
             </button>
           </div>
+          <button id="sp-swap" class="sp-swap" type="button" title="Swap which faction plays each side">
+            <span class="sp-swap-icon">&#8646;</span> Swap factions
+          </button>
           <div class="sp-difficulty" id="sp-difficulty">
             <div class="sp-diff-label">AI DIFFICULTY</div>
             <div class="sp-diff-buttons">
