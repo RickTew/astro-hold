@@ -1013,40 +1013,19 @@ export class RevealPhase {
     //      cloak is to close distance without being shot, so we
     //      don't want him hanging back.
     if (unit.type === 'stalker') {
-      // Stalker intro. Spawns visible and marches west uncloaked. The intro
-      // callout fires the moment he comes within ~350 units of ANY defender
-      // piece — which is just OUTSIDE defender weapon range — and the cloak
-      // engages on that SAME action (his first move into range). The old
-      // version waited 2 real seconds before cloaking, which spanned several
-      // reveal turns: the visible Stalker marched into weapon range and got
-      // shot before going dark. Now he calls out and vanishes together, so
-      // defenders never get a free firing window on him.
-      if (!unit.introSpoken) {
-        const STALKER_REVEAL_RANGE = 350
-        const sx = unit.worldX
-        const sy = unit.worldY
-        let inRange = false
-        for (const d of this.defenderUnits) {
-          if (d.isDead) continue
-          if (Math.hypot(d.worldX - sx, d.worldY - sy) <= STALKER_REVEAL_RANGE) { inRange = true; break }
-        }
-        if (!inRange) {
-          for (const s of this.structures) {
-            if (s.isDead) continue
-            if (Math.hypot(s.worldX - sx, s.worldY - sy) <= STALKER_REVEAL_RANGE) { inRange = true; break }
-          }
-        }
-        if (!inRange) {
-          for (const sp of this.spheres) {
-            if (sp.isDead) continue
-            if (Math.hypot(sp.worldX - sx, sp.worldY - sy) <= STALKER_REVEAL_RANGE) { inRange = true; break }
-          }
-        }
-        if (inRange) {
-          unit.introSpoken = true
-          unit.announceOnce('intro')
-          unit.engageCloak()   // cloak on this same move — no visible window for defenders to shoot
-        }
+      // Stalker intro + cloak. Spawns visible inside his own (red) deployment
+      // zone and marches west. The instant he steps OFF that zone into the
+      // open field he calls out and cloaks together. The zone edge sits well
+      // outside every defender weapon range, so he's dark long before he can
+      // be shot — and because defender structures fire BEFORE cyborgs each
+      // turn, a range/sight trigger would always give them one free turn on
+      // the still-visible Stalker the moment he crossed into range. Cloaking
+      // at the zone boundary sidesteps that entirely, and it's a single
+      // position check instead of scanning every defender piece.
+      if (!unit.introSpoken && unit.worldX < Config.ATTACKER_MIN_X) {
+        unit.introSpoken = true
+        unit.announceOnce('intro')
+        unit.engageCloak()
       }
       const meleeRange = Math.max(Config.UNITS.stalker.range, MELEE_REACH)
       const melee = this.nearestEnemy(unit, meleeRange)
