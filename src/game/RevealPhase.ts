@@ -3358,6 +3358,36 @@ export class RevealPhase {
     // a PendingGrenade sprite, detonates at the start of the next reveal.
     // Direct-fire AoE (e.g. cannon turret) keeps the original instant-blast
     // behaviour.
+    // Melee strike — Hulk / Stalker fists, or an out-of-ammo melee-fallback
+    // punch. Melee-only: the hit lands INSTANTLY on the adjacent target with
+    // NO flying projectile. A bullet visual on a melee unit reads as "shooting"
+    // (the Stalker must never appear to shoot). Single-target only — hulk and
+    // stalker have aoeRadius 0 and melee-fallback is forced non-AoE upstream.
+    if ((meleeUnlimited || isMeleeFallback) && action.kind === 'fire') {
+      const ref = (action as { target: TargetRef }).target
+      // Hulk/Stalker use their own melee recipe (melee_hit / stalker_swing);
+      // an out-of-ammo fallback punch uses the generic body-impact, NOT the
+      // unit's ranged weapon sound (a punching cannon shouldn't go "bang").
+      playWeaponSfx(isMeleeFallback ? 'melee_hit' : this.weaponSfxFor(actor))
+      const targetEntity = this.resolveTargetEntity(ref)
+      const atkType = this.actorTypeKey(actor)
+      if (targetEntity && !targetEntity.isDead) {
+        const targetLabel = this.targetLabel(targetEntity)
+        const final = this.shieldedDamage(targetEntity, damage)
+        targetEntity.takeDamage(final)
+        const killed = targetEntity.isDead
+        const shieldedTag = final < damage ? ' (shielded)' : ''
+        this.log(actor.side, `${this.actorLabel(actor)} strikes ${targetLabel} (−${final}${shieldedTag}${killed ? `, killed` : ''})`)
+        this.attribute(targetEntity, atkType, actor.side, final, killed)
+        this.emit({ kind: 'hit', actorType: atkType, side: actor.side })
+        // Brief impact spark at the target — melee feedback, not a projectile.
+        this.explosions.push(new Explosion(this.scene, aim.x, aim.y, 22, 0.3, actor.side === 'attacker' ? 0xff5533 : 0xffcc33))
+      } else {
+        this.emit({ kind: 'miss', actorType: atkType, side: actor.side })
+      }
+      return
+    }
+
     const isLobbed = (actor instanceof Structure && actor.type === 'bomber')
       || (actor instanceof SpriteUnit && (actor.type === 'bomber' || actor.type === 'grenadier'))
     const spriteTex = isLobbed ? getGrenadeTexture() : null
