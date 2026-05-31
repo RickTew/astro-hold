@@ -104,14 +104,17 @@ const STRUCTURE_OMNI_FIRE: Partial<Record<StructureType, true>> = {
 //   - Medic + Repair: support, retreat when charges are spent
 const MELEE_FALLBACK_DAMAGE = 10
 // Melee reach, derived from GRID_CELL so it survives board / cell resizes.
-// Cardinal-adjacent cells sit one GRID_CELL apart (center to center), so the
-// reach MUST exceed GRID_CELL or a melee unit standing next to its target
-// can't hit it. 1.5 cells covers cardinal (1.0) and diagonal (~1.41) adjacency
-// without reaching the next ring out (2.0). Was a hardcoded 70 ("~1.4 cells"
-// back when cells were 50px); the S22b bump to 75px left 70 < one cell, so
-// melee units (hulk / stalker) and out-of-ammo punchers couldn't reach the
+// CARDINAL-adjacent only: a touching N/S/E/W cell is exactly one GRID_CELL
+// away (center to center); a diagonal cell is GRID_CELL*sqrt(2) (~1.41 cells)
+// away. The reach sits BETWEEN those (1.3 cells) so it covers the cardinal
+// neighbor with margin but excludes the diagonal — matching cardinal-only
+// movement, so a melee unit must be truly next to its target, not a half-cell
+// gap away. (1.5 reached the diagonal, which read on screen as "attacking from
+// a distance.") Must also stay under 2.0 so it never hits a cell two out.
+// Was a hardcoded 70 ("~1.4 cells" at the old 50px cell, also cardinal-only);
+// the S22b bump to 75px left 70 < one cell, so melee units couldn't reach the
 // 2x2 Power Core or an adjacent enemy — they marched up and "danced" til dead.
-const MELEE_REACH = Math.round(Config.GRID_CELL * 1.5)
+const MELEE_REACH = Math.round(Config.GRID_CELL * 1.3)
 const MELEE_FALLBACK_RANGE = MELEE_REACH
 
 // Each bomb now carries its own timerTurns based on triggerMode (see
