@@ -344,6 +344,7 @@ export class Game {
       // FACTION_ART maps cannon -> human_warrior, medic -> human_medic).
       preloadSpriteUnit('human_warrior', 'human_warrior'),
       preloadSpriteUnit('human_medic', 'human_medic'),
+      preloadSpriteUnit('human_marine', 'human_marine'),
       preloadPixelPowerCore(),
       preloadStructureSprites(),
       preloadAllSamples(),

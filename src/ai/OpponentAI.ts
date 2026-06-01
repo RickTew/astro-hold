@@ -299,7 +299,7 @@ export class OpponentAI {
     // stats, medic) so the AI army never spawns un-skinned cyborg types. Other
     // factions use the full cyborg roster.
     const allTypes: UnitType[] = this.faction === 'human'
-      ? ['cannon', 'medic']
+      ? ['cannon', 'doublegun', 'medic']
       : ['cannon', 'grenadier', 'doublegun', 'hulk', 'sniper', 'medic', 'stalker']
 
     // Spawn from the back columns (closest to the cyborg edge of the field).

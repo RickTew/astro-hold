@@ -41,8 +41,9 @@ function spriteSizeFor(key: string): number {
 // 'cannon' wearing the human_warrior art, its MEDIC the human_medic art.
 const FACTION_ART: Partial<Record<Faction, Partial<Record<UnitType, string>>>> = {
   human: {
-    cannon: 'human_warrior',
-    medic:  'human_medic',
+    cannon:    'human_warrior',
+    medic:     'human_medic',
+    doublegun: 'human_marine',
   },
 }
 export function factionArtKey(faction: Faction | undefined, type: UnitType): string {
@@ -234,6 +235,16 @@ const MANIFEST: Record<string, AnimManifest> = {
     idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
     walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 6 },
     die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
+  },
+  // Human Space Marine — the Human faction's heavier rifle trooper (reuses
+  // 'doublegun' stats). Export ships idle (8 dirs, 4f), running -> walking
+  // (4 cardinal, 9f), lifts_gun_to_aim -> aim (4 cardinal, 9f), drops_dead ->
+  // die (4 cardinal, 9f). Diagonals mirror/fall back to the static rotations.
+  human_marine: {
+    idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
+    walking: { fps: 10, loop: true,  presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
+    aim:     { fps: 12, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
+    die:     { fps: 10, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
   },
   // Female Space Warrior — the Human faction's basic gunner (reuses 'cannon'
   // stats). PixelLab export ships 4 cardinal directions per state; diagonals

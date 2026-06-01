@@ -125,9 +125,9 @@ export class HUD {
     // the human_warrior sprite), MEDIC reuses 'medic' stats with human_medic
     // art. Remaining slots are upgrade placeholders for future human units.
     const humanTiles: Tile[] = [
-      { label: 'WARRIOR', cost: Config.UNITS.cannon.cost, icon: '/sprites/human_warrior/south.png', dataType: 'cannon' },
-      { label: 'MEDIC',   cost: Config.UNITS.medic.cost,  icon: '/sprites/human_medic/south.png',   dataType: 'medic' },
-      { label: '', cost: 0, icon: '', empty: true },
+      { label: 'WARRIOR', cost: Config.UNITS.cannon.cost,    icon: '/sprites/human_warrior/south.png', dataType: 'cannon' },
+      { label: 'MARINE',  cost: Config.UNITS.doublegun.cost, icon: '/sprites/human_marine/south.png',  dataType: 'doublegun' },
+      { label: 'MEDIC',   cost: Config.UNITS.medic.cost,     icon: '/sprites/human_medic/south.png',   dataType: 'medic' },
       { label: '', cost: 0, icon: '', empty: true },
       { label: '', cost: 0, icon: '', empty: true },
       { label: '', cost: 0, icon: '', empty: true },
