@@ -12,11 +12,14 @@ export const TEAM_TINT: Record<Team, number> = {
   ai:     0xffffff,
 }
 
-// Player faction + role choice from the side picker. Faction is currently
-// visual-only — the playable roster is determined by role, since both
-// factions share towers/power core and the movable cyborg/robot mobile
-// units don't have cross-faction sprite sets yet.
-export type Faction = 'robot' | 'cyborg'
+// Player faction + role choice from the side picker. Faction drives the
+// cosmetic identity (name, hero, music, voice) AND, where cross-faction
+// sprite sets exist, the unit ART (see FACTION_ART in SpriteUnit.ts).
+// Robots/Cyborgs share the role-bound roster; the Human faction (S22d)
+// fields its own mobile units (warrior + medic art) reusing existing
+// attacker stat blocks. Role is independent of faction - the side picker
+// lets any faction take either role.
+export type Faction = 'robot' | 'cyborg' | 'human'
 export type Role = 'defender' | 'attacker'
 
 // ─── STAGE / MAP DEFINITION ───────────────────────────────────────────────

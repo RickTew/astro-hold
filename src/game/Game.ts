@@ -21,11 +21,29 @@ import { recordBattle, BattleRecord, PerPieceCounters } from './BattleStats'
 import { getRevealSpeed } from './RevealSpeed'
 import { aiCreditMultiplier } from './Difficulty'
 import { MiniControlCenter } from '../ui/MiniControlCenter'
-import { setMusicTrack, stopMusic } from '../audio/music'
+import { setMusicTrack, stopMusic, MusicTrack } from '../audio/music'
 import { preloadAllSamples, playEventSfx } from '../audio/sfx'
 import type { CombatLogEntry } from './RevealPhase'
 
 type Phase = 'loading' | 'pick-side' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
+
+// Which faction the AI takes once the player has picked. Robots and Cyborgs
+// remain each other's classic rivals; the Human faction is matched against
+// Cyborgs by default (any pairing is otherwise valid - faction is decoupled
+// from role). Keyed exhaustively so adding a faction is a compile error here.
+const AI_OPPONENT_FACTION: Record<Faction, Faction> = {
+  robot:  'cyborg',
+  cyborg: 'robot',
+  human:  'cyborg',
+}
+// Faction -> in-game music track. Humans reuse the cyborg theme until a
+// dedicated humans.mp3 is dropped into /public/audio (then add it to
+// MusicTrack + TRACK_URLS and point 'human' at it here).
+const FACTION_MUSIC: Record<Faction, MusicTrack> = {
+  robot:  'robots',
+  cyborg: 'cyborgs',
+  human:  'cyborgs',
+}
 
 // Unified placement session — covers both cyborg and sphere placement.
 // Ghost mesh is the authoritative position; never re-raycast at click time.
@@ -322,6 +340,10 @@ export class Game {
       preloadSpriteUnit('medic', 'medic'),
       preloadSpriteUnit('repair', 'repair'),
       preloadSpriteUnit('stalker', 'cyborg_stalker'),
+      // Human faction art overrides (registered under their own art keys;
+      // FACTION_ART maps cannon -> human_warrior, medic -> human_medic).
+      preloadSpriteUnit('human_warrior', 'human_warrior'),
+      preloadSpriteUnit('human_medic', 'human_medic'),
       preloadPixelPowerCore(),
       preloadStructureSprites(),
       preloadAllSamples(),
@@ -351,7 +373,7 @@ export class Game {
   // is committed so the AI can take its first BUILD turn alongside the player.
   private enterPickSide() {
     this.phase = 'pick-side'
-    this.hud.onPickSide = (faction, role) => this.onSidePicked(faction, role)
+    this.hud.onPickSide = (faction, role, aiFaction) => this.onSidePicked(faction, role, aiFaction)
     this.hud.showSidePicker()
     // Main menu music plays under the side picker. The first click on a
     // faction card will both pick the side AND satisfy the browser's
@@ -359,18 +381,17 @@ export class Game {
     setMusicTrack('menu')
   }
 
-  private onSidePicked(faction: Faction, role: Role) {
+  private onSidePicked(faction: Faction, role: Role, aiFaction?: Faction) {
     if (this.playerSide) return  // re-entry guard
     this.playerSide = role
     this.playerFaction = faction
-    // AI gets the OPPOSITE role + OPPOSITE faction. With the 2-card
-    // picker this means: player picks Robot Defender, AI is Cyborg
-    // Attacker (and vice versa). Same-faction matchups will return when
-    // we expand the picker after faction-specific rosters are generated.
-    this.aiFaction = faction === 'robot' ? 'cyborg' : 'robot'
+    // The AI plays the faction shown on the card the player did NOT pick
+    // (passed from the side picker). Falls back to a fixed rival map for any
+    // caller that doesn't supply it.
+    this.aiFaction = aiFaction ?? AI_OPPONENT_FACTION[faction]
     const aiSide: OpponentSide = role === 'defender' ? 'attacker' : 'defender'
-    this.opponentAI = new OpponentAI(aiSide, this.aiApi(aiSide))
-    this.hud.setPlayerSide(role)
+    this.opponentAI = new OpponentAI(aiSide, this.aiApi(aiSide), this.aiFaction)
+    this.hud.setPlayerSide(role, faction, this.aiFaction)
     // Apply player team tint to the Power Core if the player is defending,
     // or AI tint if the player is attacking (the core always sits on the
     // defender side, so it belongs to whoever picked defender).
@@ -378,7 +399,7 @@ export class Game {
     // Swap menu music for the faction's in-game theme. Stays playing
     // through build / reveal / win / lose; PLAY AGAIN reloads the page
     // which brings the menu track back on its own.
-    setMusicTrack(faction === 'robot' ? 'robots' : 'cyborgs')
+    setMusicTrack(FACTION_MUSIC[faction])
     playEventSfx('power_up')
     this.enterBuildPhase()
   }
@@ -432,7 +453,7 @@ export class Game {
     if (this.isCellOccupied(x, y)) return false
     const cost = Config.UNITS[type]?.cost ?? 0
     if (!this.buildPhase.spendCredits(cost)) return false
-    this.defenderUnits.push(new SpriteUnit(this.scene, type, x, y, 'defender', 'ai'))
+    this.defenderUnits.push(new SpriteUnit(this.scene, type, x, y, 'defender', 'ai', this.aiFaction ?? 'cyborg'))
     return true
   }
   private aiSpawnAttackerUnit(type: UnitType, x: number, y: number): boolean {
@@ -441,7 +462,7 @@ export class Game {
     if (this.attCredits < cost) return false
     this.attCredits -= cost
     this.hud.setAttCredits(this.attCredits)
-    this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'ai'))
+    this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'ai', this.aiFaction ?? 'cyborg'))
     return true
   }
   private aiSpawnStructure(type: StructureType, col: number, row: number): boolean {
@@ -1351,7 +1372,7 @@ private enterBuildPhase() {
         if (this.isCellOccupied(x, y)) return false
         const cost = Config.UNITS.dog.cost
         if (!this.buildPhase || !this.buildPhase.spendCredits(cost)) return false
-        this.defenderUnits.push(new SpriteUnit(this.scene, 'dog', x, y, 'defender', 'player'))
+        this.defenderUnits.push(new SpriteUnit(this.scene, 'dog', x, y, 'defender', 'player', this.playerFaction ?? 'robot'))
         playEventSfx('structure_placement')
         return false
       },
@@ -1374,7 +1395,7 @@ private enterBuildPhase() {
         if (this.isCellOccupied(x, y)) return false
         const cost = Config.UNITS.repair.cost
         if (!this.buildPhase || !this.buildPhase.spendCredits(cost)) return false
-        this.defenderUnits.push(new SpriteUnit(this.scene, 'repair', x, y, 'defender', 'player'))
+        this.defenderUnits.push(new SpriteUnit(this.scene, 'repair', x, y, 'defender', 'player', this.playerFaction ?? 'robot'))
         playEventSfx('structure_placement')
         return false
       },
@@ -1409,7 +1430,7 @@ private enterBuildPhase() {
         if (this.attCredits < cost) return false
         this.attCredits -= cost
         this.hud.setAttCredits(this.attCredits)
-        this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'player'))
+        this.attackerUnits.push(new SpriteUnit(this.scene, type, x, y, 'attacker', 'player', this.playerFaction ?? 'cyborg'))
         playEventSfx('structure_placement')
         return false
       },

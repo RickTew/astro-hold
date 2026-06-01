@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, UnitType, TEAM_TINT } from '../game/GameConfig'
+import { Config, UnitType, TEAM_TINT, Faction } from '../game/GameConfig'
 import { QueuedAction, nextActorId } from '../game/TurnTypes'
 import { spawnHealVfx, HealVfxVariant } from './HealVfx'
 import { spawnSpeechBubble, SpeechTrigger, SpeechVoice } from './SpeechBubble'
@@ -26,9 +26,27 @@ export type AnimState = 'idle' | 'walking' | 'shoot' | 'throw' | 'die' | 'repair
 // NATIVE_SIZE is populated during preload from the loaded texture's
 // `.image.width`; falls back to 104 for any type whose textures haven't
 // finished loading by the time `spriteSizeFor` is called (defensive only).
-const NATIVE_SIZE = new Map<UnitType, number>()
-function spriteSizeFor(type: UnitType): number {
-  return NATIVE_SIZE.get(type) ?? 104
+// Keyed by ART KEY (a sprite-set id), not UnitType: a unit's art key is its
+// type by default, but a faction override (FACTION_ART) can point it at a
+// different sprite folder (e.g. a human-faction medic -> 'human_medic').
+const NATIVE_SIZE = new Map<string, number>()
+function spriteSizeFor(key: string): number {
+  return NATIVE_SIZE.get(key) ?? 104
+}
+
+// Cross-faction sprite overrides (S22d). When a unit belongs to a faction
+// listed here, its art is resolved from the override folder instead of the
+// default type folder - gameplay TYPE (and therefore stats/behavior) is
+// unchanged. The Human faction reuses attacker stat blocks: its WARRIOR is a
+// 'cannon' wearing the human_warrior art, its MEDIC the human_medic art.
+const FACTION_ART: Partial<Record<Faction, Partial<Record<UnitType, string>>>> = {
+  human: {
+    cannon: 'human_warrior',
+    medic:  'human_medic',
+  },
+}
+export function factionArtKey(faction: Faction | undefined, type: UnitType): string {
+  return (faction && FACTION_ART[faction]?.[type]) ?? type
 }
 
 // Per-unit shadow foot fraction override. Default 0.74 in Shadow.ts
@@ -84,7 +102,9 @@ interface UnitAnimSet {
   anims: Record<AnimState, AnimDef | undefined>
 }
 
-const animSets: Map<UnitType, UnitAnimSet> = new Map()
+// Keyed by ART KEY (folder-id), not UnitType, so faction art overrides can
+// register their own sets (e.g. 'human_warrior') alongside the type defaults.
+const animSets: Map<string, UnitAnimSet> = new Map()
 
 // Per-unit manifest — frame counts and FPS chosen to look right at 1.0s-ish
 // loops, matching the per-state frame inventory in /public/sprites/<unit>/.
@@ -176,15 +196,18 @@ const MANIFEST: Record<string, AnimManifest> = {
     throw:   { fps: 12, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
     die:     { fps: 10, loop: false, presentDirs: ['east'], frameCount: 9 },
   },
-  // Cyborg Medic — support unit. PixelLab export ships three animation states:
+  // Cyborg Medic — support unit. Art swapped to the Cyborg_Healer export
+  // (S22d); the prior art is staged at /sprites/human_medic for the future
+  // Human faction. The new export ships idle + walking only and NO death
+  // clip, so the live medic keeps the prior export's die/ frames on disk:
   //  - idle (Breathing_Idle): 4 frames × all 8 directions.
-  //  - walking: 6 frames × all 8 directions.
-  //  - die (stops_and_drops_dead): 9 frames × all 8 directions.
+  //  - walking (walking_slow): 9 frames × all 8 directions.
+  //  - die (retained from prior export): 9 frames × all 8 directions.
   // No throw / shoot clip — the medic snaps to the static rotation pose
   // for the brief throw moment.
   medic: {
     idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
-    walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 6 },
+    walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 9 },
     die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
   },
   // Robot Repair — defender-side support unit. PixelLab export ships:
@@ -203,6 +226,25 @@ const MANIFEST: Record<string, AnimManifest> = {
     // attaches a tether. PixelLab ships 9 frames × all 8 directions.
     repair:  { fps: 12, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
     die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 4 },
+  },
+  // Human Medic — the PRIOR cyborg-medic art, reassigned to the Human faction
+  // (the live cyborg 'medic' now wears the newer Cyborg_Healer art). This
+  // older export ships idle 4f + walking 6f + die 9f, all 8 directions.
+  human_medic: {
+    idle:    { fps: 6,  loop: true,  presentDirs: ALL_DIRS, frameCount: 4 },
+    walking: { fps: 10, loop: true,  presentDirs: ALL_DIRS, frameCount: 6 },
+    die:     { fps: 10, loop: false, presentDirs: ALL_DIRS, frameCount: 9 },
+  },
+  // Female Space Warrior — the Human faction's basic gunner (reuses 'cannon'
+  // stats). PixelLab export ships 4 cardinal directions per state; diagonals
+  // mirror off the cardinals. idle 4f, walking 9f, die 9f, aim 4f (raises
+  // pistol). No dedicated 'shoot' clip - firing falls back to the static
+  // rotation pose like the medic's throw.
+  human_warrior: {
+    idle:    { fps: 6,  loop: true,  presentDirs: ['east', 'west', 'north', 'south'], frameCount: 4 },
+    walking: { fps: 10, loop: true,  presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
+    aim:     { fps: 10, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 4 },
+    die:     { fps: 10, loop: false, presentDirs: ['east', 'west', 'north', 'south'], frameCount: 9 },
   },
   // Cyborg Stalker — cloaked melee unit. MANIFEST is keyed by FOLDER
   // name (matches preloadSpriteUnit's `folder` arg), so the key here is
@@ -233,7 +275,10 @@ function loadTexture(url: string): Promise<THREE.Texture> {
   })
 }
 
-export async function preloadSpriteUnit(type: UnitType, folder: string): Promise<void> {
+// `key` is the ART KEY the loaded set registers under (usually the UnitType,
+// but a free string for faction-override sets like 'human_warrior'). `folder`
+// is the /public/sprites subfolder and also the MANIFEST key.
+export async function preloadSpriteUnit(key: string, folder: string): Promise<void> {
   // Static rotation poses (8 PNGs in /public/sprites/<folder>/<dir>.png) —
   // kept as fallback for when no animation state has been triggered yet.
   const staticTextures = new Map<Direction, THREE.Texture>()
@@ -264,14 +309,14 @@ export async function preloadSpriteUnit(type: UnitType, folder: string): Promise
     anims[state] = { state, fps: def.fps, loop: def.loop, presentDirs: def.presentDirs, frameCount: def.frameCount, frames }
   }))
 
-  animSets.set(type, { folder, staticTextures, anims })
+  animSets.set(key, { folder, staticTextures, anims })
 
-  // S21: cache the source PNG's native pixel size so spriteSizeFor(type)
+  // S21: cache the source PNG's native pixel size so spriteSizeFor(key)
   // can return it. Render-wu == source-px = true 1:1 with PPWU=2 giving
   // a clean 2x integer upscale to screen.
   const southTex = staticTextures.get('south')
   const img = southTex?.image as HTMLImageElement | undefined
-  NATIVE_SIZE.set(type, img?.width ?? 104)
+  NATIVE_SIZE.set(key, img?.width ?? 104)
 }
 
 export class SpriteUnit {
@@ -280,6 +325,10 @@ export class SpriteUnit {
   hp: number
   readonly maxHp: number
   readonly type: UnitType
+  // Owning faction (cosmetic + art selection). Defaults 'cyborg' for legacy
+  // callers; the art key resolves any faction sprite override (FACTION_ART).
+  readonly faction: Faction
+  readonly artKey: string
   // 'attacker' = cyborg, 'defender' = robot. Assigned in constructor.
   private readonly _side: 'attacker' | 'defender'
   isDead = false
@@ -393,8 +442,11 @@ export class SpriteUnit {
     spawnY?: number,
     side: 'attacker' | 'defender' = 'attacker',
     team: 'player' | 'ai' = 'player',
+    faction: Faction = 'cyborg',
   ) {
     this.type = type
+    this.faction = faction
+    this.artKey = factionArtKey(faction, type)
     this._side = side
     this.id = nextActorId(side === 'defender' ? 'robot' : 'cyborg')
     this.hp = this.maxHp = Config.UNITS[type].hp
@@ -425,7 +477,7 @@ export class SpriteUnit {
     this.mesh = new THREE.Group()
     this.mesh.position.set(spawnX, y, 0)
 
-    const set = animSets.get(type)
+    const set = animSets.get(this.artKey)
     // Per-type colour tint × team tint. Per-type gives the role a green wash
     // (grenadier) or warm orange (doublegun); team tint stacks on top so
     // player pieces feel cool-blue and AI pieces feel warm-red. The two
@@ -442,7 +494,7 @@ export class SpriteUnit {
       alphaTest: 0.1,
     })
     this.sprite = new THREE.Sprite(mat)
-    this.sprite.scale.set(spriteSizeFor(this.type), spriteSizeFor(this.type), 1)
+    this.sprite.scale.set(spriteSizeFor(this.artKey), spriteSizeFor(this.artKey), 1)
     // Centered on mesh.position — top-down grid: piece sits in its cell, not
     // anchored at the feet.
     this.sprite.position.set(0, 0, 5)
@@ -453,7 +505,7 @@ export class SpriteUnit {
     // Side-themed grounded drop shadow. Defenders blue, attackers red.
     // Moves with the mesh group as the unit walks. See src/scene/Shadow.ts.
     this.mesh.add(makeShadowSprite({
-      size: spriteSizeFor(this.type),
+      size: spriteSizeFor(this.artKey),
       side: this._side,
       footFraction: UNIT_FOOT_FRACTION[this.type],
     }))
@@ -686,7 +738,7 @@ export class SpriteUnit {
   playAttackAnim() {
     if (this.isDead) return
     const state: AnimState = this.type === 'grenadier' ? 'throw' : 'shoot'
-    if (!animSets.get(this.type)?.anims[state]) return  // unit has no shoot/throw clip
+    if (!animSets.get(this.artKey)?.anims[state]) return  // unit has no shoot/throw clip
     this.playState(state)
   }
 
@@ -695,7 +747,7 @@ export class SpriteUnit {
   // cardinal. Falls back silently if the clip isn't loaded for this type.
   playSlamAnim() {
     if (this.isDead) return
-    if (!animSets.get(this.type)?.anims['throw']) return
+    if (!animSets.get(this.artKey)?.anims['throw']) return
     this.playState('throw')
   }
 
@@ -705,7 +757,7 @@ export class SpriteUnit {
   // 'repair' clip in their manifest (currently only the repair bot has one).
   playRepairAnim() {
     if (this.isDead) return
-    if (!animSets.get(this.type)?.anims['repair']) return
+    if (!animSets.get(this.artKey)?.anims['repair']) return
     this.playState('repair')
   }
 
@@ -757,7 +809,7 @@ export class SpriteUnit {
   crouch() {
     if (this.type !== 'sniper' || this.isDead || this.isMoving) return
     this._crouched = true
-    if (animSets.get(this.type)?.anims['aim']) {
+    if (animSets.get(this.artKey)?.anims['aim']) {
       this.playState('aim')
     }
   }
@@ -839,7 +891,7 @@ export class SpriteUnit {
   // Resolve the texture set for the current (state, direction). Handles the
   // missing-direction → MIRROR fallback by flipping sprite.scale.x.
   private refreshDirection() {
-    const set = animSets.get(this.type)
+    const set = animSets.get(this.artKey)
     if (!set) return
 
     // Compute target direction from facing angle. '+ 16' keeps the modulo a
@@ -868,7 +920,7 @@ export class SpriteUnit {
       this.sprite.material.map = tex
       this.sprite.material.needsUpdate = true
       this.currentFrames = []
-      this.sprite.scale.set(spriteSizeFor(this.type), spriteSizeFor(this.type), 1)
+      this.sprite.scale.set(spriteSizeFor(this.artKey), spriteSizeFor(this.artKey), 1)
       return
     }
 
@@ -878,7 +930,7 @@ export class SpriteUnit {
     if (this.frameIndex >= frames.length) this.frameIndex = frames.length - 1
     this.sprite.material.map = frames[this.frameIndex]
     this.sprite.material.needsUpdate = true
-    const size = spriteSizeFor(this.type)
+    const size = spriteSizeFor(this.artKey)
     this.sprite.scale.set(mirrored ? -size : size, size, 1)
     this.applySpriteOffset()
   }
@@ -898,7 +950,7 @@ export class SpriteUnit {
       // mass on the cell, shift WEST by 10 px × (60/104 world-per-px)
       // ≈ 5.8 world units = 0.10 × size. Earlier guesses of 0.22 / 0.30
       // overshot by 2-3× — that's why every adjustment looked worse.
-      const size = spriteSizeFor(this.type)
+      const size = spriteSizeFor(this.artKey)
       if (this.currentDir === 'east') dx = -size * 0.10
       else if (this.currentDir === 'west') dx = +size * 0.10
     }
@@ -906,7 +958,7 @@ export class SpriteUnit {
   }
 
   private advanceFrame(delta: number) {
-    const anim = animSets.get(this.type)?.anims[this.currentState]
+    const anim = animSets.get(this.artKey)?.anims[this.currentState]
     if (!anim || this.currentFrames.length === 0) return
 
     this.frameTime += delta

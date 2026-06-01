@@ -1,4 +1,4 @@
-import { Config, StructureType, UnitType } from '../game/GameConfig'
+import { Config, StructureType, UnitType, Faction } from '../game/GameConfig'
 import type { PlanningSelectionInfo } from '../game/PlanningPhase'
 import type { CombatLogEntry } from '../game/RevealPhase'
 import { Difficulty, getDifficulty, setDifficulty } from '../game/Difficulty'
@@ -33,7 +33,7 @@ export class HUD {
   // Side picker — Game listens here for the chosen team. Fires once with the
   // player's faction (visual identity) + role (defender or attacker). The AI
   // gets the opposite role with a randomly-chosen faction.
-  onPickSide: ((faction: 'robot' | 'cyborg', role: 'defender' | 'attacker') => void) | null = null
+  onPickSide: ((faction: Faction, role: 'defender' | 'attacker', aiFaction: Faction) => void) | null = null
   // Compass-rose callbacks. Game decides whether the purchase succeeds (cost,
   // credits, duplicate facing); HUD just forwards the click intent.
   onAddFacing: ((angle: number) => void) | null = null
@@ -120,6 +120,20 @@ export class HUD {
       // Cyborg mine. Tile shows up; placement flow + trigger are PENDING.
       { label: 'CYBORG MINE', cost: 20, icon: '/sprites/cyborg_mine/south.png', dataType: 'cyborg_mine', preview: true },
     ]
+    // Human faction attacker roster (S22d). Reuses existing attacker stat
+    // blocks - WARRIOR spawns a 'cannon' (the faction-art layer swaps it to
+    // the human_warrior sprite), MEDIC reuses 'medic' stats with human_medic
+    // art. Remaining slots are upgrade placeholders for future human units.
+    const humanTiles: Tile[] = [
+      { label: 'WARRIOR', cost: Config.UNITS.cannon.cost, icon: '/sprites/human_warrior/south.png', dataType: 'cannon' },
+      { label: 'MEDIC',   cost: Config.UNITS.medic.cost,  icon: '/sprites/human_medic/south.png',   dataType: 'medic' },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+      { label: '', cost: 0, icon: '', empty: true },
+    ]
     const tileHtml = (t: Tile, sideTag: 'def' | 'att') => {
       if (t.empty) {
         // Empty upgrade slot. Rendered with the SAME internal structure
@@ -193,6 +207,11 @@ export class HUD {
             path="M 14,4 L 306,4 L 316,14 L 316,196 L 306,206 L 14,206 L 4,196 L 4,14 Z"/>
         </circle>
       </svg>`
+
+    // Cache the human attacker roster grid markup so setPlayerSide() can swap
+    // it into the attacker panels when the player picks the Human faction.
+    // Built here while tileHtml() is in scope.
+    this.humanAttGridHtml = humanTiles.map(t => tileHtml(t, 'att')).join('')
 
     this.container.innerHTML = `
       <div id="loading-screen">LOADING ASSETS...</div>
@@ -312,8 +331,8 @@ export class HUD {
               <div class="sp-cta">PLAY</div>
             </button>
           </div>
-          <button id="sp-swap" class="sp-swap" type="button" title="Swap which faction plays each side">
-            <span class="sp-swap-icon">&#8646;</span> Swap factions
+          <button id="sp-swap" class="sp-swap" type="button" title="Cycle which factions play each side">
+            <span class="sp-swap-icon">&#8646;</span> Change factions
           </button>
           <div class="sp-difficulty" id="sp-difficulty">
             <div class="sp-diff-label">AI DIFFICULTY</div>
@@ -338,7 +357,7 @@ export class HUD {
               <h4>The basics</h4>
               <p><strong>BUILD:</strong> Spend credits to place pieces inside your zone. Click a tile to pick a piece, then click a cell. Right-click a placed piece to refund it (only for the piece type currently selected). Right-click a placed tower to open the compass rose and pay 30 credits per extra firing direction.</p>
               <p><strong>BATTLE:</strong> Click BATTLE to start the reveal. Both sides act in initiative order (faster pieces go first). Reveals auto-chain turn after turn until the Power Core falls, every cyborg is dead, or no cyborg can still damage the core (defender attrition win).</p>
-              <p><strong>SIDES:</strong> Pick DEFENDER (robots) and the AI plays cyborgs. Pick ATTACKER (cyborgs) and the AI plays robots.</p>
+              <p><strong>SIDES:</strong> Two cards, DEFENDER and ATTACKER. Click "Change factions" to cycle which factions (Robots, Cyborgs, Humans) play each role, then click the card you want. The AI plays the faction on the other card. Humans field their own roster (Warrior, Medic).</p>
               <p><strong>DIFFICULTY:</strong> EASY shrinks the AI army by 25 percent. HARD grows it by 25 percent. Your credits are unchanged either way.</p>
 
               <h4>Combat rules</h4>
@@ -410,16 +429,10 @@ export class HUD {
         this.onSelectStructure?.(type)
       })
     })
-    // Cyborg units
-    this.container.querySelectorAll<HTMLElement>('#hud-top-att .hud-tile[data-type]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        const type = (e.currentTarget as HTMLElement).dataset.type as UnitType
-        this.container.querySelectorAll('#hud-top-att .hud-tile').forEach(b => b.classList.remove('selected'))
-        ;(e.currentTarget as HTMLElement).classList.add('selected')
-        playEventSfx('button_click')
-        this.onSpawnUnit?.(type)
-      })
-    })
+    // Cyborg / Human attacker units. Extracted so it can be re-run after the
+    // attacker tile grid is swapped for a faction-specific roster (the swap
+    // replaces innerHTML, which drops the per-tile listeners).
+    this.wireAttackerTiles()
 
     // Primary action button lives inside each center HUD panel. Same handler
     // for BUILD's "READY" and PLAN's "BATTLE" — Game decides what happens
@@ -440,19 +453,25 @@ export class HUD {
     // swap keeps in sync.
     this.container.querySelectorAll<HTMLElement>('#side-picker .sp-card').forEach(card => {
       card.addEventListener('click', () => {
-        const faction = card.dataset.faction as 'robot' | 'cyborg'
+        const faction = card.dataset.faction as Faction
         const role = card.dataset.role as 'defender' | 'attacker'
-        this.onPickSide?.(faction, role)
+        // The AI plays whatever faction sits on the OTHER role card, so the
+        // matchup the player sees is the matchup they get.
+        const otherSel = role === 'defender' ? '.sp-card.attacker' : '.sp-card.defender'
+        const aiFaction = (this.container.querySelector<HTMLElement>(`#side-picker ${otherSel}`)
+          ?.dataset.faction as Faction) ?? 'cyborg'
+        this.onPickSide?.(faction, role, aiFaction)
       })
     })
     // Swap toggle: flip which faction (name + mascot sprite) is on each role
     // card, without adding more cards. Role label, card color, and tagline are
     // ROLE-bound and stay put; only the faction identity moves.
-    const FACTION_INFO: Record<'robot' | 'cyborg', { name: string; hero: string }> = {
+    const FACTION_INFO: Record<Faction, { name: string; hero: string }> = {
       robot:  { name: 'Robots',  hero: '/sprites/sphere/south.png' },
       cyborg: { name: 'Cyborgs', hero: '/sprites/hulk/south.png' },
+      human:  { name: 'Humans',  hero: '/sprites/human_warrior/south.png' },
     }
-    const applyFaction = (sel: string, faction: 'robot' | 'cyborg') => {
+    const applyFaction = (sel: string, faction: Faction) => {
       const card = this.container.querySelector<HTMLElement>(sel)
       if (!card) return
       card.dataset.faction = faction
@@ -461,11 +480,22 @@ export class HUD {
       const img = card.querySelector<HTMLImageElement>('.sp-hero img')
       if (img) img.src = FACTION_INFO[faction].hero
     }
-    let factionsSwapped = false
+    // The pill cycles the matchup through every ordered pairing of two
+    // DIFFERENT factions (defender vs attacker). With 3 factions that is 6
+    // pairings, so each faction shows up on each role across the cycle.
+    const MATCHUPS: { def: Faction; att: Faction }[] = [
+      { def: 'robot',  att: 'cyborg' },
+      { def: 'robot',  att: 'human'  },
+      { def: 'cyborg', att: 'human'  },
+      { def: 'cyborg', att: 'robot'  },
+      { def: 'human',  att: 'robot'  },
+      { def: 'human',  att: 'cyborg' },
+    ]
+    let matchupIdx = 0
     this.container.querySelector<HTMLElement>('#sp-swap')?.addEventListener('click', () => {
-      factionsSwapped = !factionsSwapped
-      applyFaction('#side-picker .sp-card.defender', factionsSwapped ? 'cyborg' : 'robot')
-      applyFaction('#side-picker .sp-card.attacker', factionsSwapped ? 'robot' : 'cyborg')
+      matchupIdx = (matchupIdx + 1) % MATCHUPS.length
+      applyFaction('#side-picker .sp-card.defender', MATCHUPS[matchupIdx].def)
+      applyFaction('#side-picker .sp-card.attacker', MATCHUPS[matchupIdx].att)
       playEventSfx('button_toggle')
     })
     // Difficulty selector. Persists immediately on click; the active
@@ -501,11 +531,43 @@ export class HUD {
   // for defender roster, #hud-top-att for attacker roster) are pre-built;
   // we toggle visibility based on the ROLE. Faction only affects piece tint
   // (handled by Game) and the side-picker visuals, not the HUD shop layout.
+  // Attach click handlers to every attacker-side unit tile. Idempotent per
+  // element is NOT guaranteed, so only call after (re)building the grid.
+  private wireAttackerTiles() {
+    this.container.querySelectorAll<HTMLElement>('#hud-top-att .hud-tile[data-type]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const type = (e.currentTarget as HTMLElement).dataset.type as UnitType
+        this.container.querySelectorAll('#hud-top-att .hud-tile').forEach(b => b.classList.remove('selected'))
+        ;(e.currentTarget as HTMLElement).classList.add('selected')
+        playEventSfx('button_click')
+        this.onSpawnUnit?.(type)
+      })
+    })
+  }
+
   private playerSide: 'defender' | 'attacker' = 'defender'
-  setPlayerSide(role: 'defender' | 'attacker') {
+  private humanAttGridHtml = ''
+  setPlayerSide(role: 'defender' | 'attacker', faction: Faction = 'cyborg', aiFaction: Faction = 'cyborg') {
     const picker = this.container.querySelector('#side-picker')
     picker?.classList.add('hidden')
     this.playerSide = role
+    // Faction-bound attacker roster: when the player attacks AS the Human
+    // faction, replace the cyborg shop tiles with the human roster. Both the
+    // left and right attacker panels render the attacker grid, so swap both.
+    if (role === 'attacker' && faction === 'human') {
+      this.container.querySelectorAll<HTMLElement>('#hud-top-att .tile-grid')
+        .forEach(grid => { grid.innerHTML = this.humanAttGridHtml })
+      this.wireAttackerTiles()
+    }
+    // Center-panel matchup label on the player's visible panel: their faction
+    // VS the AI's faction (uppercased team names).
+    const NAME: Record<Faction, string> = { robot: 'ROBOTS', cyborg: 'CYBORGS', human: 'HUMANS' }
+    const panelSel = role === 'defender' ? '#hud-top' : '#hud-top-att'
+    const panel = this.container.querySelector<HTMLElement>(panelSel)
+    const vsPlayer = panel?.querySelector('.vs-player')
+    const vsTeam = panel?.querySelector('.vs-team')
+    if (vsPlayer) vsPlayer.textContent = NAME[faction]
+    if (vsTeam) vsTeam.textContent = NAME[aiFaction]
     // Mark the inactive HUD with .ai-side; setPhase will show the active
     // one when appropriate.
     if (role === 'defender') {

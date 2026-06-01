@@ -1,4 +1,4 @@
-import { Config, StructureType, UnitType } from '../game/GameConfig'
+import { Config, StructureType, UnitType, Faction } from '../game/GameConfig'
 
 export type OpponentSide = 'defender' | 'attacker'
 
@@ -44,7 +44,7 @@ const AUTHORED_ZONE_COLS = 8
  * the old 55% per-turn cap is removed.
  */
 export class OpponentAI {
-  constructor(private side: OpponentSide, private api: OpponentAIApi) {}
+  constructor(private side: OpponentSide, private api: OpponentAIApi, private faction: Faction = 'cyborg') {}
 
   /** Called once at the start of every BUILD phase by Game. */
   runBuildTurn() {
@@ -295,7 +295,12 @@ export class OpponentAI {
   // doublegun, hulk, sniper, medic. Bomber/scout/tank/drone exist in Config
   // but are NOT in the buyable cyborg shop, so they're excluded here too.
   private buildAttacker(stopAt: number) {
-    const allTypes: UnitType[] = ['cannon', 'grenadier', 'doublegun', 'hulk', 'sniper', 'medic', 'stalker']
+    // The Human faction fields only its own art-backed units (warrior = cannon
+    // stats, medic) so the AI army never spawns un-skinned cyborg types. Other
+    // factions use the full cyborg roster.
+    const allTypes: UnitType[] = this.faction === 'human'
+      ? ['cannon', 'medic']
+      : ['cannon', 'grenadier', 'doublegun', 'hulk', 'sniper', 'medic', 'stalker']
 
     // Spawn from the back columns (closest to the cyborg edge of the field).
     // Cyborgs march west toward the core, so back-row spawns get the most
