@@ -7,6 +7,19 @@ Two terminal states: core dies (defender loses) or all cyborgs dead /
 unable to attack (defender wins). No stalemate rule
 (`feedback_die_or_survive`).
 
+**S23 state (latest).** Three factions now exist: Robots, Cyborgs, and
+the new **Humans** (`Faction = 'robot' | 'cyborg' | 'human'`), decoupled
+from role via the picker's "Change factions" cycler. Unit ART is now
+faction-aware (`FACTION_ART` in `SpriteUnit.ts`, art resolved by
+`artKey`) while gameplay TYPE/stats are unchanged - so faction is a pure
+skin over role-bound stat blocks. Human roster reuses attacker stats:
+WARRIOR=`cannon`, MARINE=`doublegun`, MEDIC=`medic`. New cyborg unit
+**HACKER** (Cyborg Nerd) turns robots into 3-turn traitors (new combat
+mechanic; `hackedTurnsRemaining`/`isHacked` on SpriteUnit + Structure).
+Full S23 log: `project_human_faction_planned` + `project_hacker_unit`
+memories and `docs/DEVNOTES.md` Session 23. **NOT browser-validated yet**
+- tsc + vite build are clean but nothing was tested live.
+
 **S22d state.** The battle map is STAGE-driven (see "Key constants"
 below + `project_lobby_configurable_stage` memory): the whole board
 derives from one `STAGE` object, placement is rule-driven via
@@ -35,13 +48,24 @@ S22d shipped a batch of fixes (full log: `project_session_23_wrap`):
   would be a separate build.
 
 **OPEN - start here next session:**
+- **Browser-test S23 on the live URL.** Pick Humans and confirm
+  Warrior/Marine/Medic render + fire (aim-flourish on fire). Place a
+  HACKER near Turrets/Sentries and confirm the cyan burst, the
+  "HACKS … / reboots" log lines, and a hacked tower shooting its
+  neighbours. (`project_human_faction_planned`, `project_hacker_unit`.)
+- **Hacker balance** (80cr / 60hp / 2 hacks / 3-turn / range 200 are
+  first guesses) + the wider **balance retune** for the bigger board
+  (`feedback_data_driven_balance`). Hacker edge case: a lone out-of-hacks
+  Hacker can't damage the core (leans on the stalemate guard, like an
+  empty Sniper) - add an explicit check if it ever hangs.
+- **Human faction polish (optional):** bespoke voice (`SpeechBubble.ts`),
+  a `humans.mp3` track, human defensive structures, and a side-aware
+  `firePhaserBeam` so the Phaser becomes hackable.
 - **Audio vocal hunt (`project_audio_vocal_hunt`).** Some cyborg sound
   triggers macOS Live Caption (an "Oh" / "wow wow") - intermittent,
-  unconfirmed which file. Use the new `?audiolog` overlay (visit
-  `/?audiolog`) which names the exact file every sound plays. Catch the
-  line when the caption fires, then pull that URL from its pool.
-- **Balance retune** for the bigger board + new melee reach (piece stats
-  still untouched on purpose; `feedback_data_driven_balance`).
+  unconfirmed which file. Use the `?audiolog` overlay (visit `/?audiolog`)
+  which names the exact file every sound plays. Catch the line when the
+  caption fires, then pull that URL from its pool.
 
 ## Where to find what
 The detail lives in topical docs, not here. Read the relevant file when

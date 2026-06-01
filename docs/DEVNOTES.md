@@ -2758,6 +2758,64 @@ Tooling:
 - **Audio vocal hunt** — `project_audio_vocal_hunt`. Use `?audiolog` to
   catch the file when Live Caption shows a vocal, then pull it.
 - **Balance retune** for bigger board + new melee reach (stats untouched).
-- **Faction-specific rosters** (optional). Today faction is cosmetic; a
-  cyborg-defender uses the robot structure roster. Distinct per-faction
-  rosters would be a separate build.
+
+## Session 23 (2026-06-01) — Human faction (3rd faction) + Cyborg Nerd hacker
+Asset drops + a new combat mechanic. NOT browser-validated yet (tsc + vite
+build clean on every push). Memories: `project_human_faction_planned`,
+`project_hacker_unit`.
+
+Faction-aware sprite art (the enabling refactor):
+- `Faction = 'robot' | 'cyborg' | 'human'`. `SpriteUnit` now takes a
+  `faction` arg and resolves an `artKey` via `FACTION_ART` (e.g. human +
+  cannon → `human_warrior`). `animSets`/`NATIVE_SIZE` re-keyed by string
+  art-key; `preloadSpriteUnit(key, folder)`. Gameplay TYPE is unchanged, so
+  stats/behavior are identical — faction art is a pure skin. First real
+  cross-faction sprite split (CLAUDE.md had flagged it as a separate build).
+
+Human faction:
+- Third faction, decoupled from role. Picker "Swap factions" → "Change
+  factions", cycling all 6 distinct matchups; AI plays the faction on the
+  card the player did NOT pick (`onPickSide` now passes `aiFaction`).
+- Roster reuses attacker stat blocks: WARRIOR=`cannon`, MARINE=`doublegun`,
+  MEDIC=`medic`, each with human art (`human_warrior`/`human_marine`/
+  `human_medic`). HUD swaps the attacker grid to `humanTiles` when attacking
+  as Human (`setPlayerSide` re-wires clicks via `wireAttackerTiles`).
+  OpponentAI human attacker roster = those types only, so the AI army is
+  fully human-skinned.
+- Cyborg Medic re-arted with Cyborg_Healer.zip; the OLD medic art became the
+  Human medic (`/sprites/human_medic`).
+- Human gunners' aim-fire: `playAttackAnim` falls back to the `aim` clip
+  when there's no `shoot` clip (Warrior/Marine), and `advanceFrame` returns
+  non-snipers from `aim` → idle so it's a transient pre-fire reaction.
+- Placeholders: human music = cyborgs track; voice still side-based; no
+  human defensive structures (human defender uses shared robot structures).
+
+Cyborg Nerd / HACKER (new mechanic):
+- Cyborg attacker, type `hacker` (cost 80, hp 60, ammo=2 hacks, damage 0).
+  Art `/sprites/cyborg_nerd`; ipad-hack clip in the `throw` slot.
+- Hacks an enemy robot piece → traitor for `HACK_DURATION = 3` reveals:
+  attacks other robots, cyborgs ignore it, ONE-WAY (loyal robots don't
+  retaliate), reverts via `tickHack`. Core never targeted.
+- `hackedTurnsRemaining` + `isHacked` on BOTH SpriteUnit and Structure. New
+  `hack` action (AP 2) → `executeHack`. Targeting hooks: `nearestEnemy`
+  skips hacked pieces; `defaultMobileUnitAction` gets turncoat + hacker
+  branches; the structure loop fires hacked towers at the nearest loyal
+  robot in arc (`pickHackedStructureTarget`).
+- `HACKABLE_STRUCTURES = turret/laser/sentry` (single-target, side-agnostic
+  projectile path). Phaser/cannon EXCLUDED (beam scans cyborgs directly);
+  bomber/signal/wall/mine/shield excluded too.
+- HUD: HACKER tile replaced the old non-functional CYBORG MINE preview.
+
+### Open going into next session
+- **Browser-test S23.** Pick Humans (warrior/marine/medic render + fire);
+  place a Hacker near turrets/sentries and confirm the cyan burst + "HACKS …
+  / reboots" log + a hacked tower shooting its neighbours.
+- **Hacker balance** (80/60/2 hacks/3-turn/range 200 are first guesses) +
+  the wider **balance retune** for the bigger board.
+- **Hacker edge case:** a lone out-of-hacks Hacker can't damage the core —
+  relies on the existing stalemate guard (same as an empty Sniper). Add an
+  explicit "hacker can't win" check if it ever hangs.
+- **Human faction polish (optional):** bespoke voice (`SpeechBubble.ts`),
+  a `humans.mp3` track, and human defensive structures so Humans can defend
+  with their own art. Make the Phaser hackable by side-aware `firePhaserBeam`.
+- **Audio vocal hunt** still open (see above).

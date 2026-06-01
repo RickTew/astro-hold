@@ -81,16 +81,27 @@ pips at 12/3/6/9 + BATTLE/PAUSE pill at the bottom. Procedural CSS
 
 ## Side-picker modal (#side-picker)
 Full-screen before BUILD. **2 cards**: DEFENDER and ATTACKER. Card color
-follows ROLE: defender=blue, attacker=red. AI gets the opposite role +
-opposite faction.
+follows ROLE: defender=blue, attacker=red. AI takes the OTHER card (opposite
+role + that card's faction).
 
-**Swap factions pill (S22d, `#sp-swap`).** A slim pill below the cards (above
-AI DIFFICULTY) flips which FACTION (team name + mascot sprite + `data-faction`)
-mans each role card. ROLE is fixed per card (label, color, tagline stay);
-faction moves. The card click reads the live `data-faction`, so swapping is
-all the wiring needs. Default = Robots defend / Cyborgs attack. Note: faction
-is cosmetic (music + label); rosters are role-bound, so a swapped pairing does
-NOT yet bring faction-specific pieces.
+**Change factions pill (S23, `#sp-swap`; was "Swap factions" S22d).** A slim
+pill below the cards (above AI DIFFICULTY) CYCLES the matchup through all 6
+ordered pairings of two distinct factions (Robots / Cyborgs / Humans) across
+the two role cards. ROLE is fixed per card (label, color, tagline stay); only
+the faction identity (team name + mascot + `data-faction`) moves. The card
+click reads the live `data-faction` and passes BOTH the picked faction and the
+OTHER card's faction (the AI's) to `onPickSide(faction, role, aiFaction)` -
+so the matchup you see is the matchup you get. Default = Robots defend /
+Cyborgs attack.
+
+**Faction-bound attacker roster (S23).** Faction is now art-aware (see
+`FACTION_ART` in SpriteUnit.ts), and when the player attacks AS Humans,
+`setPlayerSide(role, faction)` swaps the attacker tile grid to `humanTiles`
+(WARRIOR / MARINE / MEDIC) and re-runs `wireAttackerTiles()` (innerHTML swap
+drops the per-tile listeners). The center-panel matchup line is set from the
+picked + AI faction names. Cyborg roster gained a **HACKER** tile (replaced
+the old non-functional CYBORG MINE preview). Robots/Cyborgs still share the
+role-bound stat blocks; only the ART and which tiles show differ by faction.
 
 Layout uses `clamp()` everywhere (no fixed px) and the safe-centering
 pattern (outer `overflow: auto` + inner `min-height: 100% + flex
