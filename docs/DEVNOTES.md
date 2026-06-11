@@ -2819,3 +2819,78 @@ Cyborg Nerd / HACKER (new mechanic):
   a `humans.mp3` track, and human defensive structures so Humans can defend
   with their own art. Make the Phaser hackable by side-aware `firePhaserBeam`.
 - **Audio vocal hunt** still open (see above).
+
+## Session 24 (2026-06-11) - Scripted live playtest (Playwright) + reveal-tick fix
+First automated playtest of the LIVE site: a Playwright harness driving
+installed Chrome (headless, SwiftShader WebGL2) against
+https://astrohold3.vercel.app. Six scripted scenarios, four full battles to
+terminal state. Memory: `project_playwright_playtest_harness` (recipe;
+the harness itself lives in /tmp and is ephemeral).
+
+### S23 validation results (all PASS)
+- Humans attack: WARRIOR/MARINE/MEDIC tiles render with human art, units
+  fire (aim flourish observed), speech bubbles fire, battle ran to
+  DEFENDER WINS at turn 65.
+- Hacker: "Hacker HACKS Dog/Sentry/Repair" lines, cyan ring on the hacked
+  piece, hacked Dog attacked robot Mine/Sentry, hacked Repair attacked a
+  Wall and another Repair. Signal EMP counterplay stuns the Hacker. AI also
+  fields the Hacker when attacking (verified from the defender seat).
+- Lone out-of-hacks Hacker did NOT hang: it kept walking west and the
+  defense killed it (turn 18). Stalemate guard never needed in this run.
+- All 6 picker matchups cycle and wrap correctly; human DEFENDER gets the
+  robot structure roster (known placeholder state).
+
+### Bug found + FIXED: start-of-reveal ticks fired into null callbacks
+RevealPhase's constructor ran expireOldBombs / medic + repair pad ticks /
+tickCoreDefense / tickHack, but Game binds onLogEntry / onPieceEvent /
+onWin / onLose AFTER `new RevealPhase(...)`. Every tick-time event was
+silently dropped. Live symptoms: "reboots" lines NEVER appeared (the revert
+itself worked), turns whose only events were tick-driven vanished from the
+log entirely (jumped Turn 15 -> 18), and tick damage was missing from
+BattleStats (the damage-reconciliation warning fired in every hack game).
+Fix: tick block moved to `RevealPhase.start()`, called by Game right after
+callback wiring. Verified live post-deploy: 3 reboots lines + correct
+headers. Also shipped: favicon (stops the /favicon.ico 404 every session),
+"grabs an ammo box" article fix, "All cyborgs eliminated" -> "All attackers
+eliminated" (attacker can be Humans/Robots now).
+
+### Flags from the playtest (NOT fixed, need decisions)
+- Damage reconciliation warning still fires, smaller gap. Remaining
+  contributors look like (a) Power Core blast logged 'neutral' but emitted
+  as defender damage, (b) hacked-piece friendly fire attribution. Decide
+  which side turncoat damage belongs to, then align log parse + piece
+  events.
+- Board bottom is cut off at 16:9: world spans 250 -> 1070 px in a 768 px
+  viewport (about 4.5 of 12 rows hidden below the fold; 4:3 fits). Wheel
+  zoom exists but nothing hints at it. Camera framing decision needed.
+- Mini Control Center overlaps the right edge of the attacker placement
+  zone at 16:9 (cols 18-19, rows 4-6 sit under it).
+- Tile re-click toggle: after placing a unit, placement stays active
+  (multi-place), but clicking the SAME tile again silently cancels
+  placement (Game.ts onSpawnUnit toggle). Shop-UI convention reads
+  "click tile = buy another"; several scripted placements were lost to
+  this before the harness learned it.
+- Endgame grind: the humans game spent ~40 turns of -10 out-of-ammo
+  punches chewing through Signal + Phaser (turn 25 to 65). Balance/pacing
+  lever needed (punch damage vs structure HP, or attrition rule).
+- Log piece names are role-bound: human Marine logs as "Double Gun",
+  Warrior as "Cannon". actorLabel could use faction-aware labels.
+- "Phaser fires phaser beam (no targets)" logs every turn even with no
+  targets - log noise (and reads like wasted ammo).
+- Several combat-log strings contain em dashes ("reboots — back under
+  robot control", "EMP strikes X — stunned"). House rule says no em dashes
+  anywhere; sweep when touching those strings next.
+
+### Harness notes (recreate from memory file)
+networkidle never settles (audio streaming) - wait for #side-picker;
+first post-deploy load can exceed 30 s (cold CDN). Place units by clicking
+the tile ONCE then clicking N cells. Combat log must be scraped with a
+MutationObserver (panel trims to 220 rows). Bottom rows are unclickable at
+16:9 (off-screen) - use rows 4-11.
+
+### Open going into next session
+- Hacker balance + wider board retune (unchanged, now with a working
+  telemetry baseline).
+- Reconciliation attribution decision (above), camera framing decision,
+  MCC overlap.
+- Human faction polish + audio vocal hunt (unchanged).

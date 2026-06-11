@@ -17,8 +17,19 @@ WARRIOR=`cannon`, MARINE=`doublegun`, MEDIC=`medic`. New cyborg unit
 **HACKER** (Cyborg Nerd) turns robots into 3-turn traitors (new combat
 mechanic; `hackedTurnsRemaining`/`isHacked` on SpriteUnit + Structure).
 Full S23 log: `project_human_faction_planned` + `project_hacker_unit`
-memories and `docs/DEVNOTES.md` Session 23. **NOT browser-validated yet**
-- tsc + vite build are clean but nothing was tested live.
+memories and `docs/DEVNOTES.md` Session 23.
+
+**S24 (2026-06-11): S23 VALIDATED live via scripted Playwright playtest**
+(4 full battles on the production URL; harness recipe in
+`project_playwright_playtest_harness`). Humans render + fire, Hacker
+hacks/turncoats/EMP-counterplay all work, lone-hacker edge case did not
+hang. Found + FIXED a real bug: RevealPhase ran its start-of-reveal ticks
+in the constructor before Game bound the callbacks, silently dropping
+tick-time log lines ("reboots" never showed), whole turn headers, and
+tick damage telemetry. Ticks now live in `RevealPhase.start()`, called
+after wiring. Flags awaiting decisions in `docs/DEVNOTES.md` Session 24
+(reconciliation attribution, 16:9 bottom-rows cutoff, MCC overlap,
+same-tile placement toggle, endgame punch grind).
 
 **S22d state.** The battle map is STAGE-driven (see "Key constants"
 below + `project_lobby_configurable_stage` memory): the whole board
@@ -48,16 +59,15 @@ S22d shipped a batch of fixes (full log: `project_session_23_wrap`):
   would be a separate build.
 
 **OPEN - start here next session:**
-- **Browser-test S23 on the live URL.** Pick Humans and confirm
-  Warrior/Marine/Medic render + fire (aim-flourish on fire). Place a
-  HACKER near Turrets/Sentries and confirm the cyan burst, the
-  "HACKS … / reboots" log lines, and a hacked tower shooting its
-  neighbours. (`project_human_faction_planned`, `project_hacker_unit`.)
 - **Hacker balance** (80cr / 60hp / 2 hacks / 3-turn / range 200 are
   first guesses) + the wider **balance retune** for the bigger board
-  (`feedback_data_driven_balance`). Hacker edge case: a lone out-of-hacks
-  Hacker can't damage the core (leans on the stalemate guard, like an
-  empty Sniper) - add an explicit check if it ever hangs.
+  (`feedback_data_driven_balance`). S24 note: a "3-turn" hack yields
+  about 2 acting turns (timer decrements at reveal start).
+- **S24 playtest flags needing decisions** (`docs/DEVNOTES.md` S24):
+  damage-reconciliation attribution (core blast + turncoat damage),
+  bottom 4 rows hidden at 16:9 default zoom, MCC overlapping attacker
+  cells, same-tile re-click silently cancelling placement, 40-turn
+  endgame punch grind vs structures.
 - **Human faction polish (optional):** bespoke voice (`SpeechBubble.ts`),
   a `humans.mp3` track, human defensive structures, and a side-aware
   `firePhaserBeam` so the Phaser becomes hackable.
