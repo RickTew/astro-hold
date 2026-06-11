@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Config, StructureType } from './GameConfig'
+import { Config, StructureType, UnitType } from './GameConfig'
 import { CellRef, QueuedAction, TargetRef } from './TurnTypes'
 import { SpriteUnit } from '../entities/SpriteUnit'
 import { SphereDefender } from '../entities/SphereDefender'
@@ -678,7 +678,7 @@ export class RevealPhase {
       if (p.hackedTurnsRemaining <= 0) return
       p.hackedTurnsRemaining--
       if (p.hackedTurnsRemaining === 0 && !p.isDead) {
-        this.log('defender', `${this.actorLabel(p)} reboots — back under robot control`)
+        this.log('defender', `${this.actorLabel(p)} reboots - back under robot control`)
       }
     }
     for (const u of this.defenderUnits) revert(u)
@@ -714,7 +714,7 @@ export class RevealPhase {
     if (hits > 0) {
       this.combatThisReveal = true
       this.log('defender',
-        `Power Core electric defense — ${hits} hit (−${hits * CORE_DEFENSE_DAMAGE}${kills > 0 ? `, ${kills} killed` : ''})`)
+        `Power Core electric defense - ${hits} hit (−${hits * CORE_DEFENSE_DAMAGE}${kills > 0 ? `, ${kills} killed` : ''})`)
       this.emit({ kind: 'action', actorType: 'core', side: 'defender', action: 'core_pulse' })
       playEventSfx('core_zap')
     }
@@ -748,7 +748,7 @@ export class RevealPhase {
       }
       if (result.expired) {
         pad.kill()
-        this.log('attacker', `Medic-pad spent — station offline`)
+        this.log('attacker', `Medic-pad spent - station offline`)
       }
     }
     // Sweep dead pads
@@ -815,7 +815,7 @@ export class RevealPhase {
       }
       if (result.expired) {
         pad.kill()
-        this.log('defender', `Repair-pad spent — station offline`)
+        this.log('defender', `Repair-pad spent - station offline`)
       }
     }
     for (let i = this.repairPads.length - 1; i >= 0; i--) {
@@ -2429,11 +2429,14 @@ export class RevealPhase {
     // Beam visual along the full range.
     this.spawnPhaserBeamVisual(ax, ay, fx, fy, range)
     playWeaponSfx('phaser')
-    this.log('defender', hits === 0
-      ? `${this.actorLabel(struct)} fires phaser beam (no targets)`
-      : `${this.actorLabel(struct)} phaser beam hits ${hits} (−${totalDamage})`)
-    if (hits > 0) this.emit({ kind: 'hit',  actorType: 'cannon', side: 'defender' })
-    else          this.emit({ kind: 'miss', actorType: 'cannon', side: 'defender' })
+    // Only hits get a log line. A no-target beam still fires (visual, sfx,
+    // miss telemetry) but logging it every turn spammed the combat log.
+    if (hits > 0) {
+      this.log('defender', `${this.actorLabel(struct)} phaser beam hits ${hits} (−${totalDamage})`)
+      this.emit({ kind: 'hit',  actorType: 'cannon', side: 'defender' })
+    } else {
+      this.emit({ kind: 'miss', actorType: 'cannon', side: 'defender' })
+    }
   }
 
   // Quick beam visual. A translucent cyan plane positioned + rotated
@@ -2665,8 +2668,8 @@ export class RevealPhase {
       : trigger === 'expired' ? 'fuse expired'
       : `shot by ${this.actorLabel(trigger)}`
     this.log(g.side, summary.hits === 0
-      ? `Bomb detonates (${cause}) — no targets in blast`
-      : `Bomb detonates (${cause}) — ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+      ? `Bomb detonates (${cause}) - no targets in blast`
+      : `Bomb detonates (${cause}) - ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
   }
 
   private shouldDetonateGrenade(g: PendingGrenade): boolean {
@@ -2782,7 +2785,7 @@ export class RevealPhase {
       ? this.units.find(u => u.id === ref.id && !u.isDead)
       : null
     if (!target) {
-      this.log('defender', `${this.actorLabel(actor)} EMP fizzles — target gone`)
+      this.log('defender', `${this.actorLabel(actor)} EMP fizzles - target gone`)
       return
     }
     const stunTurns: number = 2
@@ -2792,7 +2795,7 @@ export class RevealPhase {
     this.explosions.push(new Explosion(this.scene, target.worldX, target.worldY, 40, 0.45, 0x66ccff))
     this.combatThisReveal = true
     this.log('defender',
-      `${this.actorLabel(actor)} EMP strikes ${this.actorLabel(target)} — stunned ${stunTurns} turns`)
+      `${this.actorLabel(actor)} EMP strikes ${this.actorLabel(target)} - stunned ${stunTurns} turns`)
     this.emit({ kind: 'action', actorType: 'signal', side: 'defender', action: 'emp' })
   }
 
@@ -2805,7 +2808,7 @@ export class RevealPhase {
     if (actor.ammoRemaining <= 0) return
     const target = this.resolveHackTarget(ref)
     if (!target) {
-      this.log('attacker', `${this.actorLabel(actor)}'s hack fizzles — target gone`)
+      this.log('attacker', `${this.actorLabel(actor)}'s hack fizzles - target gone`)
       this.decrementActorAmmo(actor)
       return
     }
@@ -2819,7 +2822,7 @@ export class RevealPhase {
     this.explosions.push(new Explosion(this.scene, target.worldX, target.worldY, 45, 0.5, 0x66ccff))
     this.combatThisReveal = true
     this.log('attacker',
-      `${this.actorLabel(actor)} HACKS ${this.actorLabel(target)} — turned for ${HACK_DURATION} turns`)
+      `${this.actorLabel(actor)} HACKS ${this.actorLabel(target)} - turned for ${HACK_DURATION} turns`)
     this.emit({ kind: 'action', actorType: 'hacker', side: 'attacker', action: 'hack' })
   }
 
@@ -3505,7 +3508,7 @@ export class RevealPhase {
       // to combat reveals position to defender targeting AI.
       if (actor.cloaked) {
         actor.dropCloak()
-        this.log('attacker', `${this.actorLabel(actor)} drops cloak — visible to defenders`)
+        this.log('attacker', `${this.actorLabel(actor)} drops cloak - visible to defenders`)
       }
     }
     // Omnidirectional structures (Sentry) rotate to face the target each
@@ -3718,7 +3721,7 @@ export class RevealPhase {
         const summary = this.applyAoe(aim.x, aim.y, aoeRadius, damage, actor)
         this.log(sourceSide, summary.hits === 0
           ? `${sourceLabel} AoE bursts harmlessly`
-          : `${sourceLabel} AoE — ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
+          : `${sourceLabel} AoE - ${summary.hits} hit (−${summary.damageDealt}${summary.kills > 0 ? `, ${summary.kills} killed` : ''})`)
         // Accuracy. Hit if ANY target took damage from the burst.
         if (summary.hits > 0) this.emit({ kind: 'hit',  actorType: sourceType, side: sourceSide })
         else                  this.emit({ kind: 'miss', actorType: sourceType, side: sourceSide })
@@ -3893,7 +3896,7 @@ export class RevealPhase {
       }
       s.takeDamage(9999)   // mine self-destructs on trigger
       this.combatThisReveal = true
-      this.log('defender', `Mine triggers — ${this.actorLabel(unit)} step set it off${hits > 0 ? ` (−${hits * dmg}, ${hits} hit${kills > 0 ? `, ${kills} killed` : ''})` : ' (no other targets)'}`)
+      this.log('defender', `Mine triggers - ${this.actorLabel(unit)} step set it off${hits > 0 ? ` (−${hits * dmg}, ${hits} hit${kills > 0 ? `, ${kills} killed` : ''})` : ' (no other targets)'}`)
     }
   }
 
@@ -4094,11 +4097,27 @@ export class RevealPhase {
     this.onLogEntry?.(entry)
   }
 
+  // Human-faction display names. Humans reuse cyborg stat blocks, but the
+  // log should read "Marine hits ...", not "Double Gun hits ...". Types
+  // without an entry (and every other faction) fall through to the
+  // Config.UNITS label.
+  private static readonly HUMAN_UNIT_LABELS: Partial<Record<UnitType, string>> = {
+    cannon: 'Warrior', doublegun: 'Marine', medic: 'Medic',
+  }
+
+  private unitLabel(u: SpriteUnit): string {
+    if (u.faction === 'human') {
+      const human = RevealPhase.HUMAN_UNIT_LABELS[u.type]
+      if (human) return human
+    }
+    return Config.UNITS[u.type].label
+  }
+
   private actorLabel(a: AnyTarget): string {
     if (a instanceof PixelPowerCore) return 'Power Core'
     if (a instanceof SphereDefender) return 'Sphere'
-    if (a instanceof SpriteUnit) return Config.UNITS[a.type].label
-    // STRUCTURES[type].label is "Bomber 70cr" — strip the cost suffix.
+    if (a instanceof SpriteUnit) return this.unitLabel(a)
+    // STRUCTURES[type].label is "Bomber 70cr" - strip the cost suffix.
     return Config.STRUCTURES[a.type].label.replace(/\s*\d+cr.*$/, '').trim()
   }
 
@@ -4108,7 +4127,7 @@ export class RevealPhase {
   private targetLabel(t: { isDead: boolean }): string {
     if (t instanceof PixelPowerCore) return 'Power Core'
     if (t instanceof SphereDefender) return 'Sphere'
-    if (t instanceof SpriteUnit) return Config.UNITS[t.type].label
+    if (t instanceof SpriteUnit) return this.unitLabel(t)
     if (t instanceof Structure)  return Config.STRUCTURES[t.type].label.replace(/\s*\d+cr.*$/, '').trim()
     if (t instanceof AmmoBox) {
       return t.type === 'medkit' ? 'medkit crate'

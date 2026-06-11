@@ -1021,7 +1021,7 @@ export class HUD {
           }
           const header = document.createElement('div')
           header.className = 'log-turn'
-          header.textContent = `── Turn ${turn} — (no activity)`
+          header.textContent = `── Turn ${turn} - (no activity)`
           log.appendChild(header)
           log.scrollTop = log.scrollHeight
         })
