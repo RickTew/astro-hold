@@ -591,8 +591,15 @@ private enterBuildPhase() {
       Config.ATTACKER_MIN_X, Config.WORLD.RIGHT, STAGE.theme.attackerBorder
     )
 
+    // Re-clicking the tile of the type already being placed is a NO-OP
+    // (placement stays armed), matching structure tiles and the shop-UI
+    // expectation that the tile click means "place this type". It used to
+    // CANCEL placement, which silently swallowed the next board click.
+    // Removal is unaffected: left-clicking a placed piece still refunds it
+    // (tryRefund), so placement mode can always be exited via a refund or
+    // by selecting another tile.
     this.hud.onBuySphere = () => {
-      if (this.placement?.kind === 'sphere') { this.endPlacement(); return }
+      if (this.placement?.kind === 'sphere') return
       if (!this.buildPhase || this.buildPhase.getCredits() < SPHERE_COST) return
       // Cancel any active structure selection so its click handler doesn't
       // fire alongside the sphere placement.
@@ -602,7 +609,7 @@ private enterBuildPhase() {
     }
 
     this.hud.onBuyDog = () => {
-      if (this.placement?.kind === 'dog') { this.endPlacement(); return }
+      if (this.placement?.kind === 'dog') return
       const cost = Config.UNITS.dog.cost
       if (!this.buildPhase || this.buildPhase.getCredits() < cost) return
       this.buildPhase?.selectStructure(null)
@@ -611,7 +618,7 @@ private enterBuildPhase() {
     }
 
     this.hud.onBuyRepair = () => {
-      if (this.placement?.kind === 'repair') { this.endPlacement(); return }
+      if (this.placement?.kind === 'repair') return
       const cost = Config.UNITS.repair.cost
       if (!this.buildPhase || this.buildPhase.getCredits() < cost) return
       this.buildPhase?.selectStructure(null)
@@ -627,7 +634,7 @@ private enterBuildPhase() {
     this.hud.onBattle = () => this.startBattleFromBuild()
 
     this.hud.onSpawnUnit = (type) => {
-      if (this.placement?.kind === type) { this.endPlacement(); return }
+      if (this.placement?.kind === type) return
       this.buildPhase?.selectStructure(null)
       this.hud.clearStructureSelection()
       this.startCyborgPlacement(type)
