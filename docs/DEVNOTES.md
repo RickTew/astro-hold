@@ -2894,8 +2894,15 @@ live: human units now log under faction names (Warrior/Marine/Medic via
 HUMAN_UNIT_LABELS in RevealPhase actor/target labels), combat-log strings
 lost their em dashes (hyphens now; comments and stats.html placeholders
 left for a later sweep), and the no-target Phaser beam no longer writes a
-log line every turn (visual/sfx/miss-telemetry unchanged). The same-tile
-re-click placement toggle was deliberately KEPT as-is per Rick.
+log line every turn (visual/sfx/miss-telemetry unchanged).
+
+Follow-up (commit 987f5cb, verified live): the same-tile re-click toggle
+was REMOVED after clarifying the interaction model with Rick. Re-clicking
+the tile of the type already being placed is now a no-op (placement stays
+armed) for Sphere / Dog / Repair / attacker units, matching structure
+tiles which never toggled. Board interactions unchanged and re-verified
+live: click empty cell to place, click a placed piece to remove + refund.
+Placement mode still exits via refund or selecting another tile.
 
 ### Open going into next session
 - Hacker balance + wider board retune (unchanged, now with a working
