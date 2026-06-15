@@ -2432,7 +2432,7 @@ export class RevealPhase {
     // Only hits get a log line. A no-target beam still fires (visual, sfx,
     // miss telemetry) but logging it every turn spammed the combat log.
     if (hits > 0) {
-      this.log('defender', `${this.actorLabel(struct)} phaser beam hits ${hits} (−${totalDamage})`)
+      this.log('defender', `${this.actorLabel(struct)} beam hits ${hits} (−${totalDamage})`)
       this.emit({ kind: 'hit',  actorType: 'cannon', side: 'defender' })
     } else {
       this.emit({ kind: 'miss', actorType: 'cannon', side: 'defender' })
