@@ -2910,3 +2910,63 @@ Placement mode still exits via refund or selecting another tile.
 - Reconciliation attribution decision (above), camera framing decision,
   MCC overlap.
 - Human faction polish + audio vocal hunt (unchanged).
+
+---
+
+## Session 25 (2026-06-26) - Supabase hub backend for online 2-player
+
+Decision + foundation only (no gameplay netcode). AstroHold is meant to be
+human-vs-human across TWO devices over the internet (one player per side),
+not single-player and not same-screen hot-seat. That is the one trigger
+that genuinely needs a backend (live board-state sync), so it was wired
+into the shared "TewBit Games" Supabase hub instead of a new project.
+
+**Hub:** org "Rick Tew Apps", project `TewBit Games`
+(ref `guwquufbifuzmphcdsdt`, region ap-southeast-1, Postgres 17).
+The hub already hosts a sibling game in `public.*` (a turn-based
+attacker/defender game: `matches` 727 rows, `rounds`, `profiles`,
+`dungeons`, `matchmaking_queue`). AstroHold NEVER touches `public` - it
+lives entirely in its own `astro_hold` schema.
+
+**What was created (5 migrations, all in `astro_hold`):**
+- Schema + usage/table grants to anon/authenticated/service_role + default
+  privileges for future tables.
+- `profiles` (FK -> auth.users; username, elo, W/L, is_guest for anon auth)
+- `matches` (attacker_id/defender_id, status, invite_token, credits,
+  `state` jsonb snapshot; realtime-published)
+- `rounds` (per-turn `*_actions` jsonb, `replay_seed`, `replay_events`;
+  realtime-published)
+- RLS: deny-by-default, keyed on `auth.uid()`. Profiles read-any /
+  write-own; matches + rounds gated to the two seated players (helper
+  `astro_hold.is_match_participant`). No DELETE policies = deletes denied.
+  All policies scoped to `authenticated`, so `anon` is denied by default.
+- Realtime publication includes matches + rounds; `updated_at` touch
+  trigger on matches.
+The schema deliberately supports BOTH sync models so the netcode isn't
+locked in: host-authoritative (write `matches.state`) OR deterministic
+replay (submit `rounds.*_actions` + shared `replay_seed`).
+
+**Repo wiring (steps 5-6):**
+- `@supabase/supabase-js` 2.108.2 added.
+- `.env.local` (gitignored via *.local) + `.env.example` (committed) hold
+  `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (publishable key, public).
+- `src/net/supabaseClient.ts`: lazy `getSupabase()` with
+  `{ db: { schema: 'astro_hold' } }`. NOT imported by gameplay yet, so it
+  tree-shakes out. tsc + full build pass.
+
+**Two manual steps before online mode can talk to the API (cannot be done
+from code):**
+1. Dashboard: Project Settings > API > Exposed schemas -> add `astro_hold`
+   (PostgREST won't serve the schema until this is on; it's platform
+   config, setting it via SQL would get reconciled away).
+2. Vercel: add `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` env vars to
+   the AstroHold project so production builds get them.
+
+**Deferred (next phase, needs design sign-off; touches mechanics):**
+- The actual online-PvP netcode: anonymous auth, match create/join RPC
+  (SECURITY DEFINER to claim an open seat), realtime subscription + board
+  reconcile, and - the big open question - whether REVEAL can be made
+  DETERMINISTIC across two machines (same seed -> same battle). If not,
+  fall back to host-authoritative `matches.state` streaming.
+- `matchmaking_queue` (random quickplay) - omitted; invite-link covers two
+  friends. Add when quickplay is wanted.
