@@ -63,6 +63,15 @@ S22d shipped a batch of fixes (full log: `project_session_23_wrap`):
   would be a separate build.
 
 **OPEN - start here next session:**
+- **Online 2-player backend wired (S25).** AstroHold is human-vs-human
+  across two devices, so it's now on the shared "TewBit Games" Supabase
+  hub in its own `astro_hold` schema (profiles/matches/rounds, RLS on
+  `auth.uid()`). Client is `src/net/supabaseClient.ts` (not yet imported
+  by gameplay). TWO manual toggles still pending before the API serves it:
+  (1) Supabase dashboard > Settings > API > Exposed schemas -> add
+  `astro_hold`; (2) add `VITE_SUPABASE_*` env vars to Vercel. Then the big
+  build: the netcode (auth, match join RPC, realtime sync, deterministic
+  REVEAL). Full log: `docs/DEVNOTES.md` S25 + `project_supabase_hub_backend`.
 - **Hacker balance** (80cr / 60hp / 2 hacks / 3-turn / range 200 are
   first guesses) + the wider **balance retune** for the bigger board
   (`feedback_data_driven_balance`). S24 note: a "3-turn" hack yields
