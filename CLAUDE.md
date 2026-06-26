@@ -63,15 +63,18 @@ S22d shipped a batch of fixes (full log: `project_session_23_wrap`):
   would be a separate build.
 
 **OPEN - start here next session:**
-- **Online 2-player backend wired (S25).** AstroHold is human-vs-human
-  across two devices, so it's now on the shared "TewBit Games" Supabase
-  hub in its own `astro_hold` schema (profiles/matches/rounds, RLS on
-  `auth.uid()`). Client is `src/net/supabaseClient.ts` (not yet imported
-  by gameplay). TWO manual toggles still pending before the API serves it:
-  (1) Supabase dashboard > Settings > API > Exposed schemas -> add
-  `astro_hold`; (2) add `VITE_SUPABASE_*` env vars to Vercel. Then the big
-  build: the netcode (auth, match join RPC, realtime sync, deterministic
-  REVEAL). Full log: `docs/DEVNOTES.md` S25 + `project_supabase_hub_backend`.
+- **Online 2-player (S25) - read `docs/ONLINE_PVP.md` to resume.** Backend
+  (shared "TewBit Games" Supabase hub, `astro_hold` schema, RLS, join_match
+  RPC) and the LOBBY are DONE and proven live in a browser
+  (`astro-hold.vercel.app/?online`): create -> share code -> realtime
+  connects both players. All 3 prereqs done (exposed schema, anon sign-in,
+  Vercel env). Client: `src/net/{supabaseClient,onlineMatch,lobbyUI}.ts`,
+  gated by `?online` (normal game untouched, HUD never touched).
+  **NEXT:** (1) in-game BUILD+REVEAL sync (host records the RevealPhase
+  `PieceEvent` stream -> `rounds.replay_events` -> guest plays back; seam =
+  `lobbyUI` onReady + `Game.onSidePicked` at Game.ts:386); (2) add the real
+  "Play Online" button into `#side-picker` (HUD.ts) LAST. Full detail +
+  gotchas: `docs/ONLINE_PVP.md`, `project_supabase_hub_backend` memory.
 - **Hacker balance** (80cr / 60hp / 2 hacks / 3-turn / range 200 are
   first guesses) + the wider **balance retune** for the bigger board
   (`feedback_data_driven_balance`). S24 note: a "3-turn" hack yields

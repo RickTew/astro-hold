@@ -2970,3 +2970,33 @@ from code):**
   fall back to host-authoritative `matches.state` streaming.
 - `matchmaking_queue` (random quickplay) - omitted; invite-link covers two
   friends. Add when quickplay is wanted.
+
+### S25 addendum: online lobby shipped + proven live (resume via docs/ONLINE_PVP.md)
+
+After the backend migrations (above), the online 2-player work continued
+and reached a proven milestone. Full handoff lives in **`docs/ONLINE_PVP.md`**
+(read that to resume). Summary:
+
+- **All 3 prerequisites done:** exposed `astro_hold` over the Data API (set
+  via SQL on the `authenticator` role + PostgREST reload, verified live),
+  enabled Anonymous sign-ins, and set the `VITE_SUPABASE_*` Vercel env vars.
+- **`join_match(invite_token)` RPC** added (SECURITY DEFINER, row-locked,
+  seats the 2nd player + flips to active + auto-creates their guest profile).
+- **Proven end-to-end over the live API** with real anonymous logins
+  (create -> join -> read) and **RLS isolation proven** via impersonation.
+- **Lobby shipped:** `src/net/{onlineMatch,lobbyUI}.ts` + a `?online` gate
+  in main.ts. Self-contained overlay (own `.ah-lobby-*` styles), HUD never
+  touched. **Tested live in a browser:** create as Defender -> code Q4XUNT
+  -> joined as 2nd player via API -> the browser's realtime fired
+  "Online match ready - you are DEFENDER". Test data cleaned up.
+
+**Gotchas logged in ONLINE_PVP.md:** Vercel env vars were created EMPTY
+(CLI `env add` via pipe is broken in CLI 53.x; fix = REST API delete+POST
+fresh, then redeploy); two same-browser tabs share the anon session (use
+two devices / incognito to test); a `vca_` Vercel token leaked to chat once
+(rotate it).
+
+**RESUME HERE:** (1) in-game BUILD + REVEAL sync (host records the
+RevealPhase PieceEvent stream to `rounds.replay_events`, guest plays back);
+(2) add the "Play Online" button into the side picker last. Seams + plan in
+docs/ONLINE_PVP.md.
