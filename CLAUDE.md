@@ -70,11 +70,16 @@ S22d shipped a batch of fixes (full log: `project_session_23_wrap`):
   connects both players. All 3 prereqs done (exposed schema, anon sign-in,
   Vercel env). Client: `src/net/{supabaseClient,onlineMatch,lobbyUI}.ts`,
   gated by `?online` (normal game untouched, HUD never touched).
-  **NEXT:** (1) in-game BUILD+REVEAL sync (host records the RevealPhase
-  `PieceEvent` stream -> `rounds.replay_events` -> guest plays back; seam =
-  `lobbyUI` onReady + `Game.onSidePicked` at Game.ts:386); (2) add the real
-  "Play Online" button into `#side-picker` (HUD.ts) LAST. Full detail +
-  gotchas: `docs/ONLINE_PVP.md`, `project_supabase_hub_backend` memory.
+  **NEXT:** (1) **entry screen + login (guest-first)** - the free/public
+  game needs an entry + OPTIONAL account; guest play must ALWAYS work, never
+  a login wall (keeps it free/public + playtest unblocked); (2) in-game
+  BUILD+REVEAL sync (host records the RevealPhase `PieceEvent` stream ->
+  `rounds.replay_events` -> guest plays back; seam = `lobbyUI` onReady +
+  `Game.onSidePicked` at Game.ts:386); (3) "Play Online" button into
+  `#side-picker` (HUD.ts) LAST. Full detail + gotchas: `docs/ONLINE_PVP.md`,
+  `project_supabase_hub_backend` + `project_login_entry_planned` memories.
+  Live game now on `www.astrohold.com` (custom domain); bare `astrohold.com`
+  apex still on a Squarespace placeholder pending a Vercel DNS tweak.
 - **Hacker balance** (80cr / 60hp / 2 hacks / 3-turn / range 200 are
   first guesses) + the wider **balance retune** for the bigger board
   (`feedback_data_driven_balance`). S24 note: a "3-turn" hack yields

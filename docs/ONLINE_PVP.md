@@ -19,11 +19,35 @@ It is NOT same-screen hot-seat.
 - **NOT built yet: the actual gameplay sync** (in-game BUILD + REVEAL). The
   lobby connects two players; nothing syncs the game itself yet.
 
-### RESUME HERE (next session, in order)
-1. **In-game BUILD + REVEAL sync** (the big one) - see "Netcode plan" below.
-2. **"Play Online" button in the side picker** - the real entry point
-   (currently gated behind `?online`). Do this LAST so the frozen HUD is
-   never destabilized mid-build.
+### RESUME HERE (next session)
+
+**1. Entry screen + login (guest-first) - NEW top priority (Rick, S25).**
+The game is FREE + PUBLIC, so it needs a branded entry/title screen
+("welcome to AstroHold") with an OPTIONAL account login.
+**HARD CONSTRAINT: guest / anonymous play must ALWAYS be one click away -
+NEVER a mandatory login wall.** This keeps the game free + public AND keeps
+playtest unblocked (Claude can't perform real email/OAuth logins, so the
+guest path is what makes automated playtests possible at all).
+Design:
+  - Standalone overlay (like `lobbyUI.ts`), NOT touching the frozen HUD.
+  - Entry -> primary **"Play"** = straight into the game as a guest
+    (anonymous Supabase auth, no login). Secondary **"Sign in"** = optional
+    account.
+  - Reuse the Supabase auth already wired: anonymous = guest; email/OAuth =
+    account; link anonymous -> account later (supabase `updateUser` /
+    `linkIdentity`) so guest progress carries over.
+  - The existing side-picker (solo vs AI) and `?online` lobby hang off this.
+  - OPEN decisions for Rick: login method (magic-link / Google OAuth
+    recommended - low friction, and friendlier to playtest than passwords)
+    and what login unlocks (display name + online-PvP identity for MVP;
+    cloud saves / leaderboards later).
+
+**2. In-game BUILD + REVEAL sync** (the big online-PvP piece) - see
+"Netcode plan" below.
+
+**3. "Play Online" button in the side picker** - the real entry point
+(currently gated behind `?online`). Do this LAST so the frozen HUD is
+never destabilized mid-build.
 
 ---
 
