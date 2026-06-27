@@ -97,9 +97,9 @@ private buildHitPlane(): THREE.Mesh {
     return plane
   }
 
-  private getCell(event: MouseEvent): { col: number; row: number; wx: number; wy: number } | null {
-    this.mouse.x =  (event.clientX / window.innerWidth)  * 2 - 1
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+  private getCell(clientX: number, clientY: number): { col: number; row: number; wx: number; wy: number } | null {
+    this.mouse.x =  (clientX / window.innerWidth)  * 2 - 1
+    this.mouse.y = -(clientY / window.innerHeight) * 2 + 1
     this.raycaster.setFromCamera(this.mouse, this.camera)
 
     const hits = this.raycaster.intersectObject(this.hitPlane)
@@ -129,7 +129,7 @@ private buildHitPlane(): THREE.Mesh {
 
   private onMouseMove = (e: MouseEvent) => {
     if (!this.selectedType) { this.hideGhost(); return }
-    const cell = this.getCell(e)
+    const cell = this.getCell(e.clientX, e.clientY)
     if (cell && !this.isCellBlocked(cell.col, cell.row)) {
       this.showGhost(cell.wx, cell.wy)
     } else {
@@ -140,9 +140,24 @@ private buildHitPlane(): THREE.Mesh {
   private onClick = (e: MouseEvent) => {
     if (this.skipNextClick) { this.skipNextClick = false; return }
     if (!this.selectedType) return
-    const cell = this.getCell(e)
+    const cell = this.getCell(e.clientX, e.clientY)
     if (!cell || this.isCellBlocked(cell.col, cell.row)) return
+    this.placeSelectedAt(cell)
+  }
 
+  // Touch entry point. Game's tap router calls this to place the selected
+  // structure at the tapped client coords (no MouseEvent, since synthetic
+  // mouse clicks are suppressed for board touches). Mirrors onClick.
+  placeAtClient(clientX: number, clientY: number) {
+    if (!this.selectedType) return
+    const cell = this.getCell(clientX, clientY)
+    if (!cell || this.isCellBlocked(cell.col, cell.row)) return
+    this.placeSelectedAt(cell)
+  }
+
+  // Shared placement body for both mouse (onClick) and touch (placeAtClient).
+  private placeSelectedAt(cell: { col: number; row: number; wx: number; wy: number }) {
+    if (!this.selectedType) return
     const cost = Config.STRUCTURES[this.selectedType].cost
     if (this.credits < cost) return
 

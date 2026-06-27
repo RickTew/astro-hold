@@ -18,6 +18,7 @@ import { AmmoBox, AmmoKitType, kitForUnit } from '../entities/AmmoBox'
 import { FireArcPreview } from '../entities/FireArcPreview'
 import { OpponentAI, OpponentSide } from '../ai/OpponentAI'
 import { recordBattle, BattleRecord, PerPieceCounters } from './BattleStats'
+import { openTouchActionMenu, closeTouchActionMenu, isTouchActionMenuOpen, TouchAction } from './TouchActionMenu'
 import { getRevealSpeed } from './RevealSpeed'
 import { aiCreditMultiplier } from './Difficulty'
 import { MiniControlCenter } from '../ui/MiniControlCenter'
@@ -245,6 +246,13 @@ export class Game {
   private lastPan = { x: 0, y: 0 }
   private zoomVelocity = 0
 
+  // Touch gesture state (mobile). 'tap' until a move threshold or a second
+  // finger upgrades it to 'pan'/'pinch'; only a clean 'tap' triggers an action.
+  private touchMode: 'idle' | 'tap' | 'pan' | 'pinch' = 'idle'
+  private touchStart = { x: 0, y: 0 }
+  private touchMoved = false
+  private lastPinchDist = 0
+
   constructor(private canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene()
     // Front scene (sprites + VFX) is transparent so the ground canvas behind
@@ -310,6 +318,20 @@ export class Game {
     window.addEventListener('mousemove', this.onMouseMove)
     window.addEventListener('mouseup', this.onMouseUp)
     window.addEventListener('contextmenu', this.onContextMenu)
+
+    // Touch input (mobile). A separate layer from the mouse handlers above:
+    // single tap places/refunds, one-finger drag pans, two-finger pinch zooms,
+    // and a tap on a placed piece opens the TouchActionMenu (Aim/Rotate/Remove)
+    // since there is no right-click on touch. Board touches preventDefault to
+    // suppress the synthetic mouse events, so the mouse handlers never
+    // double-fire; touches that start on #hud are left alone so HUD buttons get
+    // their native tap. touch-action:none stops the browser's own pan/zoom.
+    canvas.style.touchAction = 'none'
+    this.bgCanvas.style.touchAction = 'none'
+    window.addEventListener('touchstart', this.onTouchStart, { passive: false })
+    window.addEventListener('touchmove', this.onTouchMove, { passive: false })
+    window.addEventListener('touchend', this.onTouchEnd)
+    window.addEventListener('touchcancel', this.onTouchEnd)
   }
 
   async init() {
@@ -1946,20 +1968,24 @@ private enterBuildPhase() {
     return false
   }
 
+  // Slide the camera by a screen-space delta in CSS pixels. Shared by mouse
+  // drag-pan and one-finger touch pan.
+  private panCameraBy(dxPx: number, dyPx: number) {
+    const ww = this.camera.right - this.camera.left
+    const wh = this.camera.top - this.camera.bottom
+    const panY = (dyPx / window.innerHeight) * wh
+    // Camera local Y axis in world coords — has a small -Z component because of
+    // the slight tilt. Read it directly from the camera's world matrix so pan
+    // slides along the screen up direction instead of pitching the view.
+    const camUp = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
+    this.camera.position.x -= (dxPx / window.innerWidth) * ww
+    this.camera.position.y += panY * camUp.y
+    this.camera.position.z += panY * camUp.z
+  }
+
   private onMouseMove = (e: MouseEvent) => {
     if (this.isPanning) {
-      const dx = e.clientX - this.lastPan.x
-      const dy = e.clientY - this.lastPan.y
-      const ww = this.camera.right - this.camera.left
-      const wh = this.camera.top - this.camera.bottom
-      const panY = (dy / window.innerHeight) * wh
-      // Camera local Y axis in world coords — has a small -Z component because
-      // of the slight tilt. Read it directly from the camera's world matrix so
-      // pan slides along the screen up direction instead of pitching the view.
-      const camUp = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1)
-      this.camera.position.x -= (dx / window.innerWidth) * ww
-      this.camera.position.y += panY * camUp.y
-      this.camera.position.z += panY * camUp.z
+      this.panCameraBy(e.clientX - this.lastPan.x, e.clientY - this.lastPan.y)
       this.lastPan = { x: e.clientX, y: e.clientY }
     }
     if (this.placement) {
@@ -1992,6 +2018,181 @@ private enterBuildPhase() {
 
   private onContextMenu = (e: Event) => e.preventDefault()
 
+  // ── Touch input (mobile) ──────────────────────────────────────────────────
+  // Distance in CSS px between the first two active touches.
+  private touchDist(t: TouchList): number {
+    const dx = t[0].clientX - t[1].clientX
+    const dy = t[0].clientY - t[1].clientY
+    return Math.hypot(dx, dy)
+  }
+
+  // Immediate (non-damped) pinch zoom. ratio > 1 = fingers spreading = zoom in.
+  private applyPinchZoom(ratio: number) {
+    const factor = 1 / ratio
+    const newWidth = (this.camera.right - this.camera.left) * factor
+    if (newWidth < 200 || newWidth > 2800) return
+    this.camera.left   *= factor
+    this.camera.right  *= factor
+    this.camera.top    *= factor
+    this.camera.bottom *= factor
+    this.camera.updateProjectionMatrix()
+  }
+
+  private onTouchStart = (e: TouchEvent) => {
+    // Only the game canvas is a board gesture. Every interactive overlay (the
+    // HUD, the body-level Mini Control Center with BATTLE, the compass rose,
+    // and this menu) is some OTHER element, so those touches fall through to
+    // native handling and keep their tap/scroll. Board touches pass through the
+    // pointer-events:none HUD and land on the canvas.
+    if (e.target !== this.canvas && e.target !== this.bgCanvas) return
+    // A board tap while a piece menu is open just dismisses it (the menu's own
+    // outside-tap handler also closes it; this keeps touchMode from acting).
+    if (isTouchActionMenuOpen()) {
+      closeTouchActionMenu()
+      this.touchMode = 'idle'
+      e.preventDefault()
+      return
+    }
+    // Suppress the synthetic mouse events (mousedown/move/up/click) so the
+    // desktop mouse handlers never double-fire on touch.
+    e.preventDefault()
+
+    if (e.touches.length >= 2) {
+      this.touchMode = 'pinch'
+      this.touchMoved = true
+      this.lastPinchDist = this.touchDist(e.touches)
+      return
+    }
+    const t = e.touches[0]
+    this.touchMode = 'tap'
+    this.touchMoved = false
+    this.touchStart = { x: t.clientX, y: t.clientY }
+    this.lastPan = { x: t.clientX, y: t.clientY }
+  }
+
+  private onTouchMove = (e: TouchEvent) => {
+    if (this.touchMode === 'idle') return
+    e.preventDefault()
+
+    if (e.touches.length >= 2) {
+      // Either a pinch in progress, or a second finger just landed.
+      if (this.touchMode !== 'pinch') {
+        this.touchMode = 'pinch'
+        this.touchMoved = true
+      }
+      const d = this.touchDist(e.touches)
+      if (this.lastPinchDist > 0) this.applyPinchZoom(d / this.lastPinchDist)
+      this.lastPinchDist = d
+      return
+    }
+
+    const t = e.touches[0]
+    const dx = t.clientX - this.touchStart.x
+    const dy = t.clientY - this.touchStart.y
+    // Promote tap -> pan once the finger travels past a small threshold, so a
+    // slightly-imperfect tap still places instead of nudging the camera.
+    if (!this.touchMoved && Math.hypot(dx, dy) > 12) {
+      this.touchMoved = true
+      this.touchMode = 'pan'
+    }
+    if (this.touchMode === 'pan') {
+      this.panCameraBy(t.clientX - this.lastPan.x, t.clientY - this.lastPan.y)
+      this.lastPan = { x: t.clientX, y: t.clientY }
+    }
+  }
+
+  private onTouchEnd = (e: TouchEvent) => {
+    if (this.touchMode === 'tap' && !this.touchMoved && e.changedTouches.length) {
+      const t = e.changedTouches[0]
+      this.handleTap(t.clientX, t.clientY)
+    }
+    if (e.touches.length === 0) {
+      this.touchMode = 'idle'
+      this.lastPinchDist = 0
+    } else if (e.touches.length === 1) {
+      // Pinch released down to one finger: keep panning, never tap.
+      this.touchMode = 'pan'
+      this.touchMoved = true
+      this.lastPan = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  // Route a single tap to the same outcomes a desktop left/right-click would
+  // reach. With a piece selected: place (or refund a same-type piece) at the
+  // tapped cell. With nothing selected: tap a placed piece to open its action
+  // menu (Aim / Rotate / Remove).
+  private handleTap(clientX: number, clientY: number) {
+    const world = this.screenToWorld(clientX, clientY)
+    if (!world) return
+
+    const placementActive = !!this.placement || !!this.buildPhase?.getSelectedType()
+
+    if (this.phase === 'build' && placementActive) {
+      // Tap on an existing piece refunds it (mirrors desktop left-click).
+      if (this.tryRefund(world.x, world.y)) return
+      if (this.placement) {
+        const snap = this.snapToGridCell(
+          world.x, world.y, this.placement.zoneXMin, this.placement.zoneXMax,
+        )
+        if (!snap.valid) return
+        this.placement.ghost.position.set(snap.x, snap.y, 1)
+        this.placement.ghost.visible = true
+        if (this.placement.onPlace(snap.x, snap.y)) this.endPlacement()
+        return
+      }
+      this.buildPhase?.placeAtClient(clientX, clientY)
+      return
+    }
+
+    if (this.phase === 'build') {
+      // Nothing selected: tap a placed piece to open its touch action menu.
+      const struct = this.findStructureNear(world.x, world.y)
+      if (struct) { this.openPieceMenu(struct, world, clientX, clientY); return }
+      if (this.isOtherPieceNear(world.x, world.y)) {
+        this.openPieceMenu(null, world, clientX, clientY)
+        return
+      }
+      closeTouchActionMenu()
+      return
+    }
+
+    if (this.phase === 'planning') {
+      this.planningPhase?.onPrimaryClick(world.x, world.y, false)
+    }
+  }
+
+  // True if a non-structure placed piece (sphere / defender or attacker unit)
+  // sits within the refund hitbox of the tapped point.
+  private isOtherPieceNear(x: number, y: number): boolean {
+    const R_SQ = 35 * 35
+    const near = (o: { worldX: number; worldY: number }) => {
+      const dx = o.worldX - x, dy = o.worldY - y
+      return dx * dx + dy * dy < R_SQ
+    }
+    return this.spheres.some(near) || this.defenderUnits.some(near) || this.attackerUnits.some(near)
+  }
+
+  // Open the tap-piece action menu next to the tapped point. Structure actions
+  // mirror the desktop right-click: wall -> Rotate, other firing structure ->
+  // Aim (compass rose). Remove (refund) is offered for every piece.
+  private openPieceMenu(
+    struct: Structure | null,
+    world: THREE.Vector2,
+    clientX: number,
+    clientY: number,
+  ) {
+    const actions: TouchAction[] = []
+    if (struct) {
+      if (struct.type === 'wall') {
+        actions.push({ label: 'Rotate', onSelect: () => struct.rotateWall() })
+      } else {
+        actions.push({ label: 'Aim', onSelect: () => this.openCompassRose(struct) })
+      }
+    }
+    actions.push({ label: 'Remove', onSelect: () => { this.tryRefund(world.x, world.y) } })
+    openTouchActionMenu(clientX, clientY, actions)
+  }
+
   dispose() {
     cancelAnimationFrame(this.rafId)
     window.removeEventListener('resize', this.onResize)
@@ -2000,6 +2201,11 @@ private enterBuildPhase() {
     window.removeEventListener('mousemove', this.onMouseMove)
     window.removeEventListener('mouseup', this.onMouseUp)
     window.removeEventListener('contextmenu', this.onContextMenu)
+    window.removeEventListener('touchstart', this.onTouchStart)
+    window.removeEventListener('touchmove', this.onTouchMove)
+    window.removeEventListener('touchend', this.onTouchEnd)
+    window.removeEventListener('touchcancel', this.onTouchEnd)
+    closeTouchActionMenu()
     this.mcc?.dispose()
     stopMusic()
     this.buildPhase?.cleanup()
