@@ -347,6 +347,15 @@
       #hud-top > .hud-panel:nth-child(3),
       #hud-top-att > .hud-panel:nth-child(3) { display: block; }
     }
+    /* Phone: during the auto-chaining REVEAL the center panel becomes the combat
+       log, which on a small screen covers the board and is cramped to read. Hide
+       it during reveal so the battle is fully visible (the MCC PAUSE control
+       stays in the corner). #hud-top.phase-reveal is stamped by HUD.setPhase. */
+    @media (orientation: landscape) and (max-height: 540px),
+           (orientation: portrait)  and (max-width: 540px) {
+      #hud-top.phase-reveal .hud-panel.hud-center,
+      #hud-top-att.phase-reveal .hud-panel.hud-center { display: none; }
+    }
 
     /* ── Center panel content — command-deck centerpiece ──────────────────
        BUILD PHASE is the focal element. We frame it with flanking bracket

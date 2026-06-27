@@ -37,6 +37,11 @@ function ensureToggleListener() {
   if (unsubscribeMusicToggle) return
   unsubscribeMusicToggle = onMusicChange(on => {
     if (!currentEl) return
+    // iOS Safari IGNORES programmatic el.volume (it is hardware-controlled
+    // only), so a volume fade to 0 never actually silences music there. Use
+    // el.muted, which iOS honors, for the real on/off; keep the volume fade
+    // for a smooth ramp on platforms that respect it.
+    currentEl.muted = !on
     fadeTo(currentEl, on ? TARGET_VOLUME : 0, 250)
   })
 }
@@ -113,6 +118,9 @@ export function setMusicTrack(track: MusicTrack | null) {
   el.loop = true
   el.preload = 'auto'
   el.volume = 0
+  // iOS ignores volume, so gate the initial silence on .muted too: if music is
+  // toggled off when a track starts, it must not blast at full system volume.
+  el.muted = !isMusicOn()
   currentEl = el
   attemptPlay(el)
   // Dev overlay: report the music track now playing (no-op unless ?audiolog).

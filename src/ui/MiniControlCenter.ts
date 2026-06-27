@@ -145,7 +145,7 @@ export class MiniControlCenter {
       <div class="mcc-action-diamond"></div>
     `
     // Wire interactive parts.
-    this.host.querySelectorAll<HTMLElement>('.mcc-tick').forEach(el => {
+    this.host.querySelectorAll<HTMLElement>('.mcc-tick, .mcc-tick-hit').forEach(el => {
       el.addEventListener('click', () => {
         const id = el.dataset.id as RevealSpeed | undefined
         if (!id) return
@@ -231,7 +231,13 @@ export class MiniControlCenter {
     const ticks = SPEEDS.map(s => {
       const p = tickPos(s.angle, arcR)
       const active = s.id === this.speed
-      return `<circle class="mcc-tick ${s.tickClass}${active ? ' active' : ''}"
+      // The visible tick is r=6-7 in a 380 viewBox shown in a 240px box (and
+      // scaled smaller still on phones), i.e. ~2px on a phone - far too small
+      // to tap. A transparent r=34 hit-circle under it gives a real tap target
+      // without changing the look. The ticks are widely spaced on the arc, so
+      // these do not overlap each other or the inner toggle buttons.
+      return `<circle class="mcc-tick-hit" data-id="${s.id}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="34" fill="transparent" />
+              <circle class="mcc-tick ${s.tickClass}${active ? ' active' : ''}"
                       data-id="${s.id}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${active ? 7 : 6}" />`
     }).join('')
     const sideNotch = (cx: number, cy: number, w: number, h: number) =>
@@ -349,6 +355,8 @@ function injectStyles() {
       stroke-width: 1.5;
       transition: fill 160ms ease, stroke 160ms ease, filter 160ms ease, r 160ms ease;
     }
+    /* Invisible enlarged tap target behind each speed tick (see dialSvg). */
+    #mini-control-center .mcc-tick-hit { cursor: pointer; }
     #mini-control-center .mcc-tick.slow   { --tk: #ffb96b; }
     #mini-control-center .mcc-tick.normal { --tk: #6bd9ff; }
     #mini-control-center .mcc-tick.fast   { --tk: #ff6b7a; }
