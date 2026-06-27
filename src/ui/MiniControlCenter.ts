@@ -459,6 +459,18 @@ function injectStyles() {
       box-shadow: 0 0 6px rgba(107, 217, 255, 0.7);
       pointer-events: none;
     }
+
+    /* Mobile: the 240px dial covers most of a phone screen and blocks the
+       board. Shrink it uniformly toward the bottom-right corner so the inner
+       px-positioned pieces keep their proportions (no internal math to touch).
+       Matches narrow (portrait) OR short (landscape) viewports only - a normal
+       desktop window (wide AND tall) is unaffected. */
+    @media (max-width: 950px), (max-height: 520px) {
+      #mini-control-center { transform: scale(0.58); transform-origin: bottom right; }
+    }
+    @media (max-width: 430px) {
+      #mini-control-center { transform: scale(0.5); transform-origin: bottom right; }
+    }
   `
   document.head.appendChild(style)
 }

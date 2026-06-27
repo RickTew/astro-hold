@@ -305,6 +305,35 @@
       .hud-center .center-matchup { display: none; }
     }
 
+    /* ── Mobile phone tuning ──────────────────────────────────────────────
+       The breakpoints above are width-only and were tuned for narrow desktop
+       windows; phones add two new problems they don't cover: a SHORT landscape
+       viewport (the strip eats the little height there is) and a very narrow
+       portrait one (the center panel's 300px floor crushes the left shop).
+       These rules are scoped to phone-sized viewports, so a normal desktop
+       window (wide AND tall) never matches them and is untouched. Paired with
+       the MCC scale-down in MiniControlCenter.ts. */
+
+    /* Short viewport = landscape phone: shrink the strip so more board shows.
+       --hud-top-h also feeds the camera's HUD-aware Y offset, so the world
+       slides up to match automatically. */
+    @media (max-height: 540px) {
+      :root { --hud-top-h: 140px; }
+    }
+
+    /* Narrow viewport = portrait phone: drop the center floor from 300px to a
+       compact size so the left shop gets real width back instead of ~80px. */
+    @media (max-width: 500px) {
+      :root { --hud-top-h: 150px; }
+      #hud-top, #hud-top-att {
+        grid-template-columns: 1fr minmax(200px, 46%);
+        gap: 6px;
+        padding: 4px 8px 6px;
+      }
+      .tile-grid { gap: 5px; }
+      .hud-tile { padding: 2px 3px; }
+    }
+
     /* ── Center panel content — command-deck centerpiece ──────────────────
        BUILD PHASE is the focal element. We frame it with flanking bracket
        glyphs ([ ]), strong letter-spacing, and a glow. The CR chip and
