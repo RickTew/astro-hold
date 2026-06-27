@@ -23,7 +23,8 @@ import { getRevealSpeed } from './RevealSpeed'
 import { aiCreditMultiplier } from './Difficulty'
 import { MiniControlCenter } from '../ui/MiniControlCenter'
 import { setMusicTrack, stopMusic, MusicTrack } from '../audio/music'
-import { preloadAllSamples, playEventSfx } from '../audio/sfx'
+import { preloadAllSamples, playEventSfx, installAudioUnlock } from '../audio/sfx'
+import { installSamplesUnlock } from '../audio/samples'
 import type { CombatLogEntry } from './RevealPhase'
 
 type Phase = 'loading' | 'pick-side' | 'build' | 'planning' | 'reveal' | 'win' | 'lose'
@@ -335,9 +336,25 @@ export class Game {
     window.addEventListener('touchmove', this.onTouchMove, { passive: false })
     window.addEventListener('touchend', this.onTouchEnd)
     window.addEventListener('touchcancel', this.onTouchEnd)
+    // iOS Safari ignores user-scalable=no, so block its pinch-zoom gesture
+    // events directly. This stops the PAGE from zooming (only the game camera
+    // zooms, via the canvas pinch handler) and fixes tap->cell coordinates
+    // drifting when the visual viewport had been zoomed (units landing wrong).
+    document.addEventListener('gesturestart', this.preventGesture, { passive: false })
+    document.addEventListener('gesturechange', this.preventGesture, { passive: false })
+    document.addEventListener('gestureend', this.preventGesture, { passive: false })
   }
 
+  private preventGesture = (e: Event) => e.preventDefault()
+
   async init() {
+    // Resume both audio contexts (synth SFX + sampled SFX) on the first user
+    // gesture. Mobile browsers start them suspended, which is why placement and
+    // combat sounds were silent on a phone. Installed before anything else so
+    // the very first tap (picking a side) unlocks audio.
+    installAudioUnlock()
+    installSamplesUnlock()
+
     this.background = new Background(this.sceneBack)
     this.hud = new HUD()
     // Mini Control Center floats over the canvas at bottom-right.
@@ -2246,6 +2263,9 @@ private enterBuildPhase() {
     window.removeEventListener('touchmove', this.onTouchMove)
     window.removeEventListener('touchend', this.onTouchEnd)
     window.removeEventListener('touchcancel', this.onTouchEnd)
+    document.removeEventListener('gesturestart', this.preventGesture)
+    document.removeEventListener('gesturechange', this.preventGesture)
+    document.removeEventListener('gestureend', this.preventGesture)
     closeTouchActionMenu()
     this.mcc?.dispose()
     stopMusic()

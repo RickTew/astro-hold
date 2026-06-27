@@ -39,6 +39,27 @@ function getCtx(): AudioContext | null {
   return ctx
 }
 
+// This module owns its OWN AudioContext (see header), and it too starts
+// suspended on mobile until a user gesture. Resume it on the first gesture so
+// sampled SFX (placement, weapon hits, etc.) actually play on a phone.
+let unlockInstalled = false
+export function installSamplesUnlock() {
+  if (unlockInstalled) return
+  unlockInstalled = true
+  const unlock = () => {
+    const c = getCtx()
+    if (c && c.state !== 'running') void c.resume()
+    if (!c || c.state === 'running') {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchend', unlock)
+      window.removeEventListener('click', unlock)
+    }
+  }
+  window.addEventListener('pointerdown', unlock)
+  window.addEventListener('touchend', unlock)
+  window.addEventListener('click', unlock)
+}
+
 interface Pool {
   buffers: AudioBuffer[]
   names: string[]        // file name per buffer, same index — for the audio debug overlay
@@ -122,6 +143,9 @@ export function playPool(name: string): boolean {
   if (!isSfxOn()) return false
   if (shouldThrottle(`pool:${name}`, p.throttleMs)) return false
   const c = getCtx(); if (!c) return false
+  // Fallback unlock: if still suspended (no gesture captured yet), resume now -
+  // playPool is reached from a user action, so resuming here is permitted.
+  if (c.state === 'suspended') void c.resume()
 
   // Pick an index that isn't the same as the last one, when the pool has
   // 2+ buffers. Keeps consecutive triggers from sounding repetitive.

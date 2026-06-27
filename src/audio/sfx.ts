@@ -246,6 +246,28 @@ function getCtx(): AudioContext | null {
   return ctx
 }
 
+// iOS Safari and Chrome create the AudioContext SUSPENDED until a user gesture,
+// and a suspended context plays nothing (src.start is silent) - which is why
+// SFX were silent on mobile. Resume it on the first gesture. Idempotent; keeps
+// retrying on each gesture until the context reaches 'running', then unbinds.
+let unlockInstalled = false
+export function installAudioUnlock() {
+  if (unlockInstalled) return
+  unlockInstalled = true
+  const unlock = () => {
+    const c = getCtx()
+    if (c && c.state !== 'running') void c.resume()
+    if (!c || c.state === 'running') {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchend', unlock)
+      window.removeEventListener('click', unlock)
+    }
+  }
+  window.addEventListener('pointerdown', unlock)
+  window.addEventListener('touchend', unlock)
+  window.addEventListener('click', unlock)
+}
+
 // Cheap rate-limiter: prevents a single tick (which can spawn 10+ projectiles
 // at once) from stacking dozens of identical sounds and overdriving output.
 const lastFiredAt = new Map<string, number>()

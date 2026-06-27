@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- maximum-scale + user-scalable=no stop browser pinch-zoom on Chrome/Android
+       (so only the in-game camera zooms). iOS ignores these, so Game.ts also
+       blocks iOS 'gesturestart' pinch events directly. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>AstroHold</title>
   <!-- Reuse the Power Core sprite as the favicon; stops the /favicon.ico
        404 that showed in every console session. -->
