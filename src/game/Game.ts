@@ -351,9 +351,7 @@ export class Game {
     })
 
     // Block UI until all sprite atlases are ready so placements never show the
-    // swap from fallback geometry to final sprite. Sample SFX decode runs in
-    // parallel; we await it so the first weapon fire isn't silent. Sample
-    // failures are non-fatal (synth fallback kicks in per event).
+    // swap from fallback geometry to final sprite.
     await Promise.all([
       preloadSphereSprites(),
       preloadSpriteUnit('cannon', 'cannon'),
@@ -373,8 +371,17 @@ export class Game {
       preloadSpriteUnit('human_marine', 'human_marine'),
       preloadPixelPowerCore(),
       preloadStructureSprites(),
-      preloadAllSamples(),
     ])
+
+    // SFX sample decode is deliberately NOT awaited here. getCtx() builds the
+    // AudioContext, but before a user gesture the browser keeps it suspended and
+    // decodeAudioData on a suspended context is heavily throttled - decoding the
+    // SFX pool that way was blocking the loading screen for ~20s even though the
+    // sprites finished in a few seconds. Kick it off in the background instead;
+    // it does not need to be ready before the side picker, and synth fallback
+    // covers any sound that fires before its sample finishes decoding. The first
+    // user gesture (picking a side) resumes the context and the decode races on.
+    void preloadAllSamples().catch(() => {})
 
     // Pixel power core — 2x2 footprint stays at 100 world units of cell
     // occupancy, but the sprite renders at GRID_CELL * 3 (= 150) so it reads
