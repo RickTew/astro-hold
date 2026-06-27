@@ -265,8 +265,7 @@ export class Game {
     this.sceneBack.background = new THREE.Color(STAGE.theme.background)
     this.placementArcPreview = new FireArcPreview(this.scene)
 
-    const halfW = Config.WORLD_WIDTH_WU / 2
-    const halfH = halfW / (window.innerWidth / window.innerHeight)
+    const { halfW, halfH } = this.computeFrustum(window.innerWidth, window.innerHeight)
     this.camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 1500)
     // Top-down view — square grid cells project as on-screen squares. Sprites
     // are billboarded so they still face the camera with the same image.
@@ -1712,14 +1711,38 @@ private enterBuildPhase() {
     this.camera.position.y = Math.round(this.camera.position.y / step) * step
   }
 
+  // True when the viewport matches the CSS phone breakpoints (short landscape
+  // OR narrow portrait). matchMedia mirrors the index.html media queries so the
+  // camera and the HUD agree on what counts as a phone; desktop never matches.
+  private isPhoneViewport(): boolean {
+    return window.matchMedia(
+      '(orientation: landscape) and (max-height: 540px),' +
+      '(orientation: portrait) and (max-width: 540px)',
+    ).matches
+  }
+
+  // Orthographic half-extents. The horizontal view is always the full board
+  // width; height follows the aspect. On phones the short/narrow viewport would
+  // clip board rows, so zoom out a fixed, bounded amount to show more of the
+  // board by default (pinch-zoom refines from there). Desktop is unchanged.
+  private computeFrustum(w: number, h: number): { halfW: number; halfH: number } {
+    let halfW = Config.WORLD_WIDTH_WU / 2
+    let halfH = halfW / (w / h)
+    if (this.isPhoneViewport()) {
+      const f = 1.35
+      halfW *= f
+      halfH *= f
+    }
+    return { halfW, halfH }
+  }
+
   private onResize = () => {
     const { innerWidth: w, innerHeight: h } = window
     if (w === 0 || h === 0) return
     this.applyInternalCanvasSize()
     this.rendererBack.setPixelRatio(window.devicePixelRatio)
     this.rendererBack.setSize(w, h)
-    const halfW = Config.WORLD_WIDTH_WU / 2
-    const halfH = halfW / (w / h)
+    const { halfW, halfH } = this.computeFrustum(w, h)
     this.camera.left   = -halfW
     this.camera.right  =  halfW
     this.camera.top    =  halfH

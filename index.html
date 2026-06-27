@@ -334,6 +334,19 @@
         padding: 4px 8px 6px;
       }
     }
+    /* Landscape phone: ~844px wide fits all THREE panels, so un-hide the right
+       shop (Mine/Wall/Signal/Shield) that the <=860 rule hides, using a compact
+       3-column layout. Without this those four defensive pieces are unbuildable
+       on a phone. (Portrait stays 2-column; rotate to landscape for the full
+       shop.) */
+    @media (orientation: landscape) and (max-height: 540px) {
+      #hud-top, #hud-top-att {
+        grid-template-columns: 1fr minmax(210px, 30%) 1fr;
+        gap: 8px;
+      }
+      #hud-top > .hud-panel:nth-child(3),
+      #hud-top-att > .hud-panel:nth-child(3) { display: block; }
+    }
 
     /* ── Center panel content — command-deck centerpiece ──────────────────
        BUILD PHASE is the focal element. We frame it with flanking bracket
