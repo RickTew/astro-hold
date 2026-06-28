@@ -149,11 +149,14 @@ Register new animated art keys with `preloadSpriteUnit(key, folder)` in
 
 User decisions:
 - **Scope = decoupled, but shared defense.** Any faction can still play
-  either side, BUT defender STRUCTURES (and the Sphere) stay one shared
-  neutral installation look for every faction. Faction art ships only on
-  the SpriteUnits: all attacker units + the mobile defenders (Dog, Repair).
-  This removes the two most expensive columns (per-faction defender
-  structure redraws).
+  either side, BUT defender STRUCTURES (the towers: turret, cannon/Phaser,
+  bomber/Blastor, laser, sentry, signal, shield, mine, wall) stay one shared
+  neutral installation look for every faction. Faction art ships on the
+  mobile UNITS: all attacker units PLUS the mobile defenders Sphere, Dog,
+  Repair. (The Sphere is a UNIT, not a tower - it just needs the small
+  `SphereDefender` faction seam before its skin can drop in, same deferred
+  status as structures.) This removes the expensive per-faction defender
+  STRUCTURE redraws.
 - **Build now = the code seam only**, no new art, no visual change.
 
 Phase 1 shipped (this commit), all no-ops until art lands:

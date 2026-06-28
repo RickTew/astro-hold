@@ -56,14 +56,31 @@ installation flavor:
 | Signal (`signal`) | 64 | `EMP emitter, satellite dish on a pedestal` |
 | Shield (`defense`) | 64 | `dome shield generator projecting a translucent energy dome` |
 | Mine (`mine`) | 64 | `squat spiky round proximity mine, single blinking light` |
-| Sphere (`sphere`) | 108 | `armored rolling combat sphere/orb` |
-| Dog (`dog`) | 112 | `fast four-legged hunter hound` |
-| Repair (`repair`) | 108 | `utility repair drone with welding/tool arms` |
 
 ## HUMANS - missing DEFENDER towers/structures
 Prompt = Human structure preamble + the SAME subjects as the Cyborg table
-above (Tower, Phaser, Blastor, Laser, Sentry, Signal, Shield, Mine, Sphere,
-Dog, Repair), same canvas sizes.
+above (Tower, Phaser, Blastor, Laser, Sentry, Signal, Shield, Mine), same
+canvas sizes.
+
+## DEFENDER MOBILE UNITS - Sphere, Dog, Repair
+These are mobile UNITS, not towers/structures, so they belong in the
+faction-art bucket (like the attacker units), NOT the shared-structure bucket.
+They are machines/drones, so the per-faction flavor is a drone preamble, not a
+soldier or installation one. Robot versions already exist (baseline). Note:
+the Sphere is a `SphereDefender`, which still needs a small faction-art seam in
+code before its skin can drop in (deferred, same as structures - see
+docs/FACTION_ROSTERS.md); Dog and Repair are `SpriteUnit`s and are already
+faction-art-ready.
+
+Mobile-unit preambles:
+- Cyborgs: `bio-mechanical combat drone, chrome and organic cabling, glowing red accents`
+- Humans: `military-issue combat drone/robot, armored olive-drab plating, blue indicator lights`
+
+| Unit | Canvas | Subject to append |
+|---|---|---|
+| Sphere (`sphere`) | 108 | `armored rolling combat sphere/orb` |
+| Dog (`dog`) | 112 | `fast four-legged hunter drone` |
+| Repair (`repair`) | 108 | `utility repair drone with welding/tool arms` |
 
 ## HUMANS - missing ATTACKER units
 (Have: Warrior=cannon, Marine=doublegun, Medic=medic.) Prompt = Human soldier preamble + subject.
