@@ -3067,3 +3067,34 @@ attacker (grenadier, hulk, sniper, stalker, hacker), Robot attacker (8,
 optional), and faction Sphere/Dog/Repair. Per finished piece: art folder ->
 `FACTION_ART` entry -> `preloadSpriteUnit` -> (attacker) `factionAttackerGrids`
 grid -> update How to play. See `project_faction_rosters_build` memory.
+
+### Session 26 (cont., 2026-06-28 PM) - PixelLab art generation
+
+Drove PixelLab via Claude-in-Chrome (no PixelLab MCP exists; the browser route
+works on the user's logged-in session). Generated the Human attacker units
+(Sniper/Grenadier/Hulk/Stalker/Hacker, space-marine style), the Cyborg Tower,
+and both Power Cores (Cyborg + Human); the user generated several towers too.
+Art is in PixelLab, NOT yet downloaded into the repo.
+
+PixelLab recipe (in `docs/FACTION_ART_PROMPTS.md`): Create Character, Humanoid,
+**Pro**, **64px**, Low Top-Down. Lessons learned the hard way:
+- **Prompt voice matters.** Dry technical parts-lists produced "amalgamation"
+  blobs; the user's natural style works ("Space laser defense TOWER for the
+  CYBORG team with red hints and junk metal... looks hacked together from
+  various pieces of super tech"). Prompt sheet rewritten to that voice +
+  per-role accent COLORS (first Human batch was all navy/blue, too samey).
+- **Everything is SPACE.** First Sniper came out as a present-day soldier
+  ("olive-drab tactical"); humans must read as SPACE MARINES.
+- **You must actually select Pro** and verify it (button reads "Generate
+  Character" in Pro, "Generate v3 Character" in v3). My automation kept leaving
+  it on v3 -> v3 blobs.
+- **Pro locked at EOD**: "Pro mode requires a subscription" (quota hit). Resume
+  in Pro tomorrow.
+
+Process feedback (saved `feedback_execute_dont_re_confirm`): once the user has
+given clear instructions, execute the whole job; stop only for real blockers,
+not to re-confirm settings already decided.
+
+Next: finish remaining structure art (Signal/Shield/Mine/Wall + towers),
+download keepers into `/public/sprites/`, then WIRE everything in
+(FACTION_ART + structure-faction seam + SphereDefender seam + preload + shop).
