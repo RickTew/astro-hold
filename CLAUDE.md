@@ -137,6 +137,19 @@ tell of AI-generated writing; the user has flagged this multiple times.
 No Shift/Ctrl/Alt modifiers, no hotkeys. Every action must be reachable
 with the cursor alone (right-click, double-click, hover, HUD buttons).
 
+### Keep "How to play" in sync with the game
+Whenever we change, add, or adjust a game mechanic, piece, stat, or
+behavior, update the in-game **How to play** panel in the SAME change so
+it never drifts from the live build. The panel lives in the `.sp-howto`
+`<details>` inside `#side-picker` in `src/ui/HUD.ts` (editing its prose is
+content, not a HUD-style change, so it is allowed under the HUD hard lock
+as long as you only touch text in the existing `<h4>`/`<p>` pattern).
+The panel opens with an **"Updates and fixes"** changelog section (newest
+first) - add a dated one-line entry there for every player-facing change
+(e.g. the Sniper standoff fix) so the player can follow along. Also keep
+the relevant body section (basics, combat rules, side specials, win
+conditions, factions) accurate for the same change.
+
 ### Deployment ritual is `git push`, full stop
 The Vercel project has Git integration enabled. Every push to `main`
 auto-deploys to production. **Do NOT also run `vercel --prod`** —

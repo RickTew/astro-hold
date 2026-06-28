@@ -354,10 +354,18 @@ export class HUD {
           <details class="sp-howto">
             <summary>How to play</summary>
             <div class="sp-howto-body">
+              <h4>Updates and fixes</h4>
+              <p>Recent changes, newest first, so you can follow along:</p>
+              <p><strong>2026-06-28:</strong> New games now start on the SLOW reveal speed so first-time players are not rushed. Change it any time on the speed dial.</p>
+              <p><strong>2026-06-28:</strong> Cyborg Sniper now holds its distance. It used to creep one cell closer after every shot and end up well inside its own range. It now relocates sideways at long range between shots instead.</p>
+              <p><strong>2026-06-28:</strong> Phaser beam now lines up with the barrel instead of sitting slightly high.</p>
+              <p><strong>2026-06-28:</strong> Clarified how factions work (see SIDES and FACTIONS below): faction is a visual identity for now, and the Defender always commands the shared structure roster.</p>
+
               <h4>The basics</h4>
               <p><strong>BUILD:</strong> Spend credits to place pieces inside your zone. Click a tile to pick a piece, then click a cell. Right-click a placed piece to refund it (only for the piece type currently selected). Right-click a placed tower to open the compass rose and pay 30 credits per extra firing direction.</p>
               <p><strong>BATTLE:</strong> Click BATTLE to start the reveal. Both sides act in initiative order (faster pieces go first). Reveals auto-chain turn after turn until the Power Core falls, every cyborg is dead, or no cyborg can still damage the core (defender attrition win).</p>
-              <p><strong>SIDES:</strong> Two cards, DEFENDER and ATTACKER. Click "Change factions" to cycle which factions (Robots, Cyborgs, Humans) play each role, then click the card you want. The AI plays the faction on the other card. Humans field their own roster (Warrior, Medic).</p>
+              <p><strong>SIDES and FACTIONS:</strong> Pick DEFENDER (hold the line, protect the Power Core) or ATTACKER (break through to the core). Click "Change factions" to cycle which faction (Robots, Cyborgs, Humans) mans each card, then click the side you want. The AI takes the faction on the other card.</p>
+              <p><strong>Heads up on factions:</strong> faction is currently a visual identity (look, music, name), not a separate army. Both DEFENDER cards command the SAME shared structure roster (towers, Sphere, Dog, Repair, Wall, and so on), so picking Humans or Cyborgs as Defender still gives you that shared tech. The one faction with its own units today is the HUMAN ATTACKER (Warrior, Marine, Medic). Faction-specific defender rosters are a planned future build.</p>
               <p><strong>DIFFICULTY:</strong> EASY shrinks the AI army by 25 percent. HARD grows it by 25 percent. Your credits are unchanged either way.</p>
 
               <h4>Combat rules</h4>
@@ -383,7 +391,7 @@ export class HUD {
               <h4>Cyborg side specials</h4>
               <p><strong>Hulk:</strong> Heaviest unit. Unlimited fists at melee. Special POWER SLAM hits a 3-cell wedge for 40 damage (3 slams per game). When killed Hulk explodes in a death blast that damages all 8 adjacent cells, allies included.</p>
               <p><strong>Stalker:</strong> Cloaked melee bruiser. Spawns invisible. Defender targeting skips cloaked units. Cloak drops permanently on the first damage-dealing action. Melee-only, no ammo cost ever.</p>
-              <p><strong>Sniper:</strong> Single precision shot. CROUCH-AND-SHOOT rule: cannot crouch and shoot the same turn. First turn in range plays the aim pose, next turn fires. Movement breaks the crouch.</p>
+              <p><strong>Sniper:</strong> Single precision shot. CROUCH-AND-SHOOT rule: cannot crouch and shoot the same turn. First turn in range plays the aim pose, next turn fires. Movement breaks the crouch. After firing it relocates to a fresh spot at long range and settles again. It holds its distance and will not creep closer.</p>
               <p><strong>Grenadier:</strong> Throws timed grenades. Must lob to the SIDE or BEHIND the nearest enemy, never in front. Wears explosive shielding so AoE damage is halved on Grenadiers themselves.</p>
               <p><strong>Bomber:</strong> Lobs proximity mines like the robot Blastor. Strict no-self-AoE rule.</p>
               <p><strong>Medic:</strong> Heals allies via three modes (med-pack throw, deployable medic-pad, weld-tether) sharing a 5-charge pool.</p>
